@@ -1,0 +1,10 @@
+# Everything the compiler produces lives in build — that is set in Directory.Build.props.
+# icon.ico is there too: the icon is built from icon.png by build.ps1 and is not a source —
+# one picture kept in two forms eventually means an exe with the old icon.
+build/
+
+# Files the app itself creates while it runs.
+config.conf
+SystemSpinnerX64.log
+SystemSpinnerX64.log.old
+sensors-found.txt

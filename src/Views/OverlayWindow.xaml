@@ -1,0 +1,117 @@
+<Window x:Class="SystemSpinnerX64.Views.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+        Title="System Spinner x64"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight"
+        Focusable="False"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType">
+
+    <Window.Resources>
+        <!-- The values below only matter if the markup renders before the code does: the font,
+             colours, shadow and sizes come from config.conf through ApplyAppearance(). That is why
+             the references are DynamicResource — StaticResource would bind once, at load. -->
+        <FontFamily x:Key="Face">Impact, Haettenschweiler, Arial Narrow, Arial</FontFamily>
+
+        <sys:Double x:Key="SmallFontSize">10</sys:Double>
+        <Thickness x:Key="UnitMargin">2,0,0,1</Thickness>
+
+        <!-- One colour throughout, differing only in opacity: values denser, labels lighter -->
+        <SolidColorBrush x:Key="Value" Color="#FFFFFF" Opacity="0.92" />
+        <SolidColorBrush x:Key="Unit"  Color="#FFFFFF" Opacity="0.55" />
+        <SolidColorBrush x:Key="Tag"   Color="#FFFFFF" Opacity="0.70" />
+        <SolidColorBrush x:Key="Warn"  Color="#FF6A52" Opacity="0.95" />
+
+        <!-- Right-aligned in a fixed-width column: Impact is not monospaced, and without this
+             "1696" and "562" would drift against each other. -->
+        <Style x:Key="MetricValue" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource Face}" />
+            <Setter Property="Foreground" Value="{DynamicResource Value}" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="MinWidth" Value="{Binding ValueWidth}" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Warning}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- The bottom margin is computed by ApplyFontSize(): different sizes do not share a baseline. -->
+        <Style x:Key="MetricUnit" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource Face}" />
+            <Setter Property="FontSize" Value="{DynamicResource SmallFontSize}" />
+            <Setter Property="Foreground" Value="{DynamicResource Unit}" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Setter Property="Margin" Value="{DynamicResource UnitMargin}" />
+        </Style>
+    </Window.Resources>
+
+    <!-- The panel is always click-through; the controls live in the tray. No background by
+         default — over a game only the digits and their shadow show; ApplyAppearance() adds one. -->
+    <Border x:Name="Shell" CornerRadius="5" Padding="6,4,8,5">
+        <StackPanel x:Name="Readout">
+            <ItemsControl ItemsSource="{Binding Groups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="0,1,0,1">
+
+                            <TextBlock Text="{Binding Title}"
+                                       FontFamily="{DynamicResource Face}"
+                                       Foreground="{DynamicResource Tag}"
+                                       Margin="0,0,7,0"
+                                       VerticalAlignment="Bottom" />
+
+                            <ItemsControl ItemsSource="{Binding Metrics}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!-- The gap to the next column is already part of
+                                             CellWidth; no Margin belongs here. -->
+                                        <StackPanel Orientation="Horizontal"
+                                                    MinWidth="{Binding CellWidth}">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Visible}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <TextBlock Text="{Binding Value}" Style="{StaticResource MetricValue}" />
+                                            <TextBlock Text="{Binding Unit}"  Style="{StaticResource MetricUnit}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock x:Name="NoticeText"
+                       Text="{Binding Notice}"
+                       Visibility="Collapsed"
+                       FontFamily="{DynamicResource Face}"
+                       FontSize="{DynamicResource SmallFontSize}"
+                       Foreground="{DynamicResource Unit}"
+                       Margin="9,3,0,0"
+                       MaxWidth="320"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+    </Border>
+</Window>

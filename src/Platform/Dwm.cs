@@ -1,0 +1,60 @@
+using System;
+using System.Runtime.InteropServices;
+
+namespace SystemSpinnerX64.Platform;
+
+/// <summary>
+/// The blurred backdrop of Windows 11. This is the local answer to the Liquid Glass of the macOS
+/// version: the window has neither a background of its own nor an image — whatever is behind it
+/// is blurred, and the volume panel stays readable on a light desktop and on a dark one.
+///
+/// Every call is optional: unsupported means the window keeps the plain translucent background
+/// from its markup. The app does not fall over for the sake of looks.
+/// </summary>
+internal static class Dwm
+{
+    private const int DwmwaUseImmersiveDarkMode = 20;
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwaSystemBackdropType = 38;
+
+    /// <summary>DWMSBT_TRANSIENTWINDOW — acrylic, the backdrop of popup windows.</summary>
+    private const int BackdropAcrylic = 3;
+
+    /// <summary>DWMWCP_ROUND — the large rounding the system uses for popup menus.</summary>
+    private const int CornerRound = 2;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    /// <summary>
+    /// Asks the system for an acrylic backdrop, rounded corners and the dark or light set of
+    /// system colours. Returns false when the backdrop could not be had.
+    /// </summary>
+    public static bool ApplyAcrylic(IntPtr hwnd, bool dark)
+    {
+        if (hwnd == IntPtr.Zero) return false;
+
+        int darkMode = dark ? 1 : 0;
+        Set(hwnd, DwmwaUseImmersiveDarkMode, ref darkMode);
+
+        int corner = CornerRound;
+        Set(hwnd, DwmwaWindowCornerPreference, ref corner);
+
+        int backdrop = BackdropAcrylic;
+        return Set(hwnd, DwmwaSystemBackdropType, ref backdrop);
+    }
+
+    private static bool Set(IntPtr hwnd, int attribute, ref int value)
+    {
+        try
+        {
+            return DwmSetWindowAttribute(hwnd, attribute, ref value, sizeof(int)) == 0;
+        }
+        catch (Exception ex)
+        {
+            // dwmapi ships with every Windows 11, but an older build may lack the attribute.
+            System.Diagnostics.Debug.WriteLine($"DWM attribute {attribute} was refused: {ex.Message}");
+            return false;
+        }
+    }
+}

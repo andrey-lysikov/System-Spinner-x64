@@ -1,0 +1,117 @@
+<Window x:Class="SystemSpinnerX64.Views.StatsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:SystemSpinnerX64.Views"
+        Title="System Spinner x64"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        ResizeMode="NoResize"
+        SizeToContent="Height"
+        Width="230"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+    <Window.Resources>
+        <!-- The row headline: "CPU Usage 9 %". This is what the window is opened for; everything
+             else is a note about it. -->
+        <Style x:Key="RowTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+
+        <!-- The note under the bar: clock, power, fan speeds, amount. Centred and at half strength
+             so it reads as a caption rather than one more reading. -->
+        <Style x:Key="RowNote" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+
+        <Style x:Key="Bar" TargetType="views:SegmentedLevelControl">
+            <Setter Property="Height" Value="15" />
+            <Setter Property="SegmentCount" Value="20" />
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="Shell" CornerRadius="12" BorderThickness="1" Padding="15,13,15,13">
+        <StackPanel x:Name="Body">
+
+            <!-- Processor load. The chart icon on the left opens the second window, with the
+                 history and the process list; neither lives in this window on purpose — it is
+                 opened for a second, to see the numbers. -->
+            <StackPanel x:Name="CpuHeader" Orientation="Horizontal" Cursor="Hand"
+                        Background="Transparent" MouseLeftButtonUp="OnCpuChartClicked">
+                <Path x:Name="CpuChartGlyph"
+                      Data="M0,9 L4,5 L7,7 L11,1 L14,4 L18,0"
+                      StrokeThickness="1.5"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                      Width="18" Height="10"
+                      Margin="0,0,7,4"
+                      VerticalAlignment="Center"
+                      Stretch="None" />
+                <TextBlock x:Name="CpuTitle" Style="{StaticResource RowTitle}" />
+            </StackPanel>
+            <views:SegmentedLevelControl x:Name="CpuLevel" Style="{StaticResource Bar}" />
+            <TextBlock x:Name="CpuNote" Style="{StaticResource RowNote}" />
+
+            <!-- Fan speeds on a line of their own and with tags: there can be three or four, and
+                 without a tag there is no telling the cooler from the pump. -->
+            <TextBlock x:Name="FanNote" Style="{StaticResource RowNote}" Margin="0,3,0,0" />
+
+            <!-- Graphics card -->
+            <TextBlock x:Name="GpuTitle" Style="{StaticResource RowTitle}" Margin="0,12,0,4" />
+            <views:SegmentedLevelControl x:Name="GpuLevel" Style="{StaticResource Bar}" />
+            <TextBlock x:Name="GpuNote" Style="{StaticResource RowNote}" />
+
+            <Separator x:Name="Line1" Margin="0,12,0,12" />
+
+            <!-- Temperatures. Rows with nothing to show are hidden entirely: a dash next to
+                 "GPU Temp" would read as a silent sensor. -->
+            <TextBlock x:Name="CpuTempTitle" Style="{StaticResource RowTitle}" />
+            <views:SegmentedLevelControl x:Name="CpuTempLevel" Style="{StaticResource Bar}" />
+
+            <TextBlock x:Name="GpuTempTitle" Style="{StaticResource RowTitle}" Margin="0,12,0,4" />
+            <views:SegmentedLevelControl x:Name="GpuTempLevel" Style="{StaticResource Bar}" />
+
+            <Separator x:Name="Line2" Margin="0,12,0,12" />
+
+            <!-- Memory: its own bar for RAM and its own for video memory, a pair like the rest. -->
+            <StackPanel x:Name="MemHeader" Orientation="Horizontal" Cursor="Hand"
+                        Background="Transparent" MouseLeftButtonUp="OnMemChartClicked">
+                <Path x:Name="MemChartGlyph"
+                      Data="M0,9 L4,5 L7,7 L11,1 L14,4 L18,0"
+                      StrokeThickness="1.5"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                      Width="18" Height="10"
+                      Margin="0,0,7,4"
+                      VerticalAlignment="Center"
+                      Stretch="None" />
+                <TextBlock x:Name="MemTitle" Style="{StaticResource RowTitle}" />
+            </StackPanel>
+            <views:SegmentedLevelControl x:Name="MemLevel" Style="{StaticResource Bar}" />
+
+            <TextBlock x:Name="GpuMemTitle" Style="{StaticResource RowTitle}" Margin="0,12,0,4" />
+            <views:SegmentedLevelControl x:Name="GpuMemLevel" Style="{StaticResource Bar}" />
+
+            <!-- The page file. Always shown, at zero until the first reading arrives: the figure
+                 comes a poll later than the rest, and a row appearing then would make the window
+                 jump as it opens. -->
+            <TextBlock x:Name="SwapTitle" Style="{StaticResource RowTitle}" Margin="0,12,0,4" />
+            <views:SegmentedLevelControl x:Name="SwapLevel" Style="{StaticResource Bar}" />
+
+            <Separator x:Name="Line3" Margin="0,12,0,10" />
+
+            <!-- Network: address and rates, as in the macOS version — centred, one pair of lines. -->
+            <TextBlock x:Name="NetAddress" Style="{StaticResource RowNote}" Margin="0,0,0,0" />
+            <TextBlock x:Name="NetSpeed" Style="{StaticResource RowNote}" Margin="0,2,0,0" />
+        </StackPanel>
+    </Border>
+</Window>

@@ -1,0 +1,98 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>SystemSpinnerX64</AssemblyName>
+    <RootNamespace>SystemSpinnerX64</RootNamespace>
+  </PropertyGroup>
+
+  <!-- All of this shows in the exe properties and in the Explorer details pane -->
+  <PropertyGroup>
+    <Product>System Spinner x64</Product>
+    <Company>lysnet.ru</Company>
+    <Authors>Andrey.Lysikov and Claude</Authors>
+    <Copyright>© 2026 Andrey Lysikov, lysnet.ru. Apache 2.0 licence.</Copyright>
+    <Description>System monitoring: an overlay over games and an animated tray icon outside them.</Description>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The exe icon. The .ico is not a source but a build result: build.ps1 makes it from the
+         single icon.png and puts it in build, next to the exe. Keeping the same picture in src
+         as well would eventually mean an exe with the old icon. -->
+    <IconFile>$(MSBuildThisFileDirectory)..\build\icon.ico</IconFile>
+    <ApplicationIcon>$(IconFile)</ApplicationIcon>
+    <!-- The minimum of Windows 11 (build 22000) is checked at run time, in PlatformGuard.cs.
+         It cannot be declared through SupportedOSPlatformVersion: that property needs a versioned
+         TFM (net10.0-windows10.0.22000.0), which drags in the Windows SDK projections and adds
+         tens of megabytes to the exe. -->
+  </PropertyGroup>
+
+  <!-- One exe, but without .NET inside: the machine needs .NET Desktop Runtime 10 or newer.
+       When it is missing, the window with the download link is shown by the apphost itself —
+       before the first line of C#, so this cannot be checked in code. -->
+  <PropertyGroup>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Built for net10.0 (LTS until November 2028); runs on 11 and newer too -->
+    <RollForward>LatestMajor</RollForward>
+    <!-- WPF must not be trimmed: the app would fall over at startup -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <!-- So that no .pdb appears next to the exe -->
+    <DebugType>none</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- WFO0003: the WinForms analyser suggests setting DPI through ApplicationHighDpiMode instead
+         of the manifest. That is wrong advice here: the app is WPF, WinForms is only there for the
+         tray icon, and WPF reads its DPI awareness from the manifest before the first line of code. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- CPU/GPU/memory/fan sensors. The version matters: support for Intel Arrow Lake and
+         Lunar Lake only arrived in 0.9.4, so it must not be lowered. -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <!-- The ETW session for counting frames: replaces an external PresentMon.exe -->
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.5" />
+    <!-- WMI: brightness of the built-in laptop panel. DDC/CI does not reach it and Windows offers
+         no other path — this is the same call the notification-centre slider uses. The package
+         already comes with LibreHardwareMonitor, but it is used directly here, so it is declared
+         explicitly; the version has to match the one the library pulls. -->
+    <PackageReference Include="System.Management" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The same icon inside the assembly: NotifyIcon reads it from the resources, and it must
+         not sit next to the exe as a separate file — one exe was promised. -->
+    <EmbeddedResource Include="$(IconFile)" LogicalName="SystemSpinnerX64.icon.ico" />
+
+    <!-- Tray animation frames: one folder per set directly in Assets, frame numbers from zero
+         inside. The resource name is built from the path ("Spinners/Blue Ball/3.png"), with the
+         separator normalised to a forward slash: MSBuild gives %(RecursiveDir) with a backslash,
+         which would read as an escape sequence in the first regular expression that saw it. -->
+    <EmbeddedResource Include="Assets\*\*.png"
+                      LogicalName="Spinners/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests check internal classes: making them public just to be tested would mean
+         shaping the program around the way it is verified. -->
+    <InternalsVisibleTo Include="SystemSpinnerX64.Tests" />
+  </ItemGroup>
+
+  <!-- No icon means the build was started around build.ps1. Better to explain that here than
+       to let the compiler complain about a missing resource file. -->
+  <Target Name="CheckIcon" BeforeTargets="PrepareForBuild" Condition="!Exists('$(IconFile)')">
+    <Error Text="$(IconFile) not found. The icon is built from icon.png by build.ps1 — run it: powershell -ExecutionPolicy Bypass -File .\build.ps1" />
+  </Target>
+
+</Project>

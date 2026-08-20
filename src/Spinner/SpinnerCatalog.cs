@@ -1,0 +1,95 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
+using System.Text.RegularExpressions;
+
+namespace SystemSpinnerX64.Spinner;
+
+/// <summary>
+/// The frame sets baked into the assembly. Frames are resources named like
+/// <c>Spinners/Blue Ball/3.png</c> — one folder per set — so both the list of sets and the frame
+/// count come from the resources rather than a hand-written table: a table that drifted from the
+/// assembly would mean an empty tray icon.
+///
+/// Only what the pictures cannot tell is written by hand: whether a set survives being repainted
+/// as a silhouette, and how much it needs slowing down.
+/// </summary>
+public static class SpinnerCatalog
+{
+    public const string ResourcePrefix = "Spinners/";
+
+    /// <summary>The set used when the config names an unknown one.</summary>
+    public const string FallbackName = "Loader";
+
+    // Set and frame number: "Blue Ball/12.png" gives "Blue Ball" and 12.
+    private static readonly Regex FrameName = new(
+        @"^(?<style>[^/]+)/(?<index>\d+)\.png$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    // Sets a silhouette does not suit: the drawing lives by its own colours.
+    private static readonly HashSet<string> NoEffect = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Cirrcles", "Color Well", "Dots", "Grey Loader", "Loader", "Pie",
+        "Rainbow Pie", "Rotation Color Well"
+    };
+
+    // Sets to run at half speed: too few frames, so the cycle is otherwise too short.
+    private static readonly HashSet<string> HalfSpeed = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Cat", "Pikachu", "Rotation Color Well"
+    };
+
+    public static IReadOnlyList<SpinnerStyle> All { get; } = Discover();
+
+    public static SpinnerStyle Fallback { get; } =
+        All.FirstOrDefault(s => s.Name.Equals(FallbackName, StringComparison.OrdinalIgnoreCase))
+        ?? All.FirstOrDefault()
+        ?? new SpinnerStyle(FallbackName, 0, false, 1);
+
+    public static SpinnerStyle? Find(string name) =>
+        All.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The set by name; an unknown name is no reason to end up with no icon.</summary>
+    public static SpinnerStyle Validate(string name) => Find(name) ?? Fallback;
+
+    /// <summary>Resource name of one frame.</summary>
+    public static string ResourceName(SpinnerStyle style, int index) =>
+        $"{ResourcePrefix}{style.Name}/{index.ToString(CultureInfo.InvariantCulture)}.png";
+
+    private static IReadOnlyList<SpinnerStyle> Discover() =>
+        Group(typeof(SpinnerCatalog).Assembly.GetManifestResourceNames());
+
+    /// <summary>
+    /// Parses resource names into the list of sets. Separated from reading the assembly so it can
+    /// be tested: there is nothing to build an assembly with the right resources from in a test.
+    /// </summary>
+    internal static IReadOnlyList<SpinnerStyle> Group(IEnumerable<string> resourceNames)
+    {
+        var frames = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (string resource in resourceNames)
+        {
+            if (!resource.StartsWith(ResourcePrefix, StringComparison.Ordinal)) continue;
+
+            Match m = FrameName.Match(resource[ResourcePrefix.Length..]);
+            if (!m.Success) continue;
+
+            string style = m.Groups["style"].Value;
+
+            // Not the frame count but the highest number plus one: a set runs from zero upwards,
+            // and a gap in the middle must cut the animation short rather than shift it.
+            int index = int.Parse(m.Groups["index"].Value, CultureInfo.InvariantCulture);
+            frames[style] = Math.Max(frames.TryGetValue(style, out int seen) ? seen : 0, index + 1);
+        }
+
+        return frames.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
+                     .Select(p => new SpinnerStyle(
+                         p.Key,
+                         p.Value,
+                         SupportsEffect: !NoEffect.Contains(p.Key),
+                         SpeedCoefficient: HalfSpeed.Contains(p.Key) ? 2 : 1))
+                     .ToList();
+    }
+}
