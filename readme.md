@@ -27,6 +27,14 @@ While a full-screen application is in front of you, this is an overlay. The mome
 - In fullscreen mode with a customisable game overlay
 - Localization (English, Arabic, Chinese, French, German, Italian, Japanese, Russian)
 
+## Screenshots
+
+<p align="top">
+  <img src="pictures/main_window.jpg" height="380">
+  <img src="pictures/spin_menu.jpg" height="380">
+  <img src="pictures/main_detail_window.jpg" height="380">
+</p>
+
 ## Tech
 
 Written on c#, Windows 11 and newer, .NET Desktop Runtime 10 or newer, **PawnIO** — [pawnio.eu](https://pawnio.eu)
