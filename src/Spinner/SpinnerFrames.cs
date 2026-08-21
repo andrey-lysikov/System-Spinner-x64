@@ -8,19 +8,11 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Spinner;
 
-/// <summary>
-/// Prepares a set of frames for the tray: pulls the png out of the assembly resources, fits it
-/// into the icon square and repaints it as a silhouette when asked.
-///
-/// Done once per set change rather than per frame: the icon changes up to a hundred times a
-/// second, and scaling a picture inside that loop would be its most expensive part.
-/// </summary>
+// Prepares a set of frames for the tray: pulls the png out of the assembly resources, fits it into
+// the icon square and repaints it as a silhouette when asked.
 internal static class SpinnerFrames
 {
-    /// <summary>
-    /// Frames fitted into a <paramref name="size"/> square. An empty list means the resources
-    /// were not found, and the caller shows the plain app icon instead.
-    /// </summary>
+    // Frames fitted into a size square.
     public static List<Bitmap> Load(SpinnerStyle style, SpinnerEffect effect, int size, bool lightTheme)
     {
         var sources = new List<Bitmap>(style.FrameCount);
@@ -66,11 +58,7 @@ internal static class SpinnerFrames
         }
     }
 
-    /// <summary>
-    /// The part of each frame that is actually drawn on. The sets come exported with generous
-    /// transparent margins, and scaling those along with the drawing is what leaves the tray icon
-    /// looking half empty. A frame with nothing on it keeps its full size.
-    /// </summary>
+    // The part of each frame that is actually drawn on.
     internal static Rectangle[] Content(IReadOnlyList<Bitmap> frames)
     {
         var drawn = new Rectangle[frames.Count];
@@ -82,15 +70,8 @@ internal static class SpinnerFrames
         return drawn;
     }
 
-    /// <summary>
-    /// One scale for the whole set: the widest frame and the tallest one together decide it, and
-    /// every frame is then reduced by that same amount.
-    ///
-    /// Shared rather than per frame, because a frame is drawn where its own outline is: a running
-    /// cat shifts across its frame, and scaling each one to fill the icon would leave the cat
-    /// growing and shrinking as it runs. Shared rather than one rectangle for the set, because
-    /// that rectangle would span the whole run and the cat inside it would come out tiny.
-    /// </summary>
+    // One scale for the whole set: the widest frame and the tallest one together decide it, and
+    // every frame is then reduced by that same amount.
     internal static double Scale(IReadOnlyList<Rectangle> drawn, int size)
     {
         int width = 0, height = 0;
@@ -108,7 +89,7 @@ internal static class SpinnerFrames
         return Math.Min((double)size / width, (double)size / height);
     }
 
-    /// <summary>The drawn-on part of one frame, or null when it is empty.</summary>
+    // The drawn-on part of one frame, or null when it is empty.
     private static Rectangle? Bounds(Bitmap frame)
     {
         int left = frame.Width, top = frame.Height, right = 0, bottom = 0;
@@ -146,7 +127,7 @@ internal static class SpinnerFrames
         return right > left && bottom > top ? Rectangle.FromLTRB(left, top, right, bottom) : null;
     }
 
-    /// <summary>Which silhouette colour matches the effect and the current taskbar theme.</summary>
+    // Which silhouette colour matches the effect and the current taskbar theme.
     private static Color? Silhouette(SpinnerEffect effect, bool lightTheme) => effect switch
     {
         SpinnerEffect.White => Color.White,

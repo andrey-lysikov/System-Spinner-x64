@@ -3,17 +3,13 @@ using Microsoft.Win32;
 
 namespace SystemSpinnerX64.Platform;
 
-/// <summary>
-/// Whether the taskbar is light or dark. The tray icon needs this: an automatic silhouette is
-/// drawn in whichever colour shows up on the taskbar, and the taskbar can be light while the
-/// windows are dark — Windows has two separate switches for that.
-/// </summary>
+// Whether the taskbar is light or dark.
 internal static class Theme
 {
     private const string PersonalizeKey =
         @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
-    /// <summary>Whether the taskbar is light. Unknown counts as dark: that is the default.</summary>
+    // Whether the taskbar is light. Unknown counts as dark: that is the default.
     public static bool IsTaskbarLight()
     {
         try
@@ -30,7 +26,7 @@ internal static class Theme
         }
     }
 
-    /// <summary>Whether windows are dark — the switch the custom OSD is painted by.</summary>
+    // Whether windows are dark — the switch the custom OSD is painted by.
     public static bool AreWindowsDark()
     {
         try

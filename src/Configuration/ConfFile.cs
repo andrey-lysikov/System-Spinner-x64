@@ -6,12 +6,7 @@ using System.Text;
 
 namespace SystemSpinnerX64.Configuration;
 
-/// <summary>
-/// Sections in square brackets, "key = value" lines, comments from a hash. Chosen over JSON
-/// because the file is edited by hand: the explanation has to sit next to the parameter, and
-/// a forgotten comma must break nothing. A hash starts a comment only at the beginning of a
-/// line, or "TextColor = #FFFFFF" could not be written.
-/// </summary>
+// Sections in square brackets, "key = value" lines, comments from a hash.
 internal sealed class ConfFile
 {
     private readonly Dictionary<string, Dictionary<string, string>> _sections =
@@ -61,7 +56,7 @@ internal sealed class ConfFile
             ? value
             : null;
 
-    /// <summary>The string, or null when the parameter is absent. Absent always means "leave as is".</summary>
+    // The string, or null when the parameter is absent.
     public string? Text(string section, string key) => Raw(section, key);
 
     public bool? Flag(string section, string key) => Raw(section, key) switch
@@ -94,11 +89,9 @@ internal sealed class ConfFile
             : throw new FormatException($"[{section}] {key}: \"{value}\" — expected a number");
     }
 
-    /// <summary>
-    /// A number that may carry a trailing per cent sign: both "90" and "90 %" read as 90. The
-    /// sign is accepted because a bare threshold next to a temperature is easy to misread, and
-    /// the app writes it back for the same reason.
-    /// </summary>
+    // A number that may carry a trailing per cent sign: both "90" and "90 %" read as 90. The sign
+    // is accepted because a bare threshold next to a temperature is easy to misread, and the app
+    // writes it back for the same reason.
     public double? Percent(string section, string key)
     {
         string? value = Raw(section, key);
@@ -110,7 +103,7 @@ internal sealed class ConfFile
             : throw new FormatException($"[{section}] {key}: \"{value}\" — expected a percentage");
     }
 
-    /// <summary>A comma-separated list. An empty string is an empty list, not "leave as is".</summary>
+    // A comma-separated list. An empty string is an empty list, not "leave as is".
     public List<string>? List(string section, string key)
     {
         if (!_sections.TryGetValue(section, out var values) || !values.TryGetValue(key, out string? value)) return null;
@@ -128,7 +121,7 @@ internal sealed class ConfFile
             : throw new FormatException($"[{section}] {key}: \"{value}\" — allowed values are {string.Join(", ", Enum.GetNames<TEnum>())}");
     }
 
-    /// <summary>Building the file: sections, comments and values in the order they are written.</summary>
+    // Building the file: sections, comments and values in the order they are written.
     internal sealed class Writer
     {
         private readonly StringBuilder _text = new();
@@ -140,7 +133,7 @@ internal sealed class ConfFile
             return this;
         }
 
-        /// <summary>The note above a parameter — the very reason this format was chosen.</summary>
+        // The note above a parameter — the very reason this format was chosen.
         public Writer Note(params string[] lines)
         {
             foreach (string line in lines) _text.AppendLine(line.Length == 0 ? "#" : $"# {line}");
@@ -160,11 +153,19 @@ internal sealed class ConfFile
         public Writer Value(string key, double value) =>
             Value(key, value.ToString("0.###", CultureInfo.InvariantCulture));
 
-        /// <summary>A number with a unit written after it, as in "90 %".</summary>
+        // A number with a unit written after it, as in "90 %".
         public Writer Value(string key, double value, string unit) =>
             Value(key, value.ToString("0.###", CultureInfo.InvariantCulture) + " " + unit);
 
         public Writer Value(string key, IEnumerable<string> values) => Value(key, string.Join(", ", values));
+
+        // Numbered keys of one kind: Row1, Row2, and so on.
+        public Writer Values(string keyPrefix, IEnumerable<string> values)
+        {
+            int index = 1;
+            foreach (string value in values) Value(keyPrefix + index++, value);
+            return this;
+        }
 
         public Writer Blank()
         {

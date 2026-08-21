@@ -1,23 +1,17 @@
 namespace SystemSpinnerX64.Spinner;
 
-/// <summary>
-/// How the animation frames are coloured. Not every set supports it: where the drawing lives by
-/// its own colours, the flag is cleared in <see cref="SpinnerCatalog"/>.
-/// </summary>
+// How the animation frames are coloured.
 public enum SpinnerEffect
 {
-    /// <summary>As drawn — the frame is shown unchanged.</summary>
+    // As drawn — the frame is shown unchanged.
     Original = 1,
 
-    /// <summary>White silhouette: suits a dark taskbar.</summary>
+    // White silhouette: suits a dark taskbar.
     White = 2,
 
-    /// <summary>Black silhouette: suits a light one.</summary>
+    // Black silhouette: suits a light one.
     Black = 3,
 
-    /// <summary>
-    /// Silhouette matching the taskbar: black on light, white on dark. The theme is read from
-    /// the registry whenever the frames are reloaded, and the app watches for it changing.
-    /// </summary>
+    // Silhouette matching the taskbar: black on light, white on dark.
     Auto = 4
 }

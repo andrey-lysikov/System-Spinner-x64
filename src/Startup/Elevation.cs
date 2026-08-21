@@ -6,16 +6,11 @@ using System.Security.Principal;
 
 namespace SystemSpinnerX64.Startup;
 
-/// <summary>
-/// Administrator rights are required: without them the kernel driver will not load and the ETW
-/// session will not start, so there would be no temperatures, no fan speeds and no FPS.
-///
-/// The manifest with requireAdministrator normally takes care of this; this class is the backstop
-/// for when it did not (started via `dotnet SystemSpinnerX64.dll`, an unusual launcher).
-/// </summary>
+// Administrator rights are required: without them the kernel driver will not load and the ETW
+// session will not start, so there would be no temperatures, no fan speeds and no FPS.
 internal static class Elevation
 {
-    /// <summary>Whether the current process has administrator rights.</summary>
+    // Whether the current process has administrator rights.
     public static bool IsElevated { get; } = CheckElevated();
 
     private static bool CheckElevated()
@@ -33,9 +28,7 @@ internal static class Elevation
         }
     }
 
-    /// <summary>Restarts the app elevated, passing the same arguments.</summary>
-    /// <param name="problem">What to show the user when the restart did not happen.</param>
-    /// <returns>true means the restart has begun and this copy should close.</returns>
+    // Restarts the app elevated, passing the same arguments.
     public static bool TryRelaunchElevated(out string? problem)
     {
         problem = null;
@@ -45,7 +38,7 @@ internal static class Elevation
         if (string.IsNullOrEmpty(exe))
         {
             problem = "Could not determine the path to the overlay's own exe for a restart.\n\n" +
-                      "Start SystemSpinnerX64.exe as administrator manually.";
+                      $"Start {AppParameters.Identity.Name} as administrator manually.";
             return false;
         }
 
@@ -75,11 +68,11 @@ internal static class Elevation
         catch (Exception ex)
         {
             problem = $"Could not restart with administrator rights: {ex.Message}\n\n" +
-                      "Start SystemSpinnerX64.exe as administrator manually.";
+                      "Start " + AppParameters.Identity.Name + " as administrator manually.";
             return false;
         }
     }
 
-    /// <summary>ERROR_CANCELLED — the user dismissed the UAC prompt.</summary>
+    // ERROR_CANCELLED — the user dismissed the UAC prompt.
     private const int ErrorCancelled = 1223;
 }

@@ -4,10 +4,7 @@ using SystemSpinnerX64.Configuration;
 
 namespace SystemSpinnerX64.Osd;
 
-/// <summary>
-/// Shows the OSD and takes it away again. The countdown restarts on every press, so holding
-/// a key keeps the panel up instead of making it blink.
-/// </summary>
+// Shows the OSD and takes it away again.
 public sealed class OsdController : IDisposable
 {
     private readonly AppConfig _cfg;
@@ -25,7 +22,7 @@ public sealed class OsdController : IDisposable
         };
     }
 
-    /// <summary>Shows a value in percent and starts the countdown to hiding.</summary>
+    // Shows a value in percent and starts the countdown to hiding.
     public void Show(double percent, OsdKind kind)
     {
         // The window is built on first use: the app may run all day without anyone touching the
@@ -35,11 +32,11 @@ public sealed class OsdController : IDisposable
         _window.Show(percent, kind, _cfg.Osd.AdjustmentSteps);
 
         _hide.Stop();
-        _hide.Interval = TimeSpan.FromSeconds(Math.Clamp(_cfg.Osd.VisibleSeconds, 0.5, 30));
+        _hide.Interval = TimeSpan.FromSeconds(AppParameters.Osd.VisibleSeconds);
         _hide.Start();
     }
 
-    /// <summary>Re-reads the theme — called when the system has switched it.</summary>
+    // Re-reads the theme — called when the system has switched it.
     public void ApplyTheme() => _window?.ApplyTheme();
 
     public void Dispose()

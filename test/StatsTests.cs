@@ -73,6 +73,45 @@ public class StatsTests
         Assert.Null(NetworkMonitor.ParseAddress("<html><body>Service unavailable</body></html>"));
 
     [Fact]
+    public void Адрес_IPv6_тоже_выделяется()
+    {
+        // On a machine with IPv6 alone the service answers with an address of that family.
+        const string page = "<html><body>Current IP Address: 2001:db8::8a2e:370:7334</body></html>";
+
+        Assert.Equal("2001:db8::8a2e:370:7334", NetworkMonitor.ParseAddress(page));
+    }
+
+    [Fact]
+    public void IPv4_предпочитается_IPv6_в_одном_ответе()
+    {
+        const string page = "<html><body>IPv4: 203.0.113.42, IPv6: 2001:db8::1</body></html>";
+
+        Assert.Equal("203.0.113.42", NetworkMonitor.ParseAddress(page));
+    }
+
+    [Fact]
+    public void Разметка_не_принимается_за_IPv6() =>
+        // Colons are everywhere in a page; only what the framework accepts as an address counts.
+        Assert.Null(NetworkMonitor.ParseAddress("<html><body style=\"color: red\">no address here</body></html>"));
+
+    [Fact]
+    public void Скорость_спиннера_берётся_по_наибольшей_из_двух_загрузок()
+    {
+        // A game leans on the card while the processor idles: spinning by the CPU alone would
+        // leave the icon nearly still at the busiest moment.
+        Assert.Equal(87, new Readings { CpuLoad = 12, GpuLoad = 87 }.BusiestLoad);
+        Assert.Equal(64, new Readings { CpuLoad = 64, GpuLoad = 9 }.BusiestLoad);
+    }
+
+    [Fact]
+    public void Молчащий_датчик_не_мешает_второму()
+    {
+        // No card in the machine, or its load did not read: the processor decides alone.
+        Assert.Equal(40, new Readings { CpuLoad = 40 }.BusiestLoad);
+        Assert.Equal(0, new Readings().BusiestLoad);
+    }
+
+    [Fact]
     public void Занятая_память_считается_от_суммы_занятой_и_свободной()
     {
         var readings = new Readings { SysMemUsedGb = 24, SysMemFreeGb = 8 };
@@ -88,6 +127,18 @@ public class StatsTests
 
         Assert.Null(readings.MemLoadPercent);
     }
+
+    [Fact]
+    public void Встроенная_графика_не_имеет_своей_памяти()
+    {
+        // Shared memory: the amount is the system one, and a scale of it would repeat the row above.
+        Assert.False(new Readings { GpuLoad = 41 }.GpuHasOwnMemory);
+        Assert.False(new Readings { GpuMemUsedGb = 1.2, GpuMemTotalGb = 0 }.GpuHasOwnMemory);
+    }
+
+    [Fact]
+    public void Дискретная_карта_имеет_свою_память() =>
+        Assert.True(new Readings { GpuMemUsedGb = 5.3, GpuMemTotalGb = 12 }.GpuHasOwnMemory);
 
     [Fact]
     public void Видеопамять_считается_от_всего_объёма()

@@ -7,7 +7,7 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>Everything known about the machine at one moment.</summary>
+// Everything known about the machine at one moment.
 public sealed class MetricsSnapshot
 {
     public Readings Readings { get; init; } = new();
@@ -19,14 +19,9 @@ public sealed class MetricsSnapshot
     public static readonly MetricsSnapshot Empty = new();
 }
 
-/// <summary>
-/// One poll for the whole app. The in-game panel, the tray icon and the status window all take
-/// their values from here: the sensors cannot be polled three times over — each walk of the tree
-/// wakes the driver, and three walks a second are exactly the load the app is measuring.
-///
-/// Part of the work is done on demand. The process list costs a full walk of the process table
-/// with icons read from disk, and while the status window is closed nobody needs it.
-/// </summary>
+// One poll for the whole app. The in-game panel, the tray icon and the status window all take their
+// values from here: the sensors cannot be polled three times over — each walk of the tree wakes the
+// driver, and three walks a second are exactly the load the app is measuring.
 public sealed class MetricsService : IDisposable
 {
     private readonly AppConfig _cfg;
@@ -44,10 +39,10 @@ public sealed class MetricsService : IDisposable
     private DateTime _lastPoll = DateTime.MinValue;
     private string? _lastError;
 
-    /// <summary>A fresh snapshot. Raised on the UI thread.</summary>
+    // A fresh snapshot. Raised on the UI thread.
     public event Action<MetricsSnapshot>? Updated;
 
-    /// <summary>The poll failed. Raised once per new cause.</summary>
+    // The poll failed. Raised once per new cause.
     public event Action<string>? Failed;
 
     public MetricsSnapshot Latest { get; private set; } = MetricsSnapshot.Empty;
@@ -64,9 +59,7 @@ public sealed class MetricsService : IDisposable
         _timer.Tick += (_, _) => Poll();
     }
 
-    /// <summary>
-    /// Whether to collect what only the status window needs. On while it is open.
-    /// </summary>
+    // Whether to collect what only the status window needs.
     public bool Detailed
     {
         get => _detailed;
@@ -95,7 +88,7 @@ public sealed class MetricsService : IDisposable
 
     public bool IsRunning => _timer.IsEnabled;
 
-    /// <summary>Changes the poll period on the fly — from the tray menu.</summary>
+    // Changes the poll period on the fly — from the tray menu.
     public void SetInterval(int milliseconds)
     {
         _cfg.UpdateIntervalMs = Math.Max(AppParameters.Polling.MinIntervalMs, milliseconds);
@@ -150,10 +143,8 @@ public sealed class MetricsService : IDisposable
                 error = ex.Message;
             }
 
-            // Back to the thread where the windows and the icon live: the timer was created there.
-            // Unless the app is on its way out — a poll started a moment before Quit would land on
-            // a dispatcher that no longer accepts work, and the exception would look like a crash
-            // in the log at every exit.
+            // Back to the UI thread, unless the app is already closing: a dispatcher on its way
+            // out would throw, and the log would show a crash at every exit.
             if (_timer.Dispatcher.HasShutdownStarted) return;
 
             try

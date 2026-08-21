@@ -13,14 +13,7 @@ using SystemSpinnerX64.ViewModels;
 
 namespace SystemSpinnerX64.Views;
 
-/// <summary>
-/// The panel over a game: CPU, GPU and FPS rows. The window is transparent, always on top and
-/// never takes a click — they go to the game. Nothing here opens a window: the only way to say
-/// something is the notice line at the bottom of the panel.
-///
-/// The panel decides nothing itself: when to show it, when to hide it and what to fill it with
-/// is <see cref="Modes.ModeSupervisor"/>. What stays here is the look and the layout.
-/// </summary>
+// The panel over a game: CPU, GPU and FPS rows.
 public partial class OverlayWindow : Window
 {
     private readonly AppConfig _cfg;
@@ -64,7 +57,7 @@ public partial class OverlayWindow : Window
         ApplyLayout();
     }
 
-    /// <summary>Brings the panel back on top: some games and launchers reset the window order.</summary>
+    // Brings the panel back on top: some games and launchers reset the window order.
     public void KeepOnTop()
     {
         if (_handle != IntPtr.Zero) Win32.ForceTopmost(_handle);
@@ -72,7 +65,7 @@ public partial class OverlayWindow : Window
 
     // --- Layout ---
 
-    /// <summary>Recomputes the font size and position. Needed after a screen or scale change.</summary>
+    // Recomputes the font size and position.
     public void ApplyLayout()
     {
         ApplyFontSize();
@@ -81,12 +74,18 @@ public partial class OverlayWindow : Window
 
     private void ApplyFontSize()
     {
-        double percent = Math.Clamp(_cfg.Appearance.FontScalePercent, 50, 300) / 100.0;
-        double size = Math.Clamp(AppParameters.Overlay.BaseFontDip * percent, 8, 48);
+        double percent = Math.Clamp(_cfg.Appearance.FontScalePercent,
+                                    AppParameters.Limits.MinFontScalePercent,
+                                    AppParameters.Limits.MaxFontScalePercent) / 100.0;
+        double size = Math.Clamp(AppParameters.Overlay.BaseFontDip * percent,
+                                 AppParameters.Limits.MinFontDip,
+                                 AppParameters.Limits.MaxFontDip);
 
         Readout.SetValue(TextBlock.FontSizeProperty, size);
 
-        double unitSize = Math.Round(size * Math.Clamp(_cfg.Appearance.UnitSizePercent, 30, 100) / 100.0, 1);
+        double unitSize = Math.Round(size * Math.Clamp(_cfg.Appearance.UnitSizePercent,
+                                                     AppParameters.Limits.MinUnitSizePercent,
+                                                     AppParameters.Limits.MaxUnitSizePercent) / 100.0, 1);
         Resources["SmallFontSize"] = unitSize;
 
         // A larger size leaves more room below the baseline — the unit labels are lifted by the
@@ -127,11 +126,8 @@ public partial class OverlayWindow : Window
             VisualTreeHelper.GetDpi(this).PixelsPerDip);
     }
 
-    /// <summary>
-    /// The screen the panel belongs on: the one the game covers. Called when a full-screen
-    /// application appears and again whenever it moves to another monitor.
-    /// </summary>
-    /// <param name="work">Its work area in pixels, <paramref name="scale"/> its scale.</param>
+    // The screen the panel belongs on: the one the game covers. Work area in pixels, and the
+    // scale of that screen — monitors can differ in it.
     internal void MoveToScreen(Win32.RECT work, double scale)
     {
         _screen = work;
@@ -139,16 +135,15 @@ public partial class OverlayWindow : Window
         ApplyLayout();
     }
 
-    /// <summary>
-    /// Forgets the screen it was put on — that screen may have just been detached. Until a
-    /// full-screen application names a new one the panel falls back to the main screen.
-    /// </summary>
+    // Forgets the screen it was put on — that screen may have just been detached.
     public void ForgetScreen() => _screen = null;
 
     // Counted from the work area rather than the screen, or the panel slides under the taskbar.
     private void PlaceAtCorner()
     {
-        double margin = Math.Clamp(_cfg.Appearance.Margin, 0, 200);
+        double margin = Math.Clamp(_cfg.Appearance.Margin,
+                                     AppParameters.Limits.MinOverlayMargin,
+                                     AppParameters.Limits.MaxOverlayMargin);
 
         // Nothing is full screen yet — the main screen will do until something is.
         if (_screen is not Win32.RECT work || _handle == IntPtr.Zero)
@@ -184,7 +179,9 @@ public partial class OverlayWindow : Window
         Color warn = ParseColor(_cfg.Warn.Color, Color.FromRgb(0xFF, 0x6A, 0x52), nameof(_cfg.Warn.Color));
         Resources["Warn"] = Paint(warn, AppParameters.Overlay.WarnDensity);
 
-        Readout.Opacity = Math.Clamp(look.TextOpacity, 0.15, 1.0);
+        Readout.Opacity = Math.Clamp(look.TextOpacity,
+                                        AppParameters.Limits.MinTextOpacity,
+                                        AppParameters.Limits.MaxTextOpacity);
 
         // Without a backdrop this is the only thing separating the digits from bright frames.
         Readout.Effect = look.ShadowBlur <= 0
@@ -193,7 +190,9 @@ public partial class OverlayWindow : Window
             {
                 Color = Colors.Black,
                 Opacity = Math.Clamp(look.ShadowOpacity, 0.0, 1.0),
-                BlurRadius = Math.Clamp(look.ShadowBlur, 0.0, 20.0),
+                BlurRadius = Math.Clamp(look.ShadowBlur,
+                                          AppParameters.Limits.MinShadowBlur,
+                                          AppParameters.Limits.MaxShadowBlur),
                 ShadowDepth = 0
             };
 
@@ -227,7 +226,7 @@ public partial class OverlayWindow : Window
         return fallback;
     }
 
-    /// <summary>The notice line at the bottom: sensor errors, frame counter state.</summary>
+    // The notice line at the bottom: sensor errors, frame counter state.
     public void ShowNotice(string text)
     {
         _vm.Notice = text;

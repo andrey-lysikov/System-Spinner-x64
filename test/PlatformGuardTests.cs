@@ -19,7 +19,14 @@ public class PlatformGuardTests
 
     [Theory]
     [InlineData("AMD Ryzen 9 7950X")]
+    [InlineData("AMD Ryzen Threadripper 7980X")]
+    [InlineData("amd ryzen 5 5600")]        // case does not matter
+    public void AMD_проходит(string cpu) =>
+        Assert.Null(PlatformGuard.DescribeHardware(cpu, "AMD Radeon RX 7900 XTX"));
+
+    [Theory]
     [InlineData("Apple M4")]
+    [InlineData("Snapdragon X Elite")]
     public void Другой_производитель_объясняется(string cpu)
     {
         string? problem = PlatformGuard.DescribeHardware(cpu, "NVIDIA GeForce RTX 4070");
@@ -47,7 +54,7 @@ public class PlatformGuardTests
         Assert.Null(PlatformGuard.DescribeHardware(null, null));
 
     [Fact]
-    public void Имена_датчиков_от_AMD_машины_объясняются()
+    public void Имена_датчиков_от_AMD_машины_объясняются_на_Intel()
     {
         string? problem = PlatformGuard.DescribeSensorNames(
             "Intel Core Ultra 7 265K",
@@ -62,6 +69,33 @@ public class PlatformGuardTests
         Assert.Null(PlatformGuard.DescribeSensorNames(
             "Intel Core i7-13700K",
             new[] { "Core (Tctl/Tdie)", "CPU Package" }));
+
+    [Fact]
+    public void Имена_датчиков_от_Intel_машины_объясняются_на_AMD()
+    {
+        string? problem = PlatformGuard.DescribeSensorNames(
+            "AMD Ryzen 9 7950X",
+            new[] { "CPU Package", "Core Max" });
+
+        Assert.False(string.IsNullOrEmpty(problem));
+        Assert.Contains("Tctl", problem);
+    }
+
+    [Fact]
+    public void Хотя_бы_одно_амдшное_имя_проходит() =>
+        Assert.Null(PlatformGuard.DescribeSensorNames(
+            "AMD Ryzen 9 7950X",
+            new[] { "CPU Package", "Core (Tctl/Tdie)" }));
+
+    [Fact]
+    public void Список_по_умолчанию_подходит_обоим()
+    {
+        // One list serves Intel and AMD alike — that is the point of keeping both sets of names.
+        var names = new SystemSpinnerX64.Configuration.SensorNamesConfig().CpuTemp;
+
+        Assert.Null(PlatformGuard.DescribeSensorNames("Intel Core Ultra 7 265K", names));
+        Assert.Null(PlatformGuard.DescribeSensorNames("AMD Ryzen 9 7950X", names));
+    }
 
     [Fact]
     public void Пустой_список_имён_это_осознанный_отказ_от_температуры() =>

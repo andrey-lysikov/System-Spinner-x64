@@ -5,14 +5,7 @@ using System.Windows.Media;
 
 namespace SystemSpinnerX64.Views;
 
-/// <summary>
-/// History chart: an area filled from zero to the value. The vertical scale is fixed from zero
-/// to a hundred — otherwise a quiet hour would look like peak load, simply because the chart
-/// would stretch to its own maximum.
-///
-/// There can be far more points than pixels across: then they are reduced to columns, taking the
-/// largest in each. An average would smooth away exactly what the chart is looked at for.
-/// </summary>
+// History chart: an area filled from zero to the value.
 public sealed class SparklineControl : FrameworkElement
 {
     public static readonly DependencyProperty PointsProperty = DependencyProperty.Register(
@@ -55,10 +48,7 @@ public sealed class SparklineControl : FrameworkElement
         set => SetValue(GridBrushProperty, value);
     }
 
-    /// <summary>
-    /// Reduces the history to the given number of columns, taking the largest value in each.
-    /// Separated out so it can be tested.
-    /// </summary>
+    // Reduces the history to the given number of columns, taking the largest value in each.
     internal static double[] Reduce(IReadOnlyList<double> points, int columns)
     {
         if (columns <= 0) return Array.Empty<double>();

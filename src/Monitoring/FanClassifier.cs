@@ -4,13 +4,10 @@ using LibreHardwareMonitor.Hardware;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>
-/// Works out whose fan this is from the sensor name and the hardware it was found on. There can
-/// be no exact rules — headers are named freely — so the result is edited in config.conf.
-/// </summary>
+// Works out whose fan this is from the sensor name and the hardware it was found on.
 internal static class FanClassifier
 {
-    /// <summary>Words that give an AIO away, in the sensor name and in the controller name.</summary>
+    // Words that give an AIO away, in the sensor name and in the controller name.
     private static readonly string[] AioMarkers =
     {
         "pump", "aio", "water", "liquid", "насос", "kraken", "capellix", "commander",
@@ -20,10 +17,8 @@ internal static class FanClassifier
     public static FanRole Classify(string sensorName, IHardware owner, bool underGpu) =>
         Classify(sensorName, owner.Name, owner.HardwareType, underGpu || IsGpu(owner));
 
-    /// <summary>
-    /// The same on plain values instead of a hardware object, so it can be tested: a stub for
-    /// <see cref="IHardware"/> would be longer than the logic under test.
-    /// </summary>
+    // The same on plain values instead of a hardware object, so it can be tested: a stub for
+    // IHardware would be longer than the logic under test.
     public static FanRole Classify(string sensorName, string hardwareName, HardwareType hardwareType, bool onGpu)
     {
         if (onGpu) return FanRole.Gpu;

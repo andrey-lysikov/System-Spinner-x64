@@ -1,17 +1,16 @@
 namespace SystemSpinnerX64.Diagnostics;
 
-/// <summary>
-/// What goes into the log. The order matters: a message is written when its level is not above
-/// the configured one, so the values run from terse to verbose.
-/// </summary>
-public enum LogLevel
+// The kind of a log line. The order matters: a line is written when its level is not above the
+// one in force, so the values run from terse to verbose. The config has no level of its own —
+// only the Debug switch, which chooses between Info and Warn.
+internal enum LogLevel
 {
-    /// <summary>Only what got in the way: sensors did not open, the ETW session did not start.</summary>
+    // Only what got in the way: sensors did not open, the ETW session did not start.
     Error = 0,
 
-    /// <summary>Plus what is worth noticing: a sensor was not found, the config was not written.</summary>
+    // Plus what is worth noticing: a sensor was not found, the config was not written.
     Warn = 1,
 
-    /// <summary>Plus the course of work: startup checks, the chosen frame source. For debugging.</summary>
+    // Plus the course of work: startup checks, the chosen frame source.
     Info = 2
 }

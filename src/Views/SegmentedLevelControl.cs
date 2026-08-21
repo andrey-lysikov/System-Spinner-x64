@@ -4,15 +4,8 @@ using System.Windows.Media;
 
 namespace SystemSpinnerX64.Views;
 
-/// <summary>
-/// A scale of separate segments — the one the macOS version dropped the system indicator for:
-/// drawing it by hand took the GPU load there from seventy per cent to eight. The reason is the
-/// same here: a plain ProgressBar drags in a template, an animation and a highlight, while what
-/// is needed is a row of rectangles.
-///
-/// Redrawn only when the number of filled segments changes: the value moves by tenths every
-/// second, and the picture does not.
-/// </summary>
+// A scale of separate segments — the one the macOS version dropped the system indicator for:
+// drawing it by hand took the GPU load there from seventy per cent to eight.
 public sealed class SegmentedLevelControl : FrameworkElement
 {
     public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
@@ -51,7 +44,7 @@ public sealed class SegmentedLevelControl : FrameworkElement
         set => SetValue(SegmentCountProperty, value);
     }
 
-    /// <summary>The value the scale turns red at. Zero disables the threshold.</summary>
+    // The value the scale turns red at.
     public double CriticalLevel
     {
         get => (double)GetValue(CriticalLevelProperty);

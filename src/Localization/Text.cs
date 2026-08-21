@@ -2,25 +2,17 @@ using System.Globalization;
 
 namespace SystemSpinnerX64.Localization;
 
-/// <summary>
-/// Interface strings: the tray menu, notifications, the status window and the panel notice line.
-/// The log and config.conf are always English — they are read when something goes wrong.
-///
-/// Every string is written out in all eight languages next to its own name rather than kept in
-/// separate resource files: there are some sixty of them, and a wording that drifts away from
-/// where it is used is the usual way translations rot. A language left empty falls back to
-/// English, so filling in one more is a matter of text rather than code.
-/// </summary>
+// Interface strings: the tray menu, notifications, the status window and the panel notice line.
 internal static class Text
 {
     private static Language _current = Resolve(Language.Auto);
 
-    /// <summary>Applies the language from the config. <see cref="Language.Auto"/> follows the system.</summary>
+    // Applies the language from the config.
     public static void Use(Language language) => _current = Resolve(language);
 
     public static Language Current => _current;
 
-    /// <summary>Arabic is written right to left; the windows and the menu mirror themselves for it.</summary>
+    // Arabic is written right to left; the windows and the menu mirror themselves for it.
     public static bool IsRightToLeft => _current == Language.Ar;
 
     // Auto is resolved once, when it is applied: the system language does not change while the
@@ -42,10 +34,7 @@ internal static class Text
         };
     }
 
-    /// <summary>
-    /// Picks the string for the current language. English is the unnamed argument because it is
-    /// also the fallback: an empty translation means "not written yet", and English beats nothing.
-    /// </summary>
+    // Picks the string for the current language.
     private static string S(string en, string ru = "", string ar = "", string zh = "",
                             string fr = "", string de = "", string it = "", string ja = "")
     {
@@ -74,11 +63,6 @@ internal static class Text
         "HDMI/DVI DDC enabled", "HDMI/DVI DDC включён", "تمكين HDMI/DVI DDC", "已启用 HDMI/DVI DDC",
         "HDMI/DVI DDC activé", "HDMI/DVI DDC aktiv", "HDMI/DVI DDC attivo", "HDMI/DVI DDC 有効");
 
-    public static string MenuRefreshDisplays => S(
-        "Rescan displays", "Пересканировать экраны", "إعادة فحص الشاشات", "重新扫描显示器",
-        "Réanalyser les écrans", "Bildschirme neu suchen", "Rileva di nuovo gli schermi",
-        "ディスプレイを再検出");
-
     public static string MenuAdjustmentSteps => S(
         "Adjustment steps", "Шагов регулировки", "خطوات الضبط", "调节步数",
         "Pas de réglage", "Einstellschritte", "Passi di regolazione", "調整ステップ数");
@@ -99,8 +83,8 @@ internal static class Text
         "Mostra l'indirizzo IP esterno", "外部 IP アドレスを表示");
 
     public static string MenuSpinners => S(
-        "Spinners", "Анимации", "الرسوم المتحركة", "动画",
-        "Animations", "Animationen", "Animazioni", "アニメーション");
+        "Spinners", "Спиннеры", "Spinners", "Spinners",
+        "Spinners", "Spinners", "Spinners", "Spinners");
 
     public static string MenuUpdateInterval => S(
         "Data update every", "Обновлять данные каждые", "تحديث البيانات كل", "数据更新间隔",
@@ -108,19 +92,18 @@ internal static class Text
         "データ更新間隔");
 
     public static string MenuEffects => S(
-        "Spinners effects", "Эффекты анимаций", "تأثيرات الرسوم المتحركة", "动画效果",
-        "Effets des animations", "Animationseffekte", "Effetti delle animazioni",
-        "アニメーションの効果");
+        "Spinner effects", "Эффекты спиннеров", "تأثيرات Spinners", "Spinners 效果",
+        "Effets des spinners", "Spinner-Effekte", "Effetti degli spinner",
+        "Spinner の効果");
 
     public static string MenuInvertRotation => S(
         "Invert rotation", "Обратное вращение", "عكس اتجاه الدوران", "反向旋转",
         "Inverser la rotation", "Drehung umkehren", "Inverti la rotazione", "回転を逆にする");
 
     public static string MenuOverlay => S(
-        "Overlay over full-screen apps", "Оверлей поверх полноэкранных приложений",
-        "طبقة فوق التطبيقات ملء الشاشة", "全屏应用上的叠加层",
-        "Superposition en plein écran", "Overlay über Vollbild-Apps",
-        "Overlay sulle app a schermo intero", "全画面アプリ上のオーバーレイ");
+        "Full-screen overlay", "Полноэкранный оверлей", "طبقة ملء الشاشة", "全屏叠加层",
+        "Superposition plein écran", "Vollbild-Overlay", "Overlay a schermo intero",
+        "全画面オーバーレイ");
 
     public static string MenuOpenConfig => S(
         "Open config.conf", "Открыть config.conf", "فتح config.conf", "打开 config.conf",
@@ -130,9 +113,86 @@ internal static class Text
         "Open the log", "Открыть журнал", "فتح السجل", "打开日志",
         "Ouvrir le journal", "Protokoll öffnen", "Apri il registro", "ログを開く");
 
+    public static string MenuCheckUpdate => S(
+        "Check for updates", "Проверить обновление", "التحقق من التحديثات", "检查更新",
+        "Rechercher des mises à jour", "Nach Updates suchen", "Controlla aggiornamenti",
+        "更新を確認");
+
+    public static string MenuProject => S(
+        "Project page", "Страница проекта", "صفحة المشروع", "项目页面",
+        "Page du projet", "Projektseite", "Pagina del progetto", "プロジェクトのページ");
+
     public static string MenuAbout => S(
         "About", "О программе", "حول التطبيق", "关于",
         "À propos", "Über", "Informazioni", "このアプリについて");
+
+    // The notification about a newer release: a click on it opens the download page.
+    public static string UpdateAvailable(string version) => S(
+        $"Version {version} is out. Click to download it.",
+        $"Вышла версия {version}. Нажмите, чтобы скачать.",
+        $"صدر الإصدار {version}. انقر للتنزيل.",
+        $"新版本 {version} 已发布。点击下载。",
+        $"La version {version} est disponible. Cliquez pour la télécharger.",
+        $"Version {version} ist da. Zum Herunterladen klicken.",
+        $"È uscita la versione {version}. Fai clic per scaricarla.",
+        $"バージョン {version} が公開されました。クリックしてダウンロード。");
+
+    public static string UpdateUpToDate(string version) => S(
+        $"No updates right now — {version} is the newest one.",
+        $"Обновлений сейчас нет: {version} — самая свежая версия.",
+        $"لا توجد تحديثات الآن — {version} هو الأحدث.",
+        $"当前没有更新，{version} 已是最新。",
+        $"Aucune mise à jour pour le moment — {version} est la plus récente.",
+        $"Zurzeit keine Updates — {version} ist die neueste Version.",
+        $"Nessun aggiornamento al momento: {version} è la più recente.",
+        $"現在、更新はありません。{version} が最新です。");
+
+    public static string UpdateCheckFailed => S(
+        "Could not reach GitHub — the check for updates did not go through.",
+        "GitHub недоступен — проверить обновление не удалось.",
+        "تعذر الوصول إلى GitHub — لم يتم التحقق من التحديثات.",
+        "无法连接 GitHub，检查更新失败。",
+        "GitHub est injoignable — la recherche de mises à jour a échoué.",
+        "GitHub nicht erreichbar — die Updatesuche ist fehlgeschlagen.",
+        "GitHub non raggiungibile: il controllo aggiornamenti non è riuscito.",
+        "GitHub に接続できず、更新を確認できませんでした。");
+
+    // Why the app refused to start, in the words the notification uses.
+    public static string ReasonNoRights => S(
+        "administrator rights are required", "нужны права администратора",
+        "مطلوب صلاحيات المسؤول", "需要管理员权限",
+        "des droits d'administrateur sont requis", "Administratorrechte sind erforderlich",
+        "servono i diritti di amministratore", "管理者権限が必要です");
+
+    public static string ReasonAlreadyRunning => S(
+        "it is already running", "программа уже запущена",
+        "التطبيق قيد التشغيل بالفعل", "程序已在运行",
+        "l'application est déjà lancée", "die Anwendung läuft bereits",
+        "l'applicazione è già in esecuzione", "すでに実行中です");
+
+    public static string ReasonChecksFailed => S(
+        "the startup checks did not pass", "проверки при запуске не прошли",
+        "لم تنجح فحوصات بدء التشغيل", "启动检查未通过",
+        "les vérifications de démarrage ont échoué", "die Startprüfungen sind fehlgeschlagen",
+        "i controlli di avvio non sono riusciti", "起動時のチェックに失敗しました");
+
+    public static string ReasonCrashed => S(
+        "an unexpected error", "непредвиденная ошибка",
+        "خطأ غير متوقع", "发生意外错误",
+        "une erreur inattendue", "ein unerwarteter Fehler",
+        "un errore imprevisto", "予期しないエラー");
+
+    // Shown when the app refuses to start: there is no window to say it in, and the log is the
+    // only place the reason exists.
+    public static string StartupFailed(string reason) => S(
+        $"System-Spinner did not start: {reason}. Click to open the log.",
+        $"System-Spinner не запустился: {reason}. Нажмите, чтобы открыть журнал.",
+        $"لم يبدأ System-Spinner: {reason}. انقر لفتح السجل.",
+        $"System-Spinner 未能启动：{reason}。点击打开日志。",
+        $"System-Spinner n'a pas démarré : {reason}. Cliquez pour ouvrir le journal.",
+        $"System-Spinner ist nicht gestartet: {reason}. Zum Öffnen des Protokolls klicken.",
+        $"System-Spinner non si è avviato: {reason}. Fai clic per aprire il registro.",
+        $"System-Spinner を起動できませんでした: {reason}。クリックしてログを開きます。");
 
     public static string MenuExit => S(
         "Quit", "Выход", "خروج", "退出",
@@ -144,36 +204,33 @@ internal static class Text
         $"Le fichier n'existe pas encore : {path}", $"Die Datei gibt es noch nicht: {path}",
         $"Il file non esiste ancora: {path}", $"ファイルはまだありません: {path}");
 
-    // No line breaks inside a paragraph: the window wraps by its own width, and hard breaks
-    // would leave a ragged edge.
-    public static string AboutText(string version) => S(
-        "Shows the state of the system in the Windows tray, and over a full-screen application " +
-        $"it becomes a CPU, GPU and frame-rate panel.\n\nAuthor: @Andrey.Lysikov\nVersion: {version}",
+    // The About window: the name with the version stands on its own line above this text.
+    public static string AboutText => S(
+        "A program that shows how the resources of your computer are being used, in full screen " +
+        "as well. Small, light, practical.\n\nAuthor: @Andrey.Lysikov",
 
-        "Показывает состояние системы в трее Windows, а поверх полноэкранного приложения — " +
-        $"панель с CPU, GPU и счётчиком кадров.\n\nАвтор: @Andrey.Lysikov\nВерсия: {version}",
+        "Программа которая показывает утилизацию ресурсов вашего компьютера и в полноэкранном " +
+        "режиме тоже. Небольшая, легкая практичная.\n\nАвтор: @Andrey.Lysikov",
 
-        "يعرض حالة النظام في شريط مهام Windows، وفوق التطبيقات ملء الشاشة يتحول إلى لوحة " +
-        $"للمعالج وبطاقة الرسوم ومعدل الإطارات.\n\nالمؤلف: @Andrey.Lysikov\nالإصدار: {version}",
+        "برنامج يعرض استخدام موارد جهازك، وفي وضع ملء الشاشة أيضًا. صغير وخفيف وعملي.\n\n" +
+        "المؤلف: @Andrey.Lysikov",
 
-        "在 Windows 通知区域显示系统状态；在全屏应用之上则变为 CPU、GPU 和帧率面板。\n\n" +
-        $"作者：@Andrey.Lysikov\n版本：{version}",
+        "显示计算机资源占用情况的程序，全屏模式下同样可用。小巧、轻量、实用。\n\n" +
+        "作者：@Andrey.Lysikov",
 
-        "Affiche l'état du système dans la zone de notification de Windows et, par-dessus une " +
-        "application en plein écran, devient un panneau CPU, GPU et images par seconde.\n\n" +
-        $"Auteur : @Andrey.Lysikov\nVersion : {version}",
+        "Un programme qui montre l'utilisation des ressources de votre ordinateur, en plein écran " +
+        "aussi. Petit, léger, pratique.\n\nAuteur : @Andrey.Lysikov",
 
-        "Zeigt den Systemzustand im Windows-Infobereich und wird über einer Vollbildanwendung " +
-        $"zu einer Anzeige für CPU, GPU und Bildrate.\n\nAutor: @Andrey.Lysikov\nVersion: {version}",
+        "Ein Programm, das die Auslastung der Ressourcen Ihres Rechners zeigt, im Vollbild " +
+        "ebenfalls. Klein, leicht, praktisch.\n\nAutor: @Andrey.Lysikov",
 
-        "Mostra lo stato del sistema nell'area di notifica di Windows e, sopra un'applicazione " +
-        "a schermo intero, diventa un pannello con CPU, GPU e frame rate.\n\n" +
-        $"Autore: @Andrey.Lysikov\nVersione: {version}",
+        "Un programma che mostra l'utilizzo delle risorse del computer, anche a schermo intero. " +
+        "Piccolo, leggero, pratico.\n\nAutore: @Andrey.Lysikov",
 
-        "Windows の通知領域にシステムの状態を表示し、全画面アプリの上では CPU・GPU・フレームレートの" +
-        $"パネルになります。\n\n作者: @Andrey.Lysikov\nバージョン: {version}");
+        "パソコンのリソース使用状況を表示するプログラムです。全画面でも同じように使えます。" +
+        "小さく、軽く、実用的。\n\n作者: @Andrey.Lysikov");
 
-    /// <summary>Poll periods in the menu. The unit is short: it stands right after a number.</summary>
+    // Poll periods in the menu. The unit is short: it stands right after a number.
     public static string Seconds(double value) =>
         value.ToString("0.#", CultureInfo.InvariantCulture) + " " +
         S("s", "с", "ث", "秒", "s", "s", "s", "秒");
@@ -214,12 +271,6 @@ internal static class Text
         $"Démarrage automatique inchangé : {problem}", $"Autostart unverändert: {problem}",
         $"Avvio automatico invariato: {problem}", $"自動起動は変更されませんでした: {problem}");
 
-    public static string DisplaysFound(int count) => S(
-        $"Displays found: {count}.", $"Найдено экранов: {count}.",
-        $"الشاشات الموجودة: {count}.", $"找到显示器：{count}。",
-        $"Écrans détectés : {count}.", $"Gefundene Bildschirme: {count}.",
-        $"Schermi trovati: {count}.", $"検出したディスプレイ: {count}");
-
     public static string SchedulerRefused(int code) => S(
         $"Task Scheduler refused (code {code})", $"Планировщик заданий отказал (код {code})",
         $"رفض برنامج جدولة المهام (الرمز {code})", $"任务计划程序拒绝（代码 {code}）",
@@ -254,12 +305,6 @@ internal static class Text
         $"Erreur de lecture des capteurs : {message}", $"Sensorfehler: {message}",
         $"Errore di lettura dei sensori: {message}", $"センサーの読み取りエラー: {message}");
 
-    public static string FpsDisabled => S(
-        "The frame counter is off", "Счётчик кадров отключён",
-        "عداد الإطارات معطل", "帧计数器已关闭",
-        "Le compteur d'images est désactivé", "Der Bildzähler ist aus",
-        "Il contatore dei fotogrammi è disattivato", "フレームカウンターは無効です");
-
     public static string FpsNeedsAdmin => S(
         "The FPS counter requires administrator rights",
         "Для счётчика FPS нужны права администратора",
@@ -283,7 +328,7 @@ internal static class Text
 
     // --- The status window ---
 
-    /// <summary>Row headlines. A value is appended to each: "CPU Usage 9 %".</summary>
+    // Row headlines. A value is appended to each: "CPU Usage 9 %".
     public static string StatsCpu => S(
         "CPU Usage", "Загрузка ЦП", "استخدام المعالج", "CPU 占用",
         "Charge CPU", "CPU-Auslastung", "Utilizzo CPU", "CPU 使用率");
@@ -320,12 +365,12 @@ internal static class Text
         "no data", "нет данных", "لا توجد بيانات", "无数据",
         "aucune donnée", "keine Daten", "nessun dato", "データなし");
 
-    /// <summary>The unit for fan speed. One for both places it appears: the CPU and the card.</summary>
+    // The unit for fan speed. One for both places it appears: the CPU and the card.
     public static string Rpm => S(
         "rpm", "об/мин", "دورة/د", "转/分",
         "tr/min", "U/min", "giri/min", "rpm");
 
-    /// <summary>Fan speeds with tags: "CPU 903 · AIO 2210 rpm".</summary>
+    // Fan speeds with tags: "CPU 903 · AIO 2210 rpm".
     public static string StatsFans(string speeds) => $"{speeds} {Rpm}";
 
     public static string StatsFansStopped => S(

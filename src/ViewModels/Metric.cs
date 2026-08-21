@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace SystemSpinnerX64.ViewModels;
 
-/// <summary>One value on the panel: the number, its unit and the width of its column.</summary>
+// One value on the panel: the number, its unit and the width of its column.
 public sealed class Metric : Observable
 {
     private string _value = "—";
@@ -11,10 +11,6 @@ public sealed class Metric : Observable
     private double _valueWidth;
     private double _cellWidth;
 
-    /// <param name="valueSlots">
-    /// Digits in the longest expected value: 3 for load, 4 for a clock. The column width is
-    /// computed from this — otherwise a percentage cell would be as wide as an rpm one.
-    /// </param>
     public Metric(string unit, int valueSlots)
     {
         Unit = unit;
@@ -64,14 +60,14 @@ public sealed class Metric : Observable
             ? "—"
             : raw.Value.ToString("F" + decimals, CultureInfo.InvariantCulture);
 
-    /// <summary>Highlights a value that reached the threshold. A threshold of 0 is off.</summary>
+    // Highlights a value that reached the threshold.
     public void Update(double? raw, double threshold, int decimals = 0)
     {
         Update(raw, decimals);
         Warning = threshold > 0 && raw is not null && raw.Value >= threshold;
     }
 
-    /// <summary>Drops the cell when there is no value.</summary>
+    // Drops the cell when there is no value.
     public void UpdateOrHide(double? raw, int decimals = 0)
     {
         Update(raw, decimals);

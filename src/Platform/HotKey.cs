@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace SystemSpinnerX64.Platform;
 
-/// <summary>What is held with the key. The values are the ones RegisterHotKey expects.</summary>
+// What is held with the key. The values are the ones RegisterHotKey expects.
 [Flags]
 internal enum HotKeyModifiers
 {
@@ -15,18 +15,11 @@ internal enum HotKeyModifiers
     Shift = 0x0004,
     Win = 0x0008,
 
-    /// <summary>No auto-repeat — holding the key would otherwise slam brightness to the end.</summary>
+    // No auto-repeat — holding the key would otherwise slam brightness to the end.
     NoRepeat = 0x4000
 }
 
-/// <summary>
-/// A key combination from the config: "Ctrl+Alt+F2". Parsing is separated from registering so it
-/// can be tested: RegisterHotKey needs a window and a message queue and cannot run in a test.
-///
-/// Combinations are needed for brightness. Volume has its own keys on the keyboard and Windows
-/// hands them to the hook; brightness keys do not exist there at all — on laptops the firmware
-/// handles them and they never reach an application.
-/// </summary>
+// A key combination from the config: "Ctrl+Alt+F2".
 internal sealed record HotKey(HotKeyModifiers Modifiers, int VirtualKey)
 {
     private static readonly Dictionary<string, HotKeyModifiers> Names =
@@ -39,11 +32,8 @@ internal sealed record HotKey(HotKeyModifiers Modifiers, int VirtualKey)
             ["win"] = HotKeyModifiers.Win
         };
 
-    /// <summary>
-    /// Parses the config entry. An empty string and the word "off" mean there is no combination —
-    /// a deliberate refusal to drive brightness from the keyboard, not an error.
-    /// </summary>
-    /// <returns>null when there is no combination or it did not parse; the reason lands in <paramref name="problem"/>.</returns>
+    // Parses the config entry. An empty string and the word "off" mean there is no combination — a
+    // deliberate refusal to drive brightness from the keyboard, not an error.
     public static HotKey? Parse(string? text, out string? problem)
     {
         problem = null;
@@ -126,7 +116,7 @@ internal sealed record HotKey(HotKeyModifiers Modifiers, int VirtualKey)
         return null;
     }
 
-    /// <summary>The way back to text — this is what the app writes into config.conf.</summary>
+    // The way back to text — this is what the app writes into config.conf.
     public override string ToString()
     {
         var parts = new List<string>();

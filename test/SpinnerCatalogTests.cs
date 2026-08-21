@@ -69,6 +69,32 @@ public class SpinnerCatalogTests
         Assert.Equal("Blue Ball", SpinnerCatalog.Validate("blue ball").Name);
 
     [Fact]
+    public void Набор_из_одного_кадра_есть_в_списке()
+    {
+        // A folder with a single picture is a set all the same — a still one. "App Icon" is that:
+        // the icon of the program for anyone who wants the tray to hold still.
+        SpinnerStyle? still = SpinnerCatalog.Find("App Icon");
+
+        Assert.NotNull(still);
+        Assert.Equal(1, still!.FrameCount);
+    }
+
+    [Fact]
+    public void Один_кадр_не_запускает_анимацию()
+    {
+        var animator = new SpinnerAnimator();
+        animator.Load(SpinnerCatalog.Validate("App Icon"), SpinnerEffect.Original, 16, lightTheme: false);
+
+        animator.UpdateSpeed(90);
+
+        // Nothing to spin through: the timer must not be running, whatever the load says.
+        Assert.True(animator.HasFrames);
+        Assert.False(animator.IsSpinning);
+
+        animator.Dispose();
+    }
+
+    [Fact]
     public void Имя_ресурса_собирается_из_набора_и_номера()
     {
         SpinnerStyle style = new("Color Well", 20, true, 1);

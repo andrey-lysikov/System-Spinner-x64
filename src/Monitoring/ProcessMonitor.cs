@@ -7,23 +7,10 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>One row of the hungriest-processes list.</summary>
-/// <param name="Pid">Process id.</param>
-/// <param name="Name">Name as Task Manager shows it.</param>
-/// <param name="CpuPercent">Share of the processor between two polls, counting the cores.</param>
-/// <param name="MemoryMb">Memory in use, megabytes.</param>
-/// <param name="Icon">Icon of the executable, or null when it could not be reached.</param>
+// One row of the hungriest-processes list.
 public sealed record ProcessUsage(int Pid, string Name, double CpuPercent, double MemoryMb, Icon? Icon);
 
-/// <summary>
-/// Who is taking the processor and the memory. The load is counted exactly the way Task Manager
-/// counts it: the processor time a process gained between two polls, divided by all the time the
-/// machine had over the same span — that is, the span multiplied by the number of logical cores.
-///
-/// Hence the first poll shows nothing. One point is not enough for a difference, and inventing
-/// one would mean showing an untruth at the single moment the user looks at the list for the
-/// first time.
-/// </summary>
+// Who is taking the processor and the memory.
 public sealed class ProcessMonitor : IDisposable
 {
     private readonly Dictionary<int, (TimeSpan Cpu, DateTime At)> _previous = new();
@@ -31,7 +18,7 @@ public sealed class ProcessMonitor : IDisposable
 
     private static readonly int Cores = Environment.ProcessorCount;
 
-    /// <summary>The process list, sorted by processor load.</summary>
+    // The process list, sorted by processor load.
     public IReadOnlyList<ProcessUsage> Snapshot(int take)
     {
         var result = new List<ProcessUsage>();
@@ -88,7 +75,9 @@ public sealed class ProcessMonitor : IDisposable
         return result
             .OrderByDescending(p => p.CpuPercent)
             .ThenByDescending(p => p.MemoryMb)
-            .Take(Math.Clamp(take, 1, 100))
+            .Take(Math.Clamp(take,
+                          AppParameters.Limits.MinTopProcesses,
+                          AppParameters.Limits.MaxTopProcesses))
             .Select(p => p with { Icon = IconFor(p.Pid) })
             .ToList();
     }

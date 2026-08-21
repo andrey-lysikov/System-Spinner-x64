@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace SystemSpinnerX64.ViewModels;
 
-/// <summary>Common base for everything bound to the overlay.</summary>
+// Common base for everything bound to the overlay.
 public abstract class Observable : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;

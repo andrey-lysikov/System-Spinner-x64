@@ -7,12 +7,8 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Devices;
 
-/// <summary>
-/// What to do with a pressed volume or brightness key: by how much, to what, and whether to take
-/// it on at all. The same order as the macOS version: the step is counted from the current value
-/// rounded to the step grid — otherwise, after someone else moved it (a system slider, the
-/// buttons on the monitor), the scale would drift off the grid and show fractional ticks.
-/// </summary>
+// What to do with a pressed volume or brightness key: by how much, to what, and whether to take it
+// on at all.
 public sealed class DisplayManager : IDisposable
 {
     private readonly OsdConfig _cfg;
@@ -23,14 +19,14 @@ public sealed class DisplayManager : IDisposable
         _cfg = cfg;
     }
 
-    /// <summary>Names of the attached screens — the tray menu shows these.</summary>
+    // Names of the attached screens — the tray menu shows these.
     public IReadOnlyList<string> DisplayNames =>
         _displays.Select(d => d.IsInternal ? d.Name + " (built-in)" : d.Name).ToList();
 
-    /// <summary>Whether there is anything to drive by brightness.</summary>
+    // Whether there is anything to drive by brightness.
     public bool HasBrightnessControl => _displays.Any(d => d.ControlsBrightness);
 
-    /// <summary>Polls the attached screens again. Called when they change and on demand.</summary>
+    // Polls the attached screens again.
     public void Refresh()
     {
         Release();
@@ -51,7 +47,9 @@ public sealed class DisplayManager : IDisposable
                  $"{(HasBrightnessControl ? "available" : "unavailable")}");
     }
 
-    private double Step => 100.0 / Math.Clamp(_cfg.AdjustmentSteps, 2, 100);
+    private double Step => 100.0 / Math.Clamp(_cfg.AdjustmentSteps,
+                                              AppParameters.Limits.MinAdjustmentSteps,
+                                              AppParameters.Limits.MaxAdjustmentSteps);
 
     // Rounding to the step grid is the whole point of the "adjustment steps" setting: without it
     // the first press after someone else moved the value would land on a fractional tick.
@@ -61,13 +59,8 @@ public sealed class DisplayManager : IDisposable
         return Math.Clamp(stepped, 0, 100);
     }
 
-    /// <summary>
-    /// Changes the brightness of every screen that drives it.
-    /// </summary>
-    /// <param name="shown">
-    /// What to show in the OSD: the value of the screen the pointer is on, or of the first one
-    /// driven when the pointer is on a screen that has no brightness control.
-    /// </param>
+    // Changes the brightness of every screen that drives it. "shown" is what the OSD displays: the
+    // screen the pointer is on, or the first one driven.
     public MediaKeyResult AdjustBrightness(bool up, out double shown)
     {
         shown = 0;
@@ -106,12 +99,8 @@ public sealed class DisplayManager : IDisposable
         return MediaKeyResult.Consumed;
     }
 
-    /// <summary>
-    /// Changes the volume. By default this is the Windows output device volume — it works with
-    /// any output, headphones included. The monitor speakers over DDC are a separate setting:
-    /// when the sound goes over HDMI those two controls sit one after another, and moving both
-    /// at once means turning it down twice.
-    /// </summary>
+    // Changes the volume. By default this is the Windows output device volume — it works with any
+    // output, headphones included.
     public MediaKeyResult AdjustVolume(bool up, out double shown)
     {
         shown = 0;
@@ -130,7 +119,7 @@ public sealed class DisplayManager : IDisposable
         return AudioEndpoint.SetVolume(shown) ? MediaKeyResult.Consumed : MediaKeyResult.PassThrough;
     }
 
-    /// <summary>Toggles mute. The OSD then shows zero, or the previous volume.</summary>
+    // Toggles mute. The OSD then shows zero, or the previous volume.
     public MediaKeyResult ToggleMute(out double shown)
     {
         shown = 0;

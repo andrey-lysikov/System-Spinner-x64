@@ -2,7 +2,7 @@ using LibreHardwareMonitor.Hardware;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>Walks the hardware tree and refreshes the sensor values.</summary>
+// Walks the hardware tree and refreshes the sensor values.
 internal sealed class UpdateVisitor : IVisitor
 {
     public void VisitComputer(IComputer computer) => computer.Traverse(this);

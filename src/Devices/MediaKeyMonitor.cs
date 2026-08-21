@@ -6,15 +6,7 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Devices;
 
-/// <summary>
-/// Intercepting the volume keys and the brightness combinations.
-///
-/// Two different mechanisms, and not by choice. The volume keys are handled by the system, which
-/// draws its own panel, so they have to be caught by a low-level hook and not passed on — or the
-/// system panel would pop up over ours. Brightness keys do not exist in Windows at all: on
-/// laptops the firmware handles them and they never reach an application, so brightness hangs on
-/// an ordinary combination registered through RegisterHotKey.
-/// </summary>
+// Intercepting the volume keys and the brightness combinations.
 internal sealed class MediaKeyMonitor : IDisposable
 {
     private const int WhKeyboardLl = 13;
@@ -60,10 +52,7 @@ internal sealed class MediaKeyMonitor : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
-    /// <summary>
-    /// Who decides what to do with a key. Returning <see cref="MediaKeyResult.PassThrough"/> hands
-    /// the press back to the system.
-    /// </summary>
+    // Who decides what to do with a key.
     public Func<MediaKey, MediaKeyResult>? Handler { get; set; }
 
     // The delegate has to outlive the hook: the garbage collector does not know Windows refers to
@@ -72,13 +61,14 @@ internal sealed class MediaKeyMonitor : IDisposable
 
     private IntPtr _hook;
     private HwndSource? _messages;
+    private bool _hooked;
 
     public MediaKeyMonitor()
     {
         _callback = OnKey;
     }
 
-    /// <summary>Installs the volume key hook. false means volume stays with the system.</summary>
+    // Installs the volume key hook. false means volume stays with the system.
     public bool StartVolumeKeys()
     {
         if (_hook != IntPtr.Zero) return true;
@@ -98,23 +88,24 @@ internal sealed class MediaKeyMonitor : IDisposable
         return true;
     }
 
-    /// <summary>
-    /// Registers the brightness combinations. An empty one is skipped: that is a refusal to drive
-    /// brightness, not an error.
-    /// </summary>
-    /// <returns>A description of the failure, or null.</returns>
+    // Registers the brightness combinations.
     public string? StartBrightnessKeys(HotKey? up, HotKey? down)
     {
         if (up is null && down is null) return null;
 
         // The window is only an address for WM_HOTKEY messages; there is no reason to show it.
         // HWND_MESSAGE (-3) — a window with no screen presence, alive for its message queue.
-        _messages ??= new HwndSource(new HwndSourceParameters("SystemSpinnerX64.HotKeys")
+        _messages ??= new HwndSource(new HwndSourceParameters(AppParameters.Identity.HotKeyWindow)
         {
             ParentWindow = new IntPtr(-3)
         });
 
-        _messages.AddHook(OnWindowMessage);
+        // Once: called twice, the same hook would run the handler twice for every press.
+        if (!_hooked)
+        {
+            _messages.AddHook(OnWindowMessage);
+            _hooked = true;
+        }
 
         string? problem = null;
         if (up is not null &&
@@ -209,6 +200,7 @@ internal sealed class MediaKeyMonitor : IDisposable
             UnregisterHotKey(_messages.Handle, BrightnessUpId);
             UnregisterHotKey(_messages.Handle, BrightnessDownId);
             _messages.RemoveHook(OnWindowMessage);
+            _hooked = false;
             _messages.Dispose();
             _messages = null;
         }

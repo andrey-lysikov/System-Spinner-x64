@@ -11,10 +11,7 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Views;
 
-/// <summary>
-/// About: what this is, who wrote it and which version. A window of its own rather than a system
-/// dialog — that one knows no theme and would be a white patch on a dark Windows.
-/// </summary>
+// About: what this is, who wrote it and which version.
 public partial class AboutWindow : Window
 {
     public AboutWindow(string version)
@@ -25,7 +22,10 @@ public partial class AboutWindow : Window
         // or the numbers would end up on the wrong side of their captions.
         FlowDirection = Text.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
 
-        Description.Text = Text.AboutText(version);
+        // The name of the project with its version on one line, the story underneath.
+        Headline.Text = $"System Spinner x64 {version}";
+        Description.Text = Text.AboutText;
+        Project.Content = Text.MenuProject;
         Logo.Source = LoadIcon();
 
         ApplyTheme();
@@ -70,12 +70,15 @@ public partial class AboutWindow : Window
         Shell.BorderBrush = new SolidColorBrush(foreground) { Opacity = 0.12 };
         System.Windows.Documents.TextElement.SetForeground(Body, new SolidColorBrush(foreground));
 
-        Ok.Foreground = new SolidColorBrush(foreground);
-        Ok.Background = new SolidColorBrush(foreground) { Opacity = 0.10 };
-        Ok.BorderBrush = new SolidColorBrush(foreground) { Opacity = 0.18 };
+        foreach (System.Windows.Controls.Button button in new[] { Ok, Project })
+        {
+            button.Foreground = new SolidColorBrush(foreground);
+            button.Background = new SolidColorBrush(foreground) { Opacity = 0.10 };
+            button.BorderBrush = new SolidColorBrush(foreground) { Opacity = 0.18 };
+        }
     }
 
-    /// <summary>Centres the window on the screen under the pointer.</summary>
+    // Centres the window on the screen under the pointer.
     public void ShowAbout()
     {
         // Shown off-screen first: the height depends on how the text wraps, and placing it
@@ -97,7 +100,7 @@ public partial class AboutWindow : Window
         try
         {
             using Stream? stream = typeof(AboutWindow).Assembly
-                .GetManifestResourceStream("SystemSpinnerX64.icon.ico");
+                .GetManifestResourceStream(AppParameters.Identity.IconResource);
             if (stream is null) return null;
 
             var decoder = new IconBitmapDecoder(
@@ -116,4 +119,18 @@ public partial class AboutWindow : Window
     }
 
     private void OnCloseClicked(object sender, RoutedEventArgs e) => CloseOnce();
+
+    // The repository: the source, the releases and the place to report what went wrong.
+    private void OnProjectClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(AppParameters.Links.Project) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Error("the project page did not open", ex);
+        }
+    }
 }

@@ -2,15 +2,7 @@ using System.Collections.Generic;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>
-/// Frame timestamps and the average FPS over them. Split out of <see cref="FpsCounter"/> so it
-/// can be tested: everything there comes from ETW, and <c>TraceEvent</c> cannot be built in a test.
-///
-/// The stamps live on the trace clock — the time of the event, not of its parsing. ETW delivers
-/// events in batches, and stamping them at parse time would give a whole batch nearly the same
-/// time, sending the FPS into the tens of thousands. The process clock is only used to tell how
-/// long ago the last event was: the two scales must not be mixed.
-/// </summary>
+// Frame timestamps and the average FPS over them.
 internal sealed class FrameWindow
 {
     private readonly List<double> _frames = new();
@@ -20,8 +12,6 @@ internal sealed class FrameWindow
     private double _lastEventTime = double.NaN;
     private double _lastEventWall = double.NaN;
 
-    /// <param name="windowSeconds">Averaging window.</param>
-    /// <param name="staleSeconds">How much silence to tolerate before admitting there are no frames.</param>
     public FrameWindow(double windowSeconds, double staleSeconds)
     {
         _windowSeconds = windowSeconds;
@@ -30,10 +20,10 @@ internal sealed class FrameWindow
 
     public int Count => _frames.Count;
 
-    /// <summary>Forget the frames but keep the clock link: what happens on a source change.</summary>
+    // Forget the frames but keep the clock link: what happens on a source change.
     public void ClearFrames() => _frames.Clear();
 
-    /// <summary>Forget everything: another process means another clock and another way to present.</summary>
+    // Forget everything: another process means another clock and another way to present.
     public void Reset()
     {
         _frames.Clear();
@@ -41,8 +31,6 @@ internal sealed class FrameWindow
         _lastEventWall = double.NaN;
     }
 
-    /// <param name="stamp">Frame stamp on the trace clock, seconds.</param>
-    /// <param name="wallNow">"Now" on the process clock.</param>
     public void Add(double stamp, double wallNow)
     {
         // Events from different providers can arrive out of order, and the list is binary-searched.
@@ -55,10 +43,8 @@ internal sealed class FrameWindow
         Trim(wallNow);
     }
 
-    /// <summary>
-    /// The window stretches when no frame fell inside it but the last one arrived recently:
-    /// a delayed batch left the strict window empty and made a dash flicker on the panel.
-    /// </summary>
+    // The window stretches when no frame fell inside it but the last one arrived recently: a
+    // delayed batch left the strict window empty and made a dash flicker on the panel.
     public double? Average(double wallNow)
     {
         if (_frames.Count < 2) return null;

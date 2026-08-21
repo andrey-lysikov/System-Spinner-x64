@@ -4,7 +4,7 @@ using System.Text;
 
 namespace SystemSpinnerX64.Platform;
 
-/// <summary>The user32 calls the overlay cannot do without: click-through, topmost, foreground window.</summary>
+// The user32 calls the overlay cannot do without: click-through, topmost, foreground window.
 internal static class Win32
 {
     public const int GWL_EXSTYLE = -20;
@@ -35,7 +35,7 @@ internal static class Win32
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
 
-    /// <summary>Hands activation to a window. The tray menu needs it to close on a click elsewhere.</summary>
+    // Hands activation to a window. The tray menu needs it to close on a click elsewhere.
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -43,15 +43,12 @@ internal static class Win32
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
-    /// <summary>
-    /// Frees an HICON obtained from <c>Bitmap.GetHicon()</c>. Icon.FromHandle does not take
-    /// ownership, so without this call the handle leaks.
-    /// </summary>
+    // Frees an HICON obtained from Bitmap.GetHicon().
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DestroyIcon(IntPtr hIcon);
 
-    /// <summary>Makes the window transparent to mouse and keyboard — clicks go to the game.</summary>
+    // Makes the window transparent to mouse and keyboard — clicks go to the game.
     public static void SetClickThrough(IntPtr hWnd, bool enabled)
     {
         int ex = GetWindowLong(hWnd, GWL_EXSTYLE);
@@ -61,7 +58,7 @@ internal static class Win32
         SetWindowLong(hWnd, GWL_EXSTYLE, ex);
     }
 
-    /// <summary>Brings the window back to the top without taking focus.</summary>
+    // Brings the window back to the top without taking focus.
     public static void ForceTopmost(IntPtr hWnd) =>
         SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
@@ -95,7 +92,7 @@ internal static class Win32
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
-    /// <summary>Where a window is, in pixels — the one grid all the screens share.</summary>
+    // Where a window is, in pixels — the one grid all the screens share.
     public static bool TryGetWindowRect(IntPtr hWnd, out RECT rect) => GetWindowRect(hWnd, out rect);
 
     [DllImport("user32.dll")]
@@ -108,23 +105,15 @@ internal static class Win32
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
-    /// <summary>Shell windows: the desktop, the taskbar, the Start menu and search.</summary>
+    // Shell windows: the desktop, the taskbar, the Start menu and search.
     private static readonly string[] ShellClasses =
     {
         "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
         "Windows.UI.Core.CoreWindow", "XamlExplorerHostIslandWindow"
     };
 
-    /// <summary>
-    /// Whether the foreground window covers its whole monitor — how the overlay tells a game from
-    /// the desktop. The test is loose: a full-screen video player counts too, but that beats the
-    /// opposite mistake — a panel vanishing mid-fight is more annoying.
-    ///
-    /// The monitor comes back with the answer: with two screens attached the game is not
-    /// necessarily on the main one, and the panel belongs on the screen being played on.
-    /// </summary>
-    /// <param name="work">Work area of that monitor, in pixels.</param>
-    /// <param name="scale">Its scale: 1.5 at 150 per cent. Screens may differ in this.</param>
+    // Whether the foreground window covers its whole monitor — how the overlay tells a game from
+    // the desktop.
     public static bool TryFullscreenArea(out RECT work, out double scale)
     {
         work = default;
@@ -160,7 +149,7 @@ internal static class Win32
         return true;
     }
 
-    /// <summary>The scale of one monitor: 1.5 at 150 per cent. Falls back to 1 when unavailable.</summary>
+    // The scale of one monitor: 1.5 at 150 per cent.
     public static double ScaleOf(IntPtr monitor)
     {
         try
@@ -177,14 +166,11 @@ internal static class Win32
         return 1;
     }
 
-    /// <summary>The scale of the monitor a point in pixels falls on.</summary>
+    // The scale of the monitor a point in pixels falls on.
     public static double ScaleAt(int x, int y) =>
         ScaleOf(MonitorFromPoint(new POINT { X = x, Y = y }, MONITOR_DEFAULTTONEAREST));
 
-    /// <summary>
-    /// The monitor the pointer is on — the screen being looked at. Zero when the position is
-    /// unavailable, which matches no monitor.
-    /// </summary>
+    // The monitor the pointer is on — the screen being looked at.
     public static IntPtr MonitorUnderPointer() =>
         GetCursorPos(out POINT pointer)
             ? MonitorFromPoint(pointer, MONITOR_DEFAULTTONEAREST)

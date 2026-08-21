@@ -4,20 +4,12 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>
-/// The page file — what the macOS version calls swap. LibreHardwareMonitor does not report it:
-/// its "virtual memory" is the commit charge, which counts memory that has been promised rather
-/// than memory that actually went to disk. Windows exposes the page file itself through WMI, and
-/// that is the number worth showing: it means the machine has run out of RAM.
-///
-/// The query costs tens of milliseconds, so it only runs while the status window is open — that
-/// is the one place the value is shown.
-/// </summary>
+// The page file — what the macOS version calls swap.
 internal static class SwapMonitor
 {
     private const double Megabyte = 1024.0;
 
-    /// <summary>Used and total page file in gigabytes, or null when there is no page file.</summary>
+    // Used and total page file in gigabytes, or null when there is no page file.
     public static (double UsedGb, double TotalGb)? Read()
     {
         try

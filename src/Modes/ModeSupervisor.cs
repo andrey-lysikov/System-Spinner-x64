@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Threading;
@@ -21,17 +22,7 @@ using SystemSpinnerX64.Views;
 
 namespace SystemSpinnerX64.Modes;
 
-/// <summary>
-/// Two faces of one program and the switch between them.
-///
-/// While a full-screen application is in front of you this is an overlay: rows of numbers over
-/// the picture and a frame counter. The moment it is gone this is a tray icon: an animation whose
-/// speed follows the CPU, a status window behind it and the custom volume and brightness panel.
-///
-/// The switch is not about looks alone. In a game nobody needs an icon hidden behind a full-screen
-/// window, nor the process list; outside a game nobody needs the ETW session of the frame counter,
-/// and that is the most expensive part of the work. So the idle half is not hidden but stopped.
-/// </summary>
+// Two faces of one program and the switch between them.
 public sealed class ModeSupervisor : IDisposable
 {
     private readonly AppConfig _cfg;
@@ -51,6 +42,9 @@ public sealed class ModeSupervisor : IDisposable
 
     private readonly DispatcherTimer _modeTimer = new();
     private readonly DispatcherTimer _fpsTimer = new();
+    private readonly DispatcherTimer _updateTimer = new();
+    private readonly DispatcherTimer _displayTimer = new();
+    private readonly DispatcherTimer _wakeTimer = new();
 
     private StatsWindow? _stats;
 
@@ -60,6 +54,12 @@ public sealed class ModeSupervisor : IDisposable
     private Win32.RECT? _gameScreen;
 
     private string _fpsApi = "";
+    private string _audioDevice = "";
+
+    // How many screens are attached. Read when the screens are looked at rather than every poll:
+    // asking the system is a walk of the monitor list.
+    private int _screenCount = 1;
+    private DateTime _lastRescan = DateTime.MinValue;
     private DateTime _lastReadingsLog = DateTime.MinValue;
 
     public ModeSupervisor(AppConfig cfg, HardwareMonitor hardware)
@@ -68,9 +68,9 @@ public sealed class ModeSupervisor : IDisposable
         _hardware = hardware;
 
         _metrics = new MetricsService(cfg, hardware);
-        _fps = new FpsCounter(cfg.Fps);
+        _fps = new FpsCounter();
 
-        _overlayModel = new OverlayViewModel(cfg.Warn, cfg.Fans.Extra.Count);
+        _overlayModel = new OverlayViewModel(cfg.Warn, cfg.Appearance.Rows, cfg.Fans.Extra.Count);
         _overlay = new OverlayWindow(cfg, _overlayModel);
 
         _tray = new TrayIcon(cfg);
@@ -91,11 +91,35 @@ public sealed class ModeSupervisor : IDisposable
         _fpsTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(AppParameters.Polling.MinIntervalMs, cfg.UpdateIntervalMs));
         _fpsTimer.Tick += (_, _) => UpdateFps();
 
+        // The screens are looked at again now and then: the sound device every few minutes, the
+        // whole list once an hour. Neither has an event of its own that Windows raises here.
+        _displayTimer.Interval = AppParameters.Displays.AudioCheckPeriod;
+        _displayTimer.Tick += (_, _) => WatchDisplays();
+
+        // Waking up: the screens come back a moment after the message, and one asked too early
+        // answers nothing over DDC.
+        _wakeTimer.Interval = AppParameters.Displays.ResumeDelay;
+        _wakeTimer.Tick += (_, _) =>
+        {
+            _wakeTimer.Stop();
+            _audioDevice = AudioEndpoint.DefaultDeviceName();
+            RescanDisplays("the machine woke up");
+        };
+
+        // The first check waits, then one a day — the same rhythm as the macOS version.
+        _updateTimer.Interval = AppParameters.Updates.FirstCheckDelay;
+        _updateTimer.Tick += (_, _) =>
+        {
+            _updateTimer.Interval = AppParameters.Updates.CheckPeriod;
+            CheckForUpdates(announceEither: false);
+        };
+
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
     }
 
-    /// <summary>Brings up both halves and switches on the one that fits the moment.</summary>
+    // Brings up both halves and switches on the one that fits the moment.
     public void Start()
     {
         // The overlay window is created at once but only shown in a game: parsing the markup as
@@ -112,13 +136,15 @@ public sealed class ModeSupervisor : IDisposable
 
         ReloadSpinner();
 
-        _displays.Refresh();
-        _tray.ShowDisplays(_displays.DisplayNames);
+        RescanDisplays("the first look");
+        _audioDevice = AudioEndpoint.DefaultDeviceName();
 
         StartMediaKeys();
 
         _metrics.Start();
         _modeTimer.Start();
+        _updateTimer.Start();
+        _displayTimer.Start();
 
         // The first check right away rather than in a second: the app may have been started from a game.
         UpdateMode();
@@ -133,11 +159,13 @@ public sealed class ModeSupervisor : IDisposable
         Win32.RECT screen = default;
         double scale = 1;
 
-        bool inGame = _cfg.ShowOverlayInGames && Win32.TryFullscreenArea(out screen, out scale);
+        // Full screen is decided on its own, without asking whether the panel is wanted: the tray
+        // icon is hidden behind a game either way, and an animation nobody can see is pure waste.
+        bool inGame = Win32.TryFullscreenArea(out screen, out scale);
 
         if (inGame == _inGame)
         {
-            if (_inGame)
+            if (_inGame && _cfg.ShowOverlayInGames)
             {
                 // The game can move to another monitor without ever ceasing to be full screen,
                 // and the panel goes with it.
@@ -154,8 +182,8 @@ public sealed class ModeSupervisor : IDisposable
 
         _inGame = inGame;
         Log.Info(inGame
-            ? "a full-screen application is active — overlay shown, spinner stopped"
-            : "no full-screen application — overlay hidden, spinner running");
+            ? "a full-screen application is active — spinner stopped"
+            : "no full-screen application — spinner running");
 
         if (inGame) EnterGame();
         else EnterDesktop();
@@ -173,6 +201,29 @@ public sealed class ModeSupervisor : IDisposable
         // The status window over a game means a minimised game: it takes focus.
         HideStats();
 
+        if (TrayHidden) _animator.Stop();
+
+        ShowOverlay();
+    }
+
+    // Whether the tray icon is out of sight. It is only when a game covers the one screen there
+    // is: with a second monitor the icon stays visible, and so should the animation.
+    private bool TrayHidden => _inGame && _screenCount <= 1;
+
+    private void EnterDesktop()
+    {
+        HideOverlay();
+
+        if (_cfg.SpinOnDesktop) _animator.UpdateSpeed(_metrics.Latest.Readings.BusiestLoad);
+        else _animator.Rewind();
+    }
+
+    // The panel and the frame counter go together: counting frames is the expensive half, and
+    // with the panel switched off there is nowhere to show them.
+    private void ShowOverlay()
+    {
+        if (!_cfg.ShowOverlayInGames) return;
+
         _overlay.ApplyLayout();
         _overlay.Visibility = Visibility.Visible;
         _overlay.KeepOnTop();
@@ -185,13 +236,9 @@ public sealed class ModeSupervisor : IDisposable
         }
 
         _fpsTimer.Start();
-
-        // The tray animation is invisible behind a full-screen window while it changes the icon up
-        // to a hundred times a second — in a game that is pure waste.
-        _animator.Stop();
     }
 
-    private void EnterDesktop()
+    private void HideOverlay()
     {
         _overlay.Visibility = Visibility.Hidden;
         _overlay.ShowNotice("");
@@ -200,11 +247,8 @@ public sealed class ModeSupervisor : IDisposable
         _fps.Stop();
         _fpsApi = "";
 
-        // The frame values went stale the moment the game left — they must not pass for current.
+        // The frame values went stale the moment the panel left — they must not pass for current.
         _overlayModel.ApplyFps(null, null);
-
-        if (_cfg.SpinOnDesktop) _animator.UpdateSpeed(_metrics.Latest.Readings.CpuLoad ?? 0);
-        else _animator.Rewind();
     }
 
     // --- Readings ---
@@ -213,9 +257,12 @@ public sealed class ModeSupervisor : IDisposable
     {
         Readings r = snapshot.Readings;
 
-        if (_inGame) _overlayModel.Apply(r);
+        if (_inGame && _cfg.ShowOverlayInGames) _overlayModel.Apply(r);
 
-        if (!_inGame && _cfg.SpinOnDesktop) _animator.UpdateSpeed(r.CpuLoad ?? 0);
+        // Checked every poll rather than at the change of face alone: a monitor can be unplugged
+        // mid-game, and then the icon goes behind the game after all.
+        if (TrayHidden) _animator.Stop();
+        else if (_cfg.SpinOnDesktop) _animator.UpdateSpeed(r.BusiestLoad);
 
         _tray.ShowTip(Tip(r));
 
@@ -243,8 +290,9 @@ public sealed class ModeSupervisor : IDisposable
     // Writes to the log what the panel shows — for checking against Task Manager or HWiNFO.
     private void LogReadings(Readings r)
     {
-        if (AppParameters.Polling.ReadingsLogSeconds <= 0) return;
-        if (DateTime.UtcNow - _lastReadingsLog < TimeSpan.FromSeconds(AppParameters.Polling.ReadingsLogSeconds)) return;
+        TimeSpan period = TimeSpan.FromSeconds(AppParameters.Polling.ReadingsLogSeconds);
+        if (DateTime.UtcNow - _lastReadingsLog < period) return;
+
         _lastReadingsLog = DateTime.UtcNow;
 
         Log.Info($"readings: CPU {Show(r.CpuLoad)} % {Show(r.CpuTempC)} °C {Show(r.CpuPowerW)} W " +
@@ -313,12 +361,6 @@ public sealed class ModeSupervisor : IDisposable
 
     private void StartMediaKeys()
     {
-        if (!_cfg.Osd.Enabled)
-        {
-            Log.Info("media keys are left to Windows: Osd.Enabled = false");
-            return;
-        }
-
         _keys.Handler = OnMediaKey;
         _keys.StartVolumeKeys();
 
@@ -376,6 +418,7 @@ public sealed class ModeSupervisor : IDisposable
     private void WireTray()
     {
         _tray.StatsRequested += ToggleStats;
+        _tray.UpdateRequested += () => CheckForUpdates(announceEither: true);
         _tray.AutoStartToggled += SetAutoStart;
         _tray.SpinnerChanged += ReloadSpinner;
 
@@ -385,20 +428,17 @@ public sealed class ModeSupervisor : IDisposable
             _fpsTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1000, _cfg.UpdateIntervalMs));
         };
 
-        _tray.OverlayChanged += UpdateMode;
-
-        _tray.OsdChanged += () =>
+        // The switch takes effect at once, even mid-game: the panel appears or goes, and the
+        // frame counter with it. Whether the tray animation runs does not depend on it.
+        _tray.OverlayChanged += () =>
         {
-            _displays.Refresh();
-            _tray.ShowDisplays(_displays.DisplayNames);
+            if (!_inGame) return;
+
+            if (_cfg.ShowOverlayInGames) ShowOverlay();
+            else HideOverlay();
         };
 
-        _tray.DisplayRefreshRequested += () =>
-        {
-            _displays.Refresh();
-            _tray.ShowDisplays(_displays.DisplayNames);
-            _tray.Notify(Text.DisplaysFound(_displays.DisplayNames.Count));
-        };
+        _tray.OsdChanged += () => RescanDisplays("the OSD settings changed");
 
         // The language changes the titles of everything already built — the menu is rebuilt, and
         // the status window re-reads its captions the next time it is shown.
@@ -425,6 +465,77 @@ public sealed class ModeSupervisor : IDisposable
 
     // --- System changes ---
 
+    // --- Screens and sound ---
+
+    // A changed sound device means the volume goes somewhere else — the monitor speakers, the
+    // headphones — and the hourly pass catches a monitor that was switched on, handed over by
+    // a KVM, or woken up on its own.
+    private void WatchDisplays()
+    {
+        string device = AudioEndpoint.DefaultDeviceName();
+        bool soundChanged = device != _audioDevice;
+        _audioDevice = device;
+
+        bool due = DateTime.UtcNow - _lastRescan >= AppParameters.Displays.RescanPeriod;
+
+        if (soundChanged) RescanDisplays($"the sound device is now \"{device}\"");
+        else if (due) RescanDisplays("the hourly look");
+    }
+
+    private void RescanDisplays(string why)
+    {
+        _lastRescan = DateTime.UtcNow;
+        _screenCount = System.Windows.Forms.Screen.AllScreens.Length;
+
+        _displays.Refresh();
+        _tray.ShowDisplays(_displays.DisplayNames);
+
+        Log.Info($"displays rescanned: {why}");
+    }
+
+    // --- Updates ---
+
+    // Asks GitHub for the newest release. The daily check only speaks up when there is something
+    // new; the one from the menu answers either way — it was asked a question.
+    private void CheckForUpdates(bool announceEither)
+    {
+        _ = Task.Run(async () =>
+        {
+            UpdateChecker.Result? result = await UpdateChecker.Check();
+
+            // The answer can arrive after Quit: a dispatcher on its way out would throw, and the
+            // exception would surface as a crash in the log at every exit.
+            if (_overlay.Dispatcher.HasShutdownStarted) return;
+
+            _ = _overlay.Dispatcher.BeginInvoke(() =>
+            {
+                if (result is null)
+                {
+                    if (announceEither) _tray.Notify(Text.UpdateCheckFailed);
+                    return;
+                }
+
+                if (result.IsNewer)
+                    _tray.Notify(Text.UpdateAvailable(result.Latest), AppParameters.Links.LatestRelease);
+                else if (announceEither)
+                    _tray.Notify(Text.UpdateUpToDate(result.Current));
+            });
+        });
+    }
+
+    // --- System changes ---
+
+    // Waking from sleep or hibernation. The monitors come back a moment later than the message,
+    // and one that was asked too early answers nothing over DDC — hence the pause.
+    private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != PowerModes.Resume) return;
+
+        // One timer for every wake-up rather than a new one each time: a machine can report
+        // resuming twice in a row, and each of those would otherwise leave a timer behind.
+        _ = _overlay.Dispatcher.BeginInvoke(() => _wakeTimer.Start());
+    }
+
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) =>
         _overlay.Dispatcher.BeginInvoke(() =>
         {
@@ -438,8 +549,7 @@ public sealed class ModeSupervisor : IDisposable
             // The status window can be left hanging over the edge of what remains.
             _stats?.Reposition();
 
-            _displays.Refresh();
-            _tray.ShowDisplays(_displays.DisplayNames);
+            RescanDisplays("the screen configuration changed");
         });
 
     private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
@@ -460,9 +570,13 @@ public sealed class ModeSupervisor : IDisposable
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        SystemEvents.PowerModeChanged -= OnPowerModeChanged;
 
         _modeTimer.Stop();
         _fpsTimer.Stop();
+        _updateTimer.Stop();
+        _displayTimer.Stop();
+        _wakeTimer.Stop();
 
         _stats?.Close();
         _overlay.Close();
@@ -472,8 +586,10 @@ public sealed class ModeSupervisor : IDisposable
         _displays.Dispose();
         DdcQueue.Stop();
 
-        _animator.Dispose();
+        // The tray goes first: the animator frees the icon handles, and the icon must not be
+        // showing one of them by then.
         _tray.Dispose();
+        _animator.Dispose();
 
         _metrics.Dispose();
         _fps.Dispose();

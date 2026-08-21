@@ -14,20 +14,15 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Views;
 
-/// <summary>What the chart window shows: processor load history or used memory.</summary>
+// What the chart window shows: processor load history or used memory.
 public enum DetailKind
 {
     Cpu,
     Memory
 }
 
-/// <summary>
-/// History and processes — the second window, the one that slides out from under the chart icon
-/// in the macOS version. A chart of the last quarter of an hour and the list of the hungriest.
-///
-/// A separate window rather than a section of the first: the process list costs a walk of the
-/// process table with icons read from disk, and a window opened for a second must not pay that.
-/// </summary>
+// History and processes — the second window, the one that slides out from under the chart icon in
+// the macOS version.
 public partial class DetailWindow : Window
 {
     private readonly AppConfig _cfg;
@@ -54,14 +49,8 @@ public partial class DetailWindow : Window
             new Action(CloseOnClickAway));
     }
 
-    /// <summary>
-    /// A click anywhere outside this window closes it, and if it did not land on the status
-    /// window either, that one closes too — the pair opened as one thing and goes away as one.
-    ///
-    /// Which window took the click is read from the status window rather than from where focus
-    /// ends up afterwards: hiding an owned window hands activation back to its owner, so by then
-    /// the owner looks active whatever was clicked.
-    /// </summary>
+    // A click anywhere outside this window closes it, and if it did not land on the status window
+    // either, that one closes too — the pair opened as one thing and goes away as one.
     private void CloseOnClickAway()
     {
         // The check is deferred to idle, and by then the click may have come back here.
@@ -73,7 +62,7 @@ public partial class DetailWindow : Window
         if (!clickedTheStatusWindow) (Owner as StatsWindow)?.HideStats();
     }
 
-    /// <summary>What is shown now. A click on the same icon closes the window by this.</summary>
+    // What is shown now. A click on the same icon closes the window by this.
     public DetailKind Kind { get; private set; } = DetailKind.Cpu;
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -106,7 +95,7 @@ public partial class DetailWindow : Window
             label.Foreground = axis;
     }
 
-    /// <summary>Shows the window next to the status window — its owner.</summary>
+    // Shows the window next to the status window — its owner.
     public void ShowDetail(DetailKind kind, MetricsSnapshot snapshot)
     {
         Kind = kind;
@@ -116,12 +105,8 @@ public partial class DetailWindow : Window
         HeadName.Text = Text.DetailColumnName;
         HeadUsage.Text = Text.DetailColumnUsage;
 
-        // Shown before it is filled: Apply() does nothing on a hidden window — otherwise it would
-        // build the chart and the process list while nobody is looking. The other order would
-        // leave the window empty until the next poll, a whole second.
-        //
-        // It appears off screen and transparent: otherwise Windows opens it wherever it sees fit
-        // and it jumps to its place in front of the user.
+        // Shown first, off screen and transparent: Apply() does nothing on a hidden window, and
+        // a visible one would flash wherever Windows opened it.
         Opacity = 0;
         Left = AppParameters.Layout.OffScreen;
         Top = AppParameters.Layout.OffScreen;
@@ -135,7 +120,7 @@ public partial class DetailWindow : Window
         Opacity = 1;
     }
 
-    /// <summary>Follows the status window when that one is placed again.</summary>
+    // Follows the status window when that one is placed again.
     public void Reposition()
     {
         if (IsVisible) Place();
@@ -146,7 +131,7 @@ public partial class DetailWindow : Window
         if (IsVisible) Hide();
     }
 
-    /// <summary>New readings. Called only while the window is open.</summary>
+    // New readings. Called only while the window is open.
     public void Apply(MetricsSnapshot snapshot)
     {
         if (!IsVisible) return;
@@ -196,10 +181,8 @@ public partial class DetailWindow : Window
         return source;
     }
 
-    // To the left of the status window and along its bottom edge — to the right of that one is
-    // the screen edge. If it does not fit on the left, it goes to the right of it instead. The
-    // screen is taken from the status window, not from the pointer: by then the mouse may already
-    // be on the other monitor.
+    // To the left of the status window, along its bottom edge; to the right if it does not fit.
+    // The screen comes from that window, not from the pointer — the mouse may have moved on.
     private void Place()
     {
         if (Owner is not null) ScreenPlacement.PutBeside(this, Owner, AppParameters.Layout.ChartGap);

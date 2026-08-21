@@ -11,14 +11,8 @@ using SystemSpinnerX64.Views;
 
 namespace SystemSpinnerX64.Osd;
 
-/// <summary>
-/// The custom volume and brightness panel: the same bar as in the macOS version, only the blur
-/// comes from Windows 11 rather than from Liquid Glass.
-///
-/// The window lives for as long as the app does and is only shown and hidden: building it on
-/// every key press would mean paying for the markup at the very moment the user is waiting for
-/// the key to do something.
-/// </summary>
+// The custom volume and brightness panel: the same bar as in the macOS version, only the blur comes
+// from Windows 11 rather than from Liquid Glass.
 public partial class OsdWindow : Window
 {
     private readonly AppConfig _cfg;
@@ -48,7 +42,7 @@ public partial class OsdWindow : Window
         ApplyTheme();
     }
 
-    /// <summary>Re-reads the theme and repaints the window.</summary>
+    // Re-reads the theme and repaints the window.
     public void ApplyTheme()
     {
         _dark = Theme.AreWindowsDark();
@@ -73,7 +67,7 @@ public partial class OsdWindow : Window
     private Color _scaleForeground = Colors.White;
     private int _scaleSteps = -1;
 
-    /// <summary>Shows the panel with a value in percent.</summary>
+    // Shows the panel with a value in percent.
     public void Show(double percent, OsdKind kind, int steps)
     {
         Glyph.Text = GlyphFor(kind, percent);
@@ -97,7 +91,7 @@ public partial class OsdWindow : Window
         Opacity = 1;
     }
 
-    /// <summary>Hides the panel. The window stays built.</summary>
+    // Hides the panel. The window stays built.
     public void HideOsd()
     {
         if (!IsVisible) return;
@@ -123,7 +117,9 @@ public partial class OsdWindow : Window
     // key press would be for nothing.
     private void DrawScale(int steps)
     {
-        steps = Math.Clamp(steps, 2, 100);
+        steps = Math.Clamp(steps,
+                           AppParameters.Limits.MinAdjustmentSteps,
+                           AppParameters.Limits.MaxAdjustmentSteps);
         if (steps == _scaleSteps) return;
         _scaleSteps = steps;
 
@@ -150,9 +146,6 @@ public partial class OsdWindow : Window
         }
     }
 
-    /// <summary>
-    /// Puts the panel at the bottom of the screen the pointer is on. The pointer, not the active
-    /// window: a volume key is pressed while looking where the mouse is.
-    /// </summary>
-    private void PlaceOnActiveScreen() => ScreenPlacement.PutAboveBottom(this, _cfg.Osd.BottomInset);
+    // Puts the panel at the bottom of the screen the pointer is on.
+    private void PlaceOnActiveScreen() => ScreenPlacement.PutAboveBottom(this, AppParameters.Osd.BottomInset);
 }

@@ -8,11 +8,8 @@ using LibreHardwareMonitor.Hardware;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>
-/// Polling the hardware through LibreHardwareMonitor: keeps the sensor tree open, refreshes the
-/// values each cycle and picks out the ones the panel shows. The sensor names come from the
-/// config: they depend on the hardware generation and the library version.
-/// </summary>
+// Polling the hardware through LibreHardwareMonitor: keeps the sensor tree open, refreshes the
+// values each cycle and picks out the ones the panel shows.
 public sealed class HardwareMonitor : IDisposable
 {
     private readonly Computer _computer;
@@ -55,9 +52,12 @@ public sealed class HardwareMonitor : IDisposable
         _cpu = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
         _memory = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Memory);
 
-        // Discrete NVIDIA first: on a Core Ultra, GpuIndex = 0 would otherwise be the integrated one.
+        // Discrete cards first: on a Core Ultra or a Ryzen with graphics, GpuIndex = 0 would
+        // otherwise be the integrated one. Intel graphics go last — on an Intel machine the
+        // discrete card is somebody else's, and an Arc is picked with GpuIndex.
         var gpus = _computer.Hardware.Where(FanClassifier.IsGpu)
-                                     .OrderByDescending(h => h.HardwareType == HardwareType.GpuNvidia)
+                                     .OrderBy(h => h.HardwareType == HardwareType.GpuIntel)
+                                     .ThenByDescending(h => h.HardwareType == HardwareType.GpuNvidia)
                                      .ToList();
         _gpu = gpus.Count == 0 ? null : gpus[Math.Clamp(_cfg.GpuIndex, 0, gpus.Count - 1)];
 
@@ -178,14 +178,14 @@ public sealed class HardwareMonitor : IDisposable
 
     private bool _clockSourcesLogged;
 
-    // On hybrid Intel the cores are named "P-Core #1", on plain ones "CPU Core #1" — so explicit
-    // P-cores are looked for first, and failing that every core except the efficient ones.
+    // On hybrid Intel the cores are named "P-Core #1"; on plain Intel and on AMD they are
+    // "Core #1". So explicit P-cores first, and failing that every core but the efficient ones.
     private double? PerformanceCoreClock()
     {
         if (_cpu is null) return null;
 
         string wanted = _cfg.Sensors.CpuClockCores;
-        string excluded = _cfg.Sensors.CpuClockExclude;
+        string excluded = AppParameters.Sensors.ClockExclude;
 
         var clocks = Collect(_cpu, SensorType.Clock).Where(s => s.Value.HasValue).ToList();
 

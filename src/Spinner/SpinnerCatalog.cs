@@ -7,21 +7,10 @@ using System.Text.RegularExpressions;
 
 namespace SystemSpinnerX64.Spinner;
 
-/// <summary>
-/// The frame sets baked into the assembly. Frames are resources named like
-/// <c>Spinners/Blue Ball/3.png</c> — one folder per set — so both the list of sets and the frame
-/// count come from the resources rather than a hand-written table: a table that drifted from the
-/// assembly would mean an empty tray icon.
-///
-/// Only what the pictures cannot tell is written by hand: whether a set survives being repainted
-/// as a silhouette, and how much it needs slowing down.
-/// </summary>
+// The frame sets baked into the assembly.
 public static class SpinnerCatalog
 {
     public const string ResourcePrefix = "Spinners/";
-
-    /// <summary>The set used when the config names an unknown one.</summary>
-    public const string FallbackName = "Loader";
 
     // Set and frame number: "Blue Ball/12.png" gives "Blue Ball" and 12.
     private static readonly Regex FrameName = new(
@@ -44,27 +33,24 @@ public static class SpinnerCatalog
     public static IReadOnlyList<SpinnerStyle> All { get; } = Discover();
 
     public static SpinnerStyle Fallback { get; } =
-        All.FirstOrDefault(s => s.Name.Equals(FallbackName, StringComparison.OrdinalIgnoreCase))
+        All.FirstOrDefault(s => s.Name.Equals(AppParameters.Spinning.FallbackName, StringComparison.OrdinalIgnoreCase))
         ?? All.FirstOrDefault()
-        ?? new SpinnerStyle(FallbackName, 0, false, 1);
+        ?? new SpinnerStyle(AppParameters.Spinning.FallbackName, 0, false, 1);
 
     public static SpinnerStyle? Find(string name) =>
         All.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>The set by name; an unknown name is no reason to end up with no icon.</summary>
+    // The set by name; an unknown name is no reason to end up with no icon.
     public static SpinnerStyle Validate(string name) => Find(name) ?? Fallback;
 
-    /// <summary>Resource name of one frame.</summary>
+    // Resource name of one frame.
     public static string ResourceName(SpinnerStyle style, int index) =>
         $"{ResourcePrefix}{style.Name}/{index.ToString(CultureInfo.InvariantCulture)}.png";
 
     private static IReadOnlyList<SpinnerStyle> Discover() =>
         Group(typeof(SpinnerCatalog).Assembly.GetManifestResourceNames());
 
-    /// <summary>
-    /// Parses resource names into the list of sets. Separated from reading the assembly so it can
-    /// be tested: there is nothing to build an assembly with the right resources from in a test.
-    /// </summary>
+    // Parses resource names into the list of sets.
     internal static IReadOnlyList<SpinnerStyle> Group(IEnumerable<string> resourceNames)
     {
         var frames = new Dictionary<string, int>(StringComparer.Ordinal);

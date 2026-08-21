@@ -4,14 +4,7 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Devices;
 
-/// <summary>
-/// Volume and mute of the default output device through Core Audio.
-///
-/// The interfaces are declared here in full rather than taken from a package: four calls out of
-/// eighteen are needed, and the dependency would have to be dragged into an exe that is promised
-/// as a single file. The order of the methods is the order in the interface table and must not
-/// be rearranged: COM does not read names, it counts offsets.
-/// </summary>
+// Volume and mute of the default output device through Core Audio.
 internal static class AudioEndpoint
 {
     private const int ERender = 0;
@@ -94,7 +87,7 @@ internal static class AudioEndpoint
         [FieldOffset(8)] public IntPtr Pointer;
     }
 
-    /// <summary>PKEY_Device_FriendlyName — "Speakers (Realtek)" or a monitor name over HDMI.</summary>
+    // PKEY_Device_FriendlyName — "Speakers (Realtek)" or a monitor name over HDMI.
     private static PropertyKey FriendlyNameKey => new()
     {
         FormatId = new Guid("a45c254e-df1c-4efd-8020-67d146a850e0"),
@@ -142,7 +135,7 @@ internal static class AudioEndpoint
         }
     }
 
-    /// <summary>Lets go of a COM object at once instead of waiting for a collection.</summary>
+    // Lets go of a COM object at once instead of waiting for a collection.
     private static void Release(object? comObject)
     {
         if (comObject is null || !Marshal.IsComObject(comObject)) return;
@@ -151,7 +144,7 @@ internal static class AudioEndpoint
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"a COM object was not released: {ex.Message}"); }
     }
 
-    /// <summary>Opens the output, hands it over and releases it whatever happens.</summary>
+    // Opens the output, hands it over and releases it whatever happens.
     private static T With<T>(Func<IAudioEndpointVolume, T> use, T whenUnavailable)
     {
         IAudioEndpointVolume? volume = Open(out _);
@@ -192,7 +185,7 @@ internal static class AudioEndpoint
         }
     }
 
-    /// <summary>Name of the default output device. It shows whether the sound goes to a monitor.</summary>
+    // Name of the default output device.
     public static string DefaultDeviceName()
     {
         IAudioEndpointVolume? volume = Open(out string name);
@@ -200,12 +193,12 @@ internal static class AudioEndpoint
         return name;
     }
 
-    /// <summary>Volume of the default output device in percent, or null when there is none.</summary>
+    // Volume of the default output device in percent, or null when there is none.
     public static double? Volume() =>
         With<double?>(volume =>
             volume.GetMasterVolumeLevelScalar(out float level) == 0 ? level * 100.0 : null, null);
 
-    /// <summary>Sets the volume in percent. false means no device, or it refused.</summary>
+    // Sets the volume in percent. false means no device, or it refused.
     public static bool SetVolume(double percent) =>
         With(volume =>
         {
@@ -218,10 +211,7 @@ internal static class AudioEndpoint
             return true;
         }, false);
 
-    public static bool? IsMuted() =>
-        With<bool?>(volume => volume.GetMute(out bool muted) == 0 ? muted : null, null);
-
-    /// <summary>Toggles mute. Returns the new state, or null on refusal.</summary>
+    // Toggles mute. Returns the new state, or null on refusal.
     public static bool? ToggleMute() =>
         With<bool?>(volume =>
         {

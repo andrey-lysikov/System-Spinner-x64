@@ -19,7 +19,7 @@ public class ConfFormatTests
             GpuIndex = 1,
             ShowOverlayInGames = false,
             SpinOnDesktop = false,
-            LogLevel = Diagnostics.LogLevel.Error,
+            Debug = true,
             Sensors = { CpuLoad = { "CPU Core Max" }, GpuMemory = { "D3D Dedicated Memory Used" } },
             Fans = { Cpu = { "CPU Fan" }, Extra = { "System Fan #2", "PSU Fan" }, AverageCpu = true },
             Warn = { Color = "Gold", CpuTemp = 90, GpuTemp = 0, SysMem = 75, GpuMem = 80 },
@@ -35,7 +35,7 @@ public class ConfFormatTests
         Assert.Equal(1, read.GpuIndex);
         Assert.False(read.ShowOverlayInGames);
         Assert.False(read.SpinOnDesktop);
-        Assert.Equal(Diagnostics.LogLevel.Error, read.LogLevel);
+        Assert.True(read.Debug);
         Assert.Contains("CPU Core Max", read.Sensors.CpuLoad);
         Assert.Equal(new[] { "System Fan #2", "PSU Fan" }, read.Fans.Extra);
         Assert.True(read.Fans.AverageCpu);
@@ -90,7 +90,7 @@ public class ConfFormatTests
 
         Assert.Equal(1000, cfg.UpdateIntervalMs);
         Assert.True(cfg.ShowOverlayInGames);
-        Assert.Null(cfg.LogLevel);   // the "log the first run in full" rule rests on this
+        Assert.Null(cfg.Debug);   // the "log the first run in full" rule rests on this
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public class ConfFormatTests
     [Theory]
     [InlineData("[Hardware]\nGpuIndex = не число\n")]
     [InlineData("[General]\nShowOverlayInGames = ага\n")]
-    [InlineData("[General]\nLogLevel = Подробно\n")]
+    [InlineData("[General]\nDebug = ага\n")]
     [InlineData("[General\nGpuIndex = 1\n")]
     [InlineData("GpuIndex = 1\n")]                       // a value outside any section
     public void Ошибка_в_файле_не_проходит_молча(string text) =>

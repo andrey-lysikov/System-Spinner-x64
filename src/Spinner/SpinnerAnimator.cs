@@ -8,13 +8,7 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Spinner;
 
-/// <summary>
-/// Spins the tray frames at a speed set by the CPU load: the busier it is, the faster they run.
-/// That is the whole way System Spinner shows load — there may be no number anywhere.
-///
-/// The speed formula is taken from the macOS version unchanged, constants included: the icon has
-/// to stay recognisable, and re-deriving it would mean a different-looking program.
-/// </summary>
+// Spins the tray frames at a speed set by the CPU load: the busier it is, the faster they run.
 public sealed class SpinnerAnimator : IDisposable
 {
     private readonly DispatcherTimer _timer = new(DispatcherPriority.Background);
@@ -26,12 +20,12 @@ public sealed class SpinnerAnimator : IDisposable
     private SpinnerStyle _style = SpinnerCatalog.Fallback;
     private int _current;
     private double _interval = -1;
-    private double _lastCpuLoad;
+    private double _lastLoad;
 
-    /// <summary>Where the next frame goes. This call is what changes the tray icon.</summary>
+    // Where the next frame goes. This call is what changes the tray icon.
     public event Action<Icon>? FrameReady;
 
-    /// <summary>Spin the frames backwards.</summary>
+    // Spin the frames backwards.
     public bool Invert { get; set; }
 
     public SpinnerAnimator()
@@ -39,13 +33,14 @@ public sealed class SpinnerAnimator : IDisposable
         _timer.Tick += (_, _) => Advance();
     }
 
-    /// <summary>Whether there is anything to show: an empty set means the resources were missing.</summary>
+    // Whether there is anything to show: an empty set means the resources were missing.
     public bool HasFrames => _icons.Count > 0;
 
-    /// <summary>
-    /// Prepares the frames again. Called when the set, the effect, the theme or the icon size
-    /// changes — that is, whenever the old pictures stopped being usable.
-    /// </summary>
+    // Whether the frames are running. A set of one never is: it is a picture, not an animation.
+    public bool IsSpinning => _timer.IsEnabled;
+
+    // Prepares the frames again. Called when the set, the effect, the theme or the icon size
+    // changes — that is, whenever the old pictures stopped being usable.
     public void Load(SpinnerStyle style, SpinnerEffect effect, int iconSize, bool lightTheme)
     {
         _style = style;
@@ -92,18 +87,26 @@ public sealed class SpinnerAnimator : IDisposable
 
         // The speed is known from the last poll — otherwise the icon would stand still after
         // a set change until the sensors are read again.
-        UpdateSpeed(_lastCpuLoad);
+        UpdateSpeed(_lastLoad);
     }
 
-    /// <summary>Matches the speed to the CPU load in percent.</summary>
-    public void UpdateSpeed(double cpuLoadPercent)
+    // Matches the speed to the load in percent — whichever of the processor and the card is busier.
+    public void UpdateSpeed(double loadPercent)
     {
-        _lastCpuLoad = cpuLoadPercent;
+        _lastLoad = loadPercent;
         if (_icons.Count == 0) return;
+
+        // One frame is a picture, not an animation: the still set is chosen exactly so that the
+        // tray holds still, and a timer for it would change nothing a hundred times a second.
+        if (_icons.Count == 1)
+        {
+            _timer.Stop();
+            return;
+        }
 
         // The load is divided by the frame count: in a long set one frame is a smaller share of
         // the cycle, and without this long sets would spin visibly faster at the same load.
-        double load = Math.Clamp(cpuLoadPercent / _icons.Count, 1.0, 100.0);
+        double load = Math.Clamp(loadPercent / _icons.Count, 1.0, 100.0);
         double interval = Math.Max(AppParameters.Spinning.MinIntervalSeconds,
                                    0.25 / load * _style.SpeedCoefficient);
 
@@ -115,14 +118,14 @@ public sealed class SpinnerAnimator : IDisposable
         if (!_timer.IsEnabled) _timer.Start();
     }
 
-    /// <summary>Stops the spin, leaving the current frame in place.</summary>
+    // Stops the spin, leaving the current frame in place.
     public void Stop()
     {
         _timer.Stop();
         _interval = -1;
     }
 
-    /// <summary>Returns the icon to the first frame — that reads as asleep rather than stuck.</summary>
+    // Returns the icon to the first frame — that reads as asleep rather than stuck.
     public void Rewind()
     {
         if (_icons.Count == 0) return;

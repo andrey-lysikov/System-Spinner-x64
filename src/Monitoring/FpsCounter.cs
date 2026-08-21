@@ -14,17 +14,10 @@ using Microsoft.Diagnostics.Tracing.Session;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>
-/// Counts frames from ETW Present events — the same telemetry PresentMon uses, only the session
-/// is raised inside this process. Frames of the foreground window are counted, so the counter
-/// finds the game itself. There are three sources: DXGI (DirectX 10-12), D3D9 and DxgKrnl — the
-/// graphics kernel every Present passes through, Vulkan and OpenGL included. Exactly one of them
-/// is in use at a time, see <see cref="Prefer"/>.
-/// </summary>
+// Counts frames from ETW Present events — the same telemetry PresentMon uses, only the session is
+// raised inside this process.
 public sealed class FpsCounter : IDisposable
 {
-    private const string SessionName = "SystemSpinnerX64-Frames";
-
     private static readonly Guid DxgiProvider = new("CA11C036-0102-4A2D-A6AD-F03CFED5D3C9");
     private static readonly Guid D3d9Provider = new("783ACA0A-790E-4D7F-8451-AA850511C6B9");
     private static readonly Guid DxgKrnlProvider = new("802EC45A-1E99-4B83-9920-87C98277BA9D");
@@ -47,7 +40,6 @@ public sealed class FpsCounter : IDisposable
         Dxgi = 3
     }
 
-    private readonly FpsConfig _cfg;
     private readonly object _lock = new();
 
     private readonly FrameWindow _frames;
@@ -91,31 +83,27 @@ public sealed class FpsCounter : IDisposable
         _ => "—"
     };
 
-    public FpsCounter(FpsConfig cfg)
+    public FpsCounter()
     {
-        _cfg = cfg;
-        _frames = new FrameWindow(cfg.AvgWindowSeconds, AppParameters.Fps.StaleFramesSeconds);
+        _frames = new FrameWindow(AppParameters.Fps.AverageWindowSeconds,
+                                  AppParameters.Fps.StaleFramesSeconds);
     }
 
     public void Start()
     {
-        if (!_cfg.Enabled) { Status = Text.FpsDisabled; return; }
-
         try
         {
             StopStaleSession();
 
             // The delivery rate cannot be set — delayed batches are handled by Average().
-            _session = new TraceEventSession(SessionName) { StopOnDispose = true };
+            _session = new TraceEventSession(AppParameters.Identity.EtwSession) { StopOnDispose = true };
 
             // Every keyword rather than 0x1: with 0x1 DXGI sent only object lifetime events and no
             // Present at all. The provider is quiet, so there is nothing to filter.
             _session.EnableProvider(DxgiProvider, TraceEventLevel.Verbose, AllKeywords);
             _session.EnableProvider(D3d9Provider, TraceEventLevel.Verbose, AllKeywords);
 
-            Log.Info(_cfg.IncludeVulkanOpenGl
-                ? "ETW: DXGI and D3D9; DxgKrnl turns on only if they stay silent"
-                : "ETW: DXGI and D3D9 (Vulkan/OpenGL disabled in the config)");
+            Log.Info("ETW: DXGI and D3D9; DxgKrnl turns on only if they stay silent");
 
             _providerTimer = new Timer(_ => AdjustProviders(), null,
                                        AppParameters.Fps.FallbackCheckDelay, AppParameters.Fps.FallbackCheckPeriod);
@@ -148,7 +136,7 @@ public sealed class FpsCounter : IDisposable
         }
     }
 
-    /// <summary>Tears the session down: parsing the frame events is the main CPU cost.</summary>
+    // Tears the session down: parsing the frame events is the main CPU cost.
     public void Stop()
     {
         Dispose();
@@ -168,8 +156,6 @@ public sealed class FpsCounter : IDisposable
     // The graphics kernel is switched on when needed: 66 000 events in eight seconds against 2 268.
     private void AdjustProviders()
     {
-        if (!_cfg.IncludeVulkanOpenGl) return;
-
         TraceEventSession? session = _session;
         if (session is null) return;
 
@@ -183,7 +169,7 @@ public sealed class FpsCounter : IDisposable
                 session.EnableProvider(DxgKrnlProvider, TraceEventLevel.Informational, DxgKrnlBaseKeyword);
                 _dxgKrnlEnabled = true;
                 Log.Info("FPS: no DirectX events — enabling DxgKrnl " +
-                         $"(looking for {string.Join(", ", _cfg.DxgKrnlTasks)})");
+                         $"(looking for {string.Join(", ", AppParameters.Fps.DxgKrnlTasks)})");
             }
             else if (directXWorks && _dxgKrnlEnabled)
             {
@@ -200,13 +186,20 @@ public sealed class FpsCounter : IDisposable
         }
     }
 
-    /// <summary>After a crash the session stays in the system — it is torn down here.</summary>
+    // After a crash the session stays in the system — it is torn down here.
     private static void StopStaleSession()
     {
         try
         {
-            if (TraceEventSession.GetActiveSessionNames().Contains(SessionName))
-                TraceEventSession.GetActiveSession(SessionName)?.Stop();
+            if (!TraceEventSession.GetActiveSessionNames().Contains(AppParameters.Identity.EtwSession))
+                return;
+
+            // A session left by a copy that crashed: it belongs to the system rather than to this
+            // process, and the object that speaks to it has to be let go of as well.
+            using TraceEventSession? stale =
+                TraceEventSession.GetActiveSession(AppParameters.Identity.EtwSession);
+
+            stale?.Stop();
         }
         catch { /* nothing to stop */ }
     }
@@ -359,7 +352,7 @@ public sealed class FpsCounter : IDisposable
 
         string rates = string.Join(", ", measured.Select(m => $"{m.Task}≈{m.Rate:0}/s"));
 
-        var chosen = measured.FirstOrDefault(m => m.Rate <= _cfg.MaxPlausibleFps);
+        var chosen = measured.FirstOrDefault(m => m.Rate <= AppParameters.Fps.MaxPlausibleFps);
         if (chosen.Task is null)
         {
             _probeCounts.Clear();
@@ -370,8 +363,7 @@ public sealed class FpsCounter : IDisposable
                 _implausibleReported = true;
                 Log.Warn($"FPS: every candidate event arrives too often ({rates}) — no game " +
                          "runs that fast, so the event fires several times per frame. Still " +
-                         "looking; if it stays this way, remove the frequent name from " +
-                         "Fps.DxgKrnlTasks in config.conf.");
+                         "looking. Please report this along with these names.");
             }
             return;
         }
@@ -393,18 +385,16 @@ public sealed class FpsCounter : IDisposable
         if (_seenTasks.Values.Sum() < AppParameters.Fps.MinEventsToComplain) return;
 
         _noMatchReported = true;
-        Log.Warn($"FPS: none of the events {string.Join(", ", _cfg.DxgKrnlTasks)} arrived from " +
+        Log.Warn($"FPS: none of the events {string.Join(", ", AppParameters.Fps.DxgKrnlTasks)} arrived from " +
                  $"the game. What did arrive: {string.Join(", ", _seenTasks.OrderByDescending(p => p.Value).Select(p => $"{p.Key}={p.Value}"))}. " +
-                 "Add a suitable one at the start of Fps.DxgKrnlTasks in config.conf — by name, " +
-                 "or by the number N if it shows up as EventID(N).");
+                 "Please report this: the list of events the app looks for is built in, and this " +
+                 "game sends something else.");
     }
 
-    private int IndexOfTask(string task, int id) => IndexOfTask(_cfg.DxgKrnlTasks, task, id);
+    private int IndexOfTask(string task, int id) => IndexOfTask(AppParameters.Fps.DxgKrnlTasks, task, id);
 
-    /// <summary>
-    /// The place of an event in the preference list, or -1. Both task names and bare numbers are
-    /// allowed: when the provider manifest does not load, the event has no name at all.
-    /// </summary>
+    // The place of an event in the preference list, or -1. Both task names and bare numbers are
+    // allowed: when the provider manifest does not load, the event has no name at all.
     internal static int IndexOfTask(IReadOnlyList<string> tasks, string task, int id)
     {
         string number = id.ToString(CultureInfo.InvariantCulture);

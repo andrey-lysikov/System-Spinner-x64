@@ -3,23 +3,15 @@ using Microsoft.Win32;
 
 namespace SystemSpinnerX64.Platform;
 
-/// <summary>
-/// LibreHardwareMonitor 0.9.6 does not carry a driver inside it the way WinRing0 did: it expects
-/// PawnIO — a separate signed driver with its own installer, into which the library merely loads
-/// its modules.
-///
-/// Without it half the panel silently disappears: CPU temperature and power and every fan speed
-/// except the one on the card. From outside that is indistinguishable from "there are no
-/// sensors" — the library returns nothing either way, so the check is made here.
-/// </summary>
+// LibreHardwareMonitor 0.9.6 does not carry a driver inside it the way WinRing0 did: it expects
+// PawnIO — a separate signed driver with its own installer, into which the library merely loads its
+// modules.
 internal static class SensorDriver
 {
-    /// <summary>The PawnIO installer leaves an entry in the list of installed programs.</summary>
+    // The PawnIO installer leaves an entry in the list of installed programs.
     private const string UninstallKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO";
 
-    public const string DownloadPage = "https://pawnio.eu";
-
-    /// <summary>true means PawnIO is installed, null means it could not be established.</summary>
+    // true means PawnIO is installed, null means it could not be established.
     public static bool? IsPawnIoInstalled()
     {
         try
@@ -36,16 +28,13 @@ internal static class SensorDriver
         }
     }
 
-    /// <summary>
-    /// Explanation for the log, or null when the driver is in place. A panel where half the
-    /// values are dashes misleads more than no panel at all, so this stops the startup.
-    /// </summary>
+    // Explanation for the log, or null when the driver is in place.
     public static string? DescribeIfMissing()
     {
         if (IsPawnIoInstalled() != false) return null;
 
         return "THE PawnIO DRIVER IS NOT INSTALLED — the app will not start without it.\n" +
-               $"Installer: {DownloadPage}\n" +
+               $"Installer: {AppParameters.Links.SensorDriver}\n" +
                "LibreHardwareMonitor uses this driver to read the CPU MSRs and the motherboard " +
                "monitoring chip. Without it there is no CPU temperature or power, and no fan " +
                "speeds for the CPU cooler, the pump or the case fans — half of both the overlay " +

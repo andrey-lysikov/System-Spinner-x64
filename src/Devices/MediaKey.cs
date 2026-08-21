@@ -1,6 +1,6 @@
 namespace SystemSpinnerX64.Devices;
 
-/// <summary>Which key was pressed. The macOS set minus the keyboard backlight.</summary>
+// Which key was pressed. The macOS set minus the keyboard backlight.
 public enum MediaKey
 {
     VolumeUp,
@@ -10,10 +10,8 @@ public enum MediaKey
     BrightnessDown
 }
 
-/// <summary>
-/// What to do with the press. <see cref="PassThrough"/> means there was nothing to control and
-/// the key goes back to Windows, which then shows its own panel.
-/// </summary>
+// What to do with the press. PassThrough means there was nothing to control and the key goes back
+// to Windows, which then shows its own panel.
 public enum MediaKeyResult
 {
     PassThrough,

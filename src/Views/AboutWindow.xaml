@@ -1,7 +1,7 @@
 <Window x:Class="SystemSpinnerX64.Views.AboutWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="System Spinner x64"
+        Title="System-Spinner"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -15,13 +15,31 @@
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Ideal">
 
+    <Window.Resources>
+        <!-- Both buttons look the same; the colours come from the theme in ApplyTheme(). -->
+        <ControlTemplate x:Key="FlatButton" TargetType="Button">
+            <Border x:Name="Face"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Face" Property="Opacity" Value="0.8" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+    </Window.Resources>
+
     <!-- A window of its own rather than a MessageBox: a system dialog knows no theme and would
          stay a white rectangle in the middle of a dark menu. -->
     <Border x:Name="Shell" CornerRadius="12" BorderThickness="1" Padding="22,20,22,18">
         <StackPanel x:Name="Body">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
                 <Image x:Name="Logo" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Top" />
-                <TextBlock Text="System Spinner x64"
+                <TextBlock x:Name="Headline"
                            FontSize="19"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -31,32 +49,23 @@
                        TextWrapping="Wrap"
                        LineHeight="19" />
 
-            <Button x:Name="Ok"
-                    Content="OK"
-                    Width="88"
-                    Height="30"
-                    Margin="0,20,0,0"
-                    HorizontalAlignment="Right"
-                    IsDefault="True"
-                    IsCancel="True"
-                    Click="OnCloseClicked">
-                <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Face"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Face" Property="Opacity" Value="0.8" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Button.Template>
-            </Button>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button x:Name="Project"
+                        Width="150"
+                        Height="30"
+                        Margin="0,0,10,0"
+                        Click="OnProjectClicked"
+                        Template="{StaticResource FlatButton}" />
+
+                <Button x:Name="Ok"
+                        Content="OK"
+                        Width="88"
+                        Height="30"
+                        IsDefault="True"
+                        IsCancel="True"
+                        Click="OnCloseClicked"
+                        Template="{StaticResource FlatButton}" />
+            </StackPanel>
         </StackPanel>
     </Border>
 </Window>

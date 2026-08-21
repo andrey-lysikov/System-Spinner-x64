@@ -14,18 +14,7 @@ using SystemSpinnerX64.Spinner;
 
 namespace SystemSpinnerX64.Tray;
 
-/// <summary>
-/// The tray icon and its menu.
-///
-/// The menu repeats the macOS version, item for item. It controls what it controlled there: the
-/// animation, the volume and brightness panel, the language and the poll. Everything else — fans,
-/// sensor names, the look of the in-game panel, the frame counter — lives in config.conf, as in
-/// GameOverlay: there are dozens of those parameters, each with its own note, and a menu of them
-/// would be longer than the program.
-///
-/// Every choice is written to config.conf at once: the settings live in one place rather than
-/// two, and after a restart the menu looks the way it was left.
-/// </summary>
+// The tray icon and its menu. The menu repeats the macOS version, item for item.
 public sealed class TrayIcon : IDisposable
 {
     private readonly AppConfig _cfg;
@@ -50,7 +39,7 @@ public sealed class TrayIcon : IDisposable
     public event Action? OsdChanged;
     public event Action? LanguageChanged;
     public event Action? OverlayChanged;
-    public event Action? DisplayRefreshRequested;
+    public event Action? UpdateRequested;
     public event Action? ExitRequested;
 
     public TrayIcon(AppConfig cfg)
@@ -77,7 +66,7 @@ public sealed class TrayIcon : IDisposable
         {
             Icon = _fallbackIcon,
             Visible = true,
-            Text = "System Spinner x64"
+            Text = AppParameters.Identity.Name
         };
 
         // Left button: the status window. Right button: the menu. As in the macOS version.
@@ -86,16 +75,33 @@ public sealed class TrayIcon : IDisposable
             if (e.Button == MouseButtons.Left) StatsRequested?.Invoke();
             else if (e.Button == MouseButtons.Right) ShowMenu();
         };
+
+        _icon.BalloonTipClicked += (_, _) => Follow();
     }
 
-    /// <summary>Shows the next animation frame.</summary>
+    // A click on a notification that carried a link. The link is dropped afterwards: the next
+    // notification may have none, and an old one must not open then.
+    private void Follow()
+    {
+        string? link = _link;
+        _link = null;
+
+        if (link is not { Length: > 0 }) return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(link) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"{link} did not open", ex);
+        }
+    }
+
+    // Shows the next animation frame.
     public void ShowFrame(Icon frame) => _icon.Icon = frame;
 
-    /// <summary>
-    /// The tooltip under the pointer. It is also the answer to "how many per cent exactly": the
-    /// speed of the animation shows the load at a glance, and the number is here. No second icon
-    /// with digits is needed for that.
-    /// </summary>
+    // The tooltip under the pointer.
     public void ShowTip(string tip)
     {
         // NotifyIcon.Text longer than 63 characters is silently refused along with the whole icon.
@@ -112,35 +118,40 @@ public sealed class TrayIcon : IDisposable
         _autoStartItem.CheckedChanged += OnAutoStartChanged;
     }
 
-    /// <summary>Fills the submenu with the list of attached screens.</summary>
+    // Fills the submenu with the list of attached screens. The names are shown greyed out: they
+    // are what was found, not something to pick.
     public void ShowDisplays(IReadOnlyList<string> displays)
     {
+        // The list is rebuilt whenever the screens are looked at again — hourly at the least, so
+        // the old items are let go of rather than left for the collector.
+        foreach (ToolStripItem item in _displaysItem.DropDownItems.Cast<ToolStripItem>().ToList())
+            item.Dispose();
+
         _displaysItem.DropDownItems.Clear();
 
         foreach (string display in displays)
             _displaysItem.DropDownItems.Add(new ToolStripMenuItem(display) { Enabled = false });
-
-        var refresh = new ToolStripMenuItem(Text.MenuRefreshDisplays);
-        refresh.Click += (_, _) => DisplayRefreshRequested?.Invoke();
-
-        if (displays.Count > 0) _displaysItem.DropDownItems.Add(new ToolStripSeparator());
-        _displaysItem.DropDownItems.Add(refresh);
     }
 
-    public void Notify(string message)
+    // A notification in the Windows action centre. With a link, a click on it opens that link —
+    // there is nowhere else for a tray app to put one.
+    public void Notify(string message, string? link = null)
     {
-        _icon.BalloonTipTitle = "System Spinner x64";
+        _link = link;
+
+        _icon.BalloonTipTitle = AppParameters.Identity.Name;
         _icon.BalloonTipText = message;
-        _icon.ShowBalloonTip(5000);
+        _icon.BalloonTipIcon = ToolTipIcon.Info;
+        _icon.ShowBalloonTip(NotificationSeconds * 1000);
     }
+
+    private const int NotificationSeconds = 10;
+
+    private string? _link;
 
     // --- Building the menu. The item order follows the macOS version. ---
 
-    /// <summary>
-    /// Subscriptions for the permanent items. Separate from building the menu and done exactly
-    /// once: the menu is rebuilt on a language change, and the handlers must stay single — after
-    /// switching the language every click would otherwise fire twice.
-    /// </summary>
+    // Subscriptions for the permanent items.
     private void WireItems()
     {
         _autoStartItem.CheckedChanged += OnAutoStartChanged;
@@ -183,10 +194,8 @@ public sealed class TrayIcon : IDisposable
         };
     }
 
-    /// <summary>
-    /// Builds the menu again. The permanent items get new titles, the submenus are built from
-    /// scratch: what they hold depends on what the config says.
-    /// </summary>
+    // Builds the menu again. The permanent items get new titles, the submenus are built from
+    // scratch: what they hold depends on what the config says.
     private void BuildMenu()
     {
         _autoStartItem.Text = Text.MenuAutoStart;
@@ -206,15 +215,19 @@ public sealed class TrayIcon : IDisposable
         var log = new ToolStripMenuItem(Text.MenuOpenLog);
         log.Click += (_, _) => Edit(Log.Path);
 
+        var update = new ToolStripMenuItem(Text.MenuCheckUpdate);
+        update.Click += (_, _) => UpdateRequested?.Invoke();
+
         var about = new ToolStripMenuItem(Text.MenuAbout);
         about.Click += (_, _) => ShowAbout();
 
         var exit = new ToolStripMenuItem(Text.MenuExit);
         exit.Click += (_, _) => ExitRequested?.Invoke();
 
-        // The previews are freed here: Clear() takes the items out of the menu, but the bitmaps
-        // attached to them stay around until the garbage collector notices.
+        // Clear() only takes the items out of the menu. The bitmaps and the submenus built last
+        // time have to be let go of by hand, or every language change leaves a set behind.
         ReleasePreviews();
+        ReleaseBuiltItems();
 
         _menu.Items.Clear();
         _menu.Items.AddRange(new ToolStripItem[]
@@ -235,19 +248,17 @@ public sealed class TrayIcon : IDisposable
             new ToolStripSeparator(),
             config,
             log,
+            new ToolStripSeparator(),
+            update,
             about,
             exit
         });
 
+        // Empty until the screens are polled.
         ShowDisplays(Array.Empty<string>());
     }
 
-    /// <summary>
-    /// Opens the menu at the pointer. <c>NotifyIcon</c> can do this itself, but it places the menu
-    /// before the menu has been laid out: on the very first right click one of no size lands in a
-    /// corner of the screen. Shown by hand it also opens in the right direction — upwards from a
-    /// taskbar at the bottom, downwards from one at the top — instead of running off the screen.
-    /// </summary>
+    // Opens the menu at the pointer.
     private void ShowMenu()
     {
         System.Drawing.Point pointer = Control.MousePosition;
@@ -264,20 +275,15 @@ public sealed class TrayIcon : IDisposable
             _ => ToolStripDropDownDirection.BelowRight
         };
 
-        // Activation goes to a window of our own first. Something has to be the foreground window
-        // or the menu stays open after a click elsewhere — and if that something is the menu
-        // itself, Windows puts a button for it on the taskbar. The owner window is a tool window:
-        // those get no button.
+        // Activation goes to an invisible tool window of ours: something must be in the
+        // foreground for the menu to close on a click elsewhere, and a menu that takes that role
+        // itself gets a button on the taskbar.
         Win32.SetForegroundWindow(_owner.Handle);
 
         _menu.Show(pointer, direction);
     }
 
-    /// <summary>
-    /// An invisible window the menu can be activated through. A tray icon has no window of its
-    /// own, and a menu needs one behind it: that is what keeps it off the taskbar and lets it
-    /// close on a click elsewhere.
-    /// </summary>
+    // An invisible window the menu can be activated through.
     private sealed class MenuOwner : NativeWindow, IDisposable
     {
         private const int WsPopup = unchecked((int)0x80000000);
@@ -319,7 +325,7 @@ public sealed class TrayIcon : IDisposable
                 _cfg.Spinner.Style = style.Name;
                 Save();
                 SpinnerChanged?.Invoke();
-                RefreshEffectsAvailability();
+                RefreshSpinnerAvailability();
             };
 
             root.DropDownItems.Add(item);
@@ -333,8 +339,11 @@ public sealed class TrayIcon : IDisposable
     {
         try
         {
-            using Stream? stream = typeof(TrayIcon).Assembly
-                .GetManifestResourceStream(SpinnerCatalog.ResourceName(style, 1));
+            // A set of one frame has only the first; everywhere else the second is taken — the
+            // first is often the empty start of a cycle.
+            using Stream? stream = typeof(TrayIcon).Assembly.GetManifestResourceStream(
+                SpinnerCatalog.ResourceName(style, style.FrameCount > 1 ? 1 : 0));
+
             if (stream is null) return null;
 
             using var frame = new Bitmap(stream);
@@ -377,16 +386,20 @@ public sealed class TrayIcon : IDisposable
             root.DropDownItems.Add(item);
         }
 
-        RefreshEffectsAvailability();
+        RefreshSpinnerAvailability();
         return root;
     }
 
     // For sets that live by their own colours a silhouette would turn the drawing into a blob —
     // there the item is simply disabled, as in the macOS version.
-    private void RefreshEffectsAvailability()
+    // What the chosen set allows: a drawing that lives by its own colours takes no silhouette,
+    // and a set of one frame has no rotation to reverse.
+    private void RefreshSpinnerAvailability()
     {
-        if (_effectsItem is null) return;
-        _effectsItem.Enabled = SpinnerCatalog.Validate(_cfg.Spinner.Style).SupportsEffect;
+        SpinnerStyle style = SpinnerCatalog.Validate(_cfg.Spinner.Style);
+
+        if (_effectsItem is not null) _effectsItem.Enabled = style.SupportsEffect;
+        _invertItem.Enabled = style.FrameCount > 1;
     }
 
     private ToolStripMenuItem IntervalsMenu()
@@ -439,7 +452,7 @@ public sealed class TrayIcon : IDisposable
         return root;
     }
 
-    /// <summary>Rebuilds the menu in another language. Simpler and safer than rewriting titles.</summary>
+    // Rebuilds the menu in another language.
     public void Rebuild()
     {
         BuildMenu();
@@ -447,10 +460,7 @@ public sealed class TrayIcon : IDisposable
         ShowAutoStart(Startup.AutoStart.IsEnabled());
     }
 
-    /// <summary>
-    /// Paints the menu to match the Windows theme. Called when the menu is built and when the
-    /// theme was switched on the fly: WinForms does not follow the theme, its menu is white at any.
-    /// </summary>
+    // Paints the menu to match the Windows theme.
     public void ApplyTheme()
     {
         var renderer = new MenuRenderer(Theme.AreWindowsDark());
@@ -499,26 +509,10 @@ public sealed class TrayIcon : IDisposable
             Log.Warn("the setting was not written to config.conf — it applies until restart");
     }
 
-    /// <summary>The only window with a button in the whole program: what this is and which version.</summary>
-    private void ShowAbout() => new Views.AboutWindow(Version()).ShowAbout();
+    // The only window with a button in the whole program: what this is and which version.
+    private void ShowAbout() => new Views.AboutWindow(AppParameters.Identity.Version).ShowAbout();
 
-    /// <summary>
-    /// The version as three numbers. The assembly always has four — .NET adds the revision itself —
-    /// but showing "0.1.0.0" means showing a field nobody here uses.
-    /// </summary>
-    private static string Version()
-    {
-        System.Version? version = typeof(TrayIcon).Assembly.GetName().Version;
-        return version is null
-            ? ""
-            : $"{version.Major}.{version.Minor}.{version.Build}";
-    }
-
-    /// <summary>
-    /// Opens the first existing file in Notepad. In Notepad specifically rather than through the
-    /// shell: .conf and .log may have no association, and a click would open the "choose a program"
-    /// dialog instead of the file.
-    /// </summary>
+    // Opens the first existing file in Notepad.
     private void Edit(params string?[] candidates)
     {
         foreach (string? path in candidates)
@@ -547,7 +541,7 @@ public sealed class TrayIcon : IDisposable
         try
         {
             using Stream? stream = typeof(TrayIcon).Assembly
-                .GetManifestResourceStream("SystemSpinnerX64.icon.ico");
+                .GetManifestResourceStream(AppParameters.Identity.IconResource);
             if (stream is null) return SystemIcons.Information;
 
             using var full = new Icon(stream);
@@ -561,6 +555,25 @@ public sealed class TrayIcon : IDisposable
     }
 
     // The first-frame previews in the animation submenu are the only bitmaps the menu creates itself.
+    // Everything the menu builds anew each time: the submenus, the separators, the items created
+    // in place. The permanent ones live in fields and are reused, so they are kept.
+    private void ReleaseBuiltItems()
+    {
+        var permanent = new HashSet<ToolStripItem>
+        {
+            _overlayItem, _autoStartItem, _languageItem, _externalAddressItem,
+            _displaysItem, _alwaysOsdItem, _invertItem
+        };
+
+        foreach (ToolStripItem item in _menu.Items.Cast<ToolStripItem>().ToList())
+        {
+            if (permanent.Contains(item)) continue;
+
+            _menu.Items.Remove(item);
+            item.Dispose();
+        }
+    }
+
     private void ReleasePreviews()
     {
         foreach (ToolStripMenuItem item in _menu.Items.OfType<ToolStripMenuItem>()

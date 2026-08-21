@@ -4,11 +4,7 @@ using System.Linq;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>
-/// Tail of recent values for a chart. A list rather than a ring: there are a few hundred points,
-/// the chart reads them in order from old to new, and a ring would have to be unrolled on every
-/// redraw — more expensive than shifting the array now and then.
-/// </summary>
+// Tail of recent values for a chart.
 public sealed class History
 {
     private readonly List<double> _points = new();
@@ -16,7 +12,9 @@ public sealed class History
 
     public History(int capacity)
     {
-        _capacity = Math.Clamp(capacity, 10, 10_000);
+        _capacity = Math.Clamp(capacity,
+                              AppParameters.Limits.MinHistoryPoints,
+                              AppParameters.Limits.MaxHistoryPoints);
     }
 
     public int Count => _points.Count;
@@ -31,7 +29,7 @@ public sealed class History
             _points.RemoveRange(0, _points.Count - _capacity);
     }
 
-    /// <summary>Snapshot for the chart. A copy: drawing runs on a different thread than polling.</summary>
+    // Snapshot for the chart. A copy: drawing runs on a different thread than polling.
     public IReadOnlyList<double> Snapshot()
     {
         int extra = Math.Max(0, _points.Count - _capacity);

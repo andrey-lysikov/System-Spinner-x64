@@ -6,23 +6,12 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Views;
 
-/// <summary>
-/// Where to put a popup window. Three places need this — the volume OSD, the status window and
-/// the About box — and all of them run into the same thing: several monitors, each with its own
-/// scale, its own taskbar and its own place in one shared coordinate grid.
-///
-/// Everything here is counted in pixels of that shared grid and the window is moved with
-/// SetWindowPos. WPF's own Left and Top are read in the units of the screen the window is on at
-/// that moment, which — for a window about to be shown on a different monitor — is the screen it
-/// is leaving: at 100 and 150 per cent side by side that lands it half a screen off.
-///
-/// The taskbar is the other half of it. It has a size, it can sit at any edge, and on a second
-/// monitor it may not be there at all — hence the work area, the screen minus the docked bars,
-/// rather than the screen itself.
-/// </summary>
+// Where to put a popup window. Three places need this — the volume OSD, the status window and the
+// About box — and all of them run into the same thing: several monitors, each with its own scale,
+// its own taskbar and its own place in one shared coordinate grid.
 internal static class ScreenPlacement
 {
-    /// <summary>The mouse pointer, in pixels. This is the grid everything here counts in.</summary>
+    // The mouse pointer, in pixels. This is the grid everything here counts in.
     public static System.Drawing.Point Pointer()
     {
         try
@@ -36,20 +25,9 @@ internal static class ScreenPlacement
         }
     }
 
-    /// <summary>
-    /// Puts the window against the side the taskbar is on and centres it on the tray icon.
-    ///
-    /// Windows does not tell an application where the icon is — <c>NotifyIcon</c> gives up neither
-    /// its window nor its id, and without those the system will not report the rectangle. But the
-    /// window is opened by clicking the icon, and the pointer is right on it at that moment: that
-    /// is the reference point.
-    /// </summary>
-    /// <param name="anchor">
-    /// The pointer as it was when the window was opened, in pixels. Passed in rather than read
-    /// here because the window is placed again whenever its height changes, and by then the
-    /// pointer has moved: reading it afresh would drag the window along.
-    /// </param>
-    /// <param name="gap">Gap between the window and the work area edge, in WPF units.</param>
+    // Puts the window against the side the taskbar is on and centres it on the tray icon. The
+    // anchor is the pointer as it was when the window opened: reading it afresh on every
+    // re-placement would drag the window after the mouse.
     public static void PutNearTray(Window window, System.Drawing.Point anchor, double gap)
     {
         Screen screen = At(anchor);
@@ -61,10 +39,8 @@ internal static class ScreenPlacement
             gap * screen.Scale));
     }
 
-    /// <summary>
-    /// The arithmetic of the above, in pixels and without a window to it: which side the taskbar
-    /// is on, where on it the icon sits, and what of that still fits on the screen.
-    /// </summary>
+    // The arithmetic of the above, in pixels and without a window to it: which side the taskbar is
+    // on, where on it the icon sits, and what of that still fits on the screen.
     internal static Point TrayCorner(Rect bounds, Rect work, Point anchor, Size size, double gap)
     {
         // The taskbar is the difference between the screen and the work area. Whichever side it
@@ -93,11 +69,8 @@ internal static class ScreenPlacement
         return Clamp(new Point(x, y), size, work, gap);
     }
 
-    /// <summary>
-    /// Puts the window beside another one, aligned to its bottom edge — the chart window next to
-    /// the status window. To the left, unless that runs off the screen; then to the right.
-    /// </summary>
-    /// <param name="gap">Gap between the two windows, in WPF units.</param>
+    // Puts the window beside another one, aligned to its bottom edge — the chart window next to the
+    // status window.
     public static void PutBeside(Window window, Window neighbour, double gap)
     {
         System.Drawing.Rectangle anchor = PixelBounds(neighbour);
@@ -110,7 +83,7 @@ internal static class ScreenPlacement
             gap * screen.Scale));
     }
 
-    /// <summary>The arithmetic of the above, in pixels: to the left if it fits, else to the right.</summary>
+    // The arithmetic of the above, in pixels: to the left if it fits, else to the right.
     internal static Point BesideCorner(Rect anchor, Rect work, Size size, double gap)
     {
         double x = anchor.Left - size.Width - gap;
@@ -124,13 +97,8 @@ internal static class ScreenPlacement
         return new Point(x, y);
     }
 
-    /// <summary>
-    /// Puts the window in the middle of the screen at a given height above its bottom edge — the
-    /// OSD. From the screen, not the work area: the OSD also appears over a game, where there is
-    /// no taskbar. The screen is the one under the pointer: a volume key is pressed while looking
-    /// where the mouse is.
-    /// </summary>
-    /// <param name="bottomInset">Height above the bottom edge, in WPF units.</param>
+    // Puts the window in the middle of the screen at a given height above its bottom edge — the
+    // OSD.
     public static void PutAboveBottom(Window window, double bottomInset)
     {
         Screen screen = At(Pointer());
@@ -142,7 +110,7 @@ internal static class ScreenPlacement
             Math.Round(bounds.Bottom - bottomInset * screen.Scale - size.Height)));
     }
 
-    /// <summary>Centres the window on the screen under the pointer.</summary>
+    // Centres the window on the screen under the pointer.
     public static void PutCentred(Window window)
     {
         Screen screen = At(Pointer());
@@ -154,17 +122,17 @@ internal static class ScreenPlacement
             Math.Round(work.Top + (work.Height - size.Height) / 2)));
     }
 
-    /// <summary>A pixel rectangle as WPF states it — the form the arithmetic above is written in.</summary>
+    // A pixel rectangle as WPF states it — the form the arithmetic above is written in.
     private static Rect Box(System.Drawing.Rectangle rect) =>
         new(rect.Left, rect.Top, rect.Width, rect.Height);
 
-    /// <summary>One monitor: its rectangles in pixels and its scale.</summary>
+    // One monitor: its rectangles in pixels and its scale.
     private readonly record struct Screen(
         System.Drawing.Rectangle Bounds,
         System.Drawing.Rectangle Work,
         double Scale);
 
-    /// <summary>The monitor a point in pixels falls on. The nearest one when it falls off them all.</summary>
+    // The monitor a point in pixels falls on.
     private static Screen At(System.Drawing.Point point)
     {
         try
@@ -183,11 +151,7 @@ internal static class ScreenPlacement
         }
     }
 
-    /// <summary>
-    /// The size the window will have on the target screen, in pixels. Its own units are those of
-    /// the screen it is on now; moving it to one at another scale changes the pixel size to match,
-    /// and that is the size to place by.
-    /// </summary>
+    // The size the window will have on the target screen, in pixels.
     private static Size PixelSize(Window window, double scale)
     {
         double width = window.ActualWidth > 0 ? window.ActualWidth : window.Width;
@@ -199,7 +163,7 @@ internal static class ScreenPlacement
         return new Size(width * scale, height * scale);
     }
 
-    /// <summary>Where a window is now, in pixels.</summary>
+    // Where a window is now, in pixels.
     private static System.Drawing.Rectangle PixelBounds(Window window)
     {
         IntPtr handle = new WindowInteropHelper(window).Handle;
@@ -212,10 +176,7 @@ internal static class ScreenPlacement
             (int)(window.Left + window.ActualWidth), (int)(window.Top + window.ActualHeight));
     }
 
-    /// <summary>
-    /// Keeps the window inside the work area. The icon can sit right in a corner, and a window
-    /// centred on it would hang half off the screen.
-    /// </summary>
+    // Keeps the window inside the work area.
     private static Point Clamp(Point corner, Size window, Rect work, double gap)
     {
         double x = Math.Min(corner.X, work.Right - window.Width - gap);
@@ -224,7 +185,7 @@ internal static class ScreenPlacement
         return new Point(Math.Max(work.Left + gap, x), Math.Max(work.Top + gap, y));
     }
 
-    /// <summary>Moves the window to a point in pixels, leaving its size and its order alone.</summary>
+    // Moves the window to a point in pixels, leaving its size and its order alone.
     private static void Put(Window window, Point corner)
     {
         IntPtr handle = new WindowInteropHelper(window).Handle;

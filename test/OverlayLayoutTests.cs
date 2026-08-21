@@ -15,7 +15,7 @@ public class OverlayLayoutTests
     /// independent of which fonts are installed.</summary>
     private static OverlayViewModel Laid(int extraFans = 0)
     {
-        var vm = new OverlayViewModel(new WarnConfig(), extraFans);
+        var vm = new OverlayViewModel(new WarnConfig(), OverlayRow.Default(), extraFans);
         vm.Layout(slots => slots * 10, unit => unit.Length * 5, unitGap: 2, columnGap: 6);
         return vm;
     }

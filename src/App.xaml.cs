@@ -4,21 +4,14 @@ using System.Threading.Tasks;
 using System.Windows;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
+using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Modes;
 using SystemSpinnerX64.Startup;
 
 namespace SystemSpinnerX64;
 
-/// <summary>
-/// Startup. The app shows no windows at all, neither on refusal nor on error: the panel hangs
-/// over a game, and a window popping up mid-fight is worse than any unexplained trouble.
-/// Everything goes to SystemSpinnerX64.log next to config.conf. Hence a failed start looks like
-/// "nothing happened", and the reason is always in the log and always at ERROR, so it is visible
-/// whatever LogLevel says.
-///
-/// The app closes only through the Quit item: it has no main window, and the tray icon does not
-/// count — hence <c>ShutdownMode</c> of <c>OnExplicitShutdown</c>.
-/// </summary>
+// Startup. The app shows no windows at all, neither on refusal nor on error: the panel hangs over a
+// game, and a window popping up mid-fight is worse than any unexplained trouble.
 public partial class App : Application
 {
     private Mutex? _instanceLock;
@@ -48,17 +41,17 @@ public partial class App : Application
             }
 
             Log.Error(elevationProblem ?? "administrator rights are required");
-            Stop("no administrator rights");
+            Stop("no administrator rights", Text.ReasonNoRights);
             return;
         }
 
         // Two copies cannot raise one ETW session or share the key hook — only the first starts.
-        _instanceLock = new Mutex(initiallyOwned: true, "SystemSpinnerX64.SingleInstance", out bool first);
+        _instanceLock = new Mutex(initiallyOwned: true, AppParameters.Identity.SingleInstanceMutex, out bool first);
         if (!first)
         {
-            Log.Error("System Spinner x64 is already running — a second copy is not needed, " +
-                      "use the tray icon");
-            Stop("already running");
+            Log.Error(AppParameters.Identity.Name +
+                      " is already running — a second copy is not needed, use the tray icon");
+            Stop("already running", Text.ReasonAlreadyRunning);
             return;
         }
 
@@ -67,7 +60,7 @@ public partial class App : Application
         if (!preflight.CanStart)
         {
             Log.Error(preflight.Problem ?? "startup failed");
-            Stop("startup checks did not pass");
+            Stop("startup checks did not pass", Text.ReasonChecksFailed);
             return;
         }
 
@@ -77,14 +70,7 @@ public partial class App : Application
         // --list-sensors is handled in Preflight: there it works even when the start did not happen.
     }
 
-    /// <summary>
-    /// Catches what nobody else caught. Without this a crash looks like the app simply vanishing:
-    /// no windows, the tray icon gone and silence in the log, because the last line was written
-    /// long before the failure.
-    ///
-    /// Three sources, and all three are needed: the UI thread has its own channel, other threads
-    /// have another, and in a task the exception stays quiet until garbage collection.
-    /// </summary>
+    // Catches what nobody else caught.
     private void CatchEverything()
     {
         DispatcherUnhandledException += (_, args) =>
@@ -94,7 +80,7 @@ public partial class App : Application
             // Marked handled and closed deliberately: carrying on after an unknown failure means
             // showing something unknown. This way the tray still gets to remove the icon.
             args.Handled = true;
-            Stop("unhandled exception");
+            Stop("unhandled exception", Text.ReasonCrashed);
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
@@ -111,10 +97,13 @@ public partial class App : Application
         };
     }
 
-    private void Stop(string reason)
+    // notice is what the user is told in the action centre; without it the app just closes.
+    private void Stop(string reason, string? notice = null)
     {
         Log.Finish(reason);
-        Shutdown();
+
+        if (notice is not null) StartupNotice.Show(notice);
+        else Shutdown();
     }
 
     protected override void OnExit(ExitEventArgs e)

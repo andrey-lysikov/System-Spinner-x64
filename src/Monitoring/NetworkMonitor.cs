@@ -12,7 +12,7 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Monitoring;
 
-/// <summary>Rate on a network interface. The unit is picked to fit, as in the macOS version.</summary>
+// Rate on a network interface. The unit is picked to fit, as in the macOS version.
 public readonly record struct Throughput(double BytesPerSecond)
 {
     public static readonly Throughput Zero = new(0);
@@ -41,7 +41,7 @@ public readonly record struct Throughput(double BytesPerSecond)
         Value.ToString(Value >= 100 ? "0" : "0.0", CultureInfo.InvariantCulture) + " " + Unit;
 }
 
-/// <summary>What the network line of the status window shows.</summary>
+// What the network line of the status window shows.
 public sealed class NetworkUsage
 {
     public string Address { get; init; } = "";
@@ -51,22 +51,21 @@ public sealed class NetworkUsage
     public static readonly NetworkUsage Empty = new();
 }
 
-/// <summary>
-/// Receive and send rates and the address of the machine. The counters come from the interfaces
-/// themselves: total bytes since power-on, so the rate is the difference between two polls
-/// divided by the time between them.
-///
-/// The external address is a separate request outwards, made only when configured: it is the
-/// only time the app touches the network, so it can be refused.
-/// </summary>
+// Receive and send rates and the address of the machine.
 public sealed class NetworkMonitor
 {
     // One client for the whole app: each new one takes its own socket, and that lingers for two
     // more minutes after closing — over a day that would add up.
     private static readonly HttpClient Http = new() { Timeout = AppParameters.Network.RequestTimeout };
 
+    // IPv4 first, then IPv6: the service answers over whichever family the request went out on,
+    // and a machine with IPv6 alone would otherwise show nothing.
     private static readonly Regex AddressInPage = new(
         @"\b(?<ip>(?:\d{1,3}\.){3}\d{1,3})\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex AddressV6InPage = new(
+        @"(?<ip>[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7})",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private long _previousIn;
@@ -77,11 +76,13 @@ public sealed class NetworkMonitor
     private string _externalAddress = "";
     private bool _lookupRunning;
     private DateTime _lookupAllowedAt = DateTime.MinValue;
+    private DateTime _retryAt = DateTime.MinValue;
+    private int _retriesLeft = AppParameters.Network.MaxRetries;
     private bool _wasResolving = true;
 
     public NetworkUsage Usage { get; private set; } = NetworkUsage.Empty;
 
-    /// <summary>A poll. <paramref name="seconds"/> is the time since the last one.</summary>
+    // A poll. seconds is the time since the last one.
     public void Update(double seconds, bool resolveExternalAddress)
     {
         (long inBytes, long outBytes, string address) = ReadCounters();
@@ -93,10 +94,22 @@ public sealed class NetworkMonitor
         {
             _localAddress = address;
             _externalAddress = "";
+
+            // A different network is a different answer — the tries start over.
+            _retriesLeft = AppParameters.Network.MaxRetries;
             RequestLookup(resolveExternalAddress);
         }
         else if (resolveExternalAddress && !_wasResolving)
         {
+            RequestLookup(true);
+        }
+        else if (resolveExternalAddress && _externalAddress.Length == 0 &&
+                 _retriesLeft > 0 && DateTime.UtcNow >= _retryAt)
+        {
+            // The last attempt came to nothing — timed out, no route, the service down. A couple
+            // of tries later is the only way the address appears without a restart; past that the
+            // local address stands and the app stops knocking.
+            _retriesLeft--;
             RequestLookup(true);
         }
 
@@ -145,9 +158,7 @@ public sealed class NetworkMonitor
                 IPInterfaceProperties properties = adapter.GetIPProperties();
                 if (properties.GatewayAddresses.Count == 0) continue;
 
-                address = properties.UnicastAddresses
-                    .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)
-                    ?.Address.ToString() ?? "";
+                address = PickAddress(properties.UnicastAddresses);
             }
         }
         catch (NetworkInformationException ex)
@@ -156,6 +167,21 @@ public sealed class NetworkMonitor
         }
 
         return (inBytes, outBytes, address);
+    }
+
+    // IPv4 if there is one, otherwise a routable IPv6. Link-local (fe80::) is skipped: it says
+    // nothing about where the machine is on the network.
+    private static string PickAddress(UnicastIPAddressInformationCollection addresses)
+    {
+        IPAddress? v4 = addresses.FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)?.Address;
+        if (v4 is not null) return v4.ToString();
+
+        IPAddress? v6 = addresses
+            .Select(a => a.Address)
+            .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetworkV6 &&
+                                 !a.IsIPv6LinkLocal && !a.IsIPv6SiteLocal && !a.IsIPv6Teredo);
+
+        return v6?.ToString() ?? "";
     }
 
     private void RequestLookup(bool enabled)
@@ -182,6 +208,10 @@ public sealed class NetworkMonitor
                     _externalAddress = found;
                     Log.Info($"external address: {found}");
                 }
+                else
+                {
+                    _retryAt = DateTime.UtcNow + AppParameters.Network.RetryDelay;
+                }
             }
             finally
             {
@@ -206,13 +236,22 @@ public sealed class NetworkMonitor
         }
     }
 
-    /// <summary>
-    /// Extracting the address from the service answer. Separated out so it can be tested: the
-    /// answer arrives as a page reading "Current IP Address: 1.2.3.4".
-    /// </summary>
+    // Extracting the address from the service answer.
     internal static string? ParseAddress(string page)
     {
         Match match = AddressInPage.Match(page);
-        return match.Success ? match.Groups["ip"].Value : null;
+        if (match.Success) return match.Groups["ip"].Value;
+
+        // IPv6 is only accepted when the framework agrees it is an address: the pattern alone
+        // would also match a fragment of markup or a timestamp.
+        foreach (Match candidate in AddressV6InPage.Matches(page))
+        {
+            string text = candidate.Groups["ip"].Value;
+            if (IPAddress.TryParse(text, out IPAddress? parsed) &&
+                parsed.AddressFamily == AddressFamily.InterNetworkV6)
+                return parsed.ToString();
+        }
+
+        return null;
     }
 }

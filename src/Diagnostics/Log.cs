@@ -5,22 +5,9 @@ using System.Text;
 
 namespace SystemSpinnerX64.Diagnostics;
 
-/// <summary>
-/// A log file next to config.conf. The app shows no windows at all, so the log is the only way
-/// to find out what happened: why the FPS is empty, where the dash instead of fan speed came
-/// from, why the app closed right after starting.
-///
-/// Opened on the first line of <c>App.OnStartup</c>, before every check, at Info — otherwise the
-/// reason for the earliest refusal would have nowhere to go.
-/// </summary>
+// A log file next to config.conf.
 public static class Log
 {
-    public const string FileName = "SystemSpinnerX64.log";
-
-    // Past this the file moves to SystemSpinnerX64.log.old and a new one starts.
-
-    // Checking the size on every write would mean extra trips to the disk.
-
     private static readonly object Gate = new();
 
     private static string? _path;
@@ -32,10 +19,8 @@ public static class Log
         get { lock (Gate) return _path; }
     }
 
-    /// <summary>
-    /// If the folder cannot be written to, tries the fallback; if that fails too, work goes on
-    /// without a log: being unable to keep records is no reason not to start.
-    /// </summary>
+    // If the folder cannot be written to, tries the fallback; if that fails too, work goes on
+    // without a log: being unable to keep records is no reason not to start.
     public static void Start(string directory, string? fallbackDirectory = null)
     {
         lock (Gate)
@@ -47,7 +32,7 @@ public static class Log
                 try
                 {
                     System.IO.Directory.CreateDirectory(dir);
-                    string path = System.IO.Path.Combine(dir, FileName);
+                    string path = System.IO.Path.Combine(dir, AppParameters.Identity.LogFile);
 
                     RotateIfBig(path);
 
@@ -55,7 +40,7 @@ public static class Log
                     // errors, and a folder without write access would look like a log that opened
                     // fine but receives nothing — the fallback folder would never kick in.
                     using (var probe = new StreamWriter(path, append: true, new UTF8Encoding(true)))
-                        probe.WriteLine($"--- System Spinner x64 {Version()} started ---");
+                        probe.WriteLine($"--- {AppParameters.Identity.Name} {AppParameters.Identity.Version} started ---");
 
                     _path = path;
                     return;
@@ -68,14 +53,17 @@ public static class Log
         }
     }
 
-    /// <summary>Everything is written until this is called.</summary>
-    public static void SetLevel(LogLevel level)
+    // Everything is written until this is called. Debug keeps it that way; without it only what
+    // got in the way is written — warnings and errors.
+    public static void SetVerbose(bool verbose)
     {
+        LogLevel level = verbose ? LogLevel.Info : LogLevel.Warn;
+
         lock (Gate)
         {
             if (_level == level) return;
             _level = level;
-            if (_path is not null) Write($"log level: {level}");
+            if (_path is not null) Write(verbose ? "debug logging on" : "debug logging off");
         }
     }
 
@@ -86,11 +74,8 @@ public static class Log
     public static void Error(string message, Exception? ex = null) =>
         Add(LogLevel.Error, ex is null ? message : $"{message}: {ex.GetType().Name}: {ex.Message}");
 
-    /// <summary>
-    /// An exception nobody caught. Unlike <see cref="Error"/> this writes the stack as well:
-    /// a crash leaves no other trace, and the line that threw is the only thing worth having.
-    /// Inner exceptions are unwrapped — the outer one is usually just a wrapper.
-    /// </summary>
+    // An exception nobody caught. Unlike Error this writes the stack as well: a crash leaves no
+    // other trace, and the line that threw is the only thing worth having.
     public static void Crash(string where, Exception ex)
     {
         var text = new StringBuilder();
@@ -167,9 +152,7 @@ public static class Log
         }
     }
 
-    /// <summary>Closing line — it shows the exit was orderly rather than a crash.</summary>
+    // Closing line — it shows the exit was orderly rather than a crash.
     public static void Finish(string reason) => Add(LogLevel.Info, $"--- shutdown: {reason} ---");
 
-    private static string Version() =>
-        typeof(Log).Assembly.GetName().Version?.ToString() ?? "";
 }

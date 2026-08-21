@@ -9,14 +9,7 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Startup;
 
-/// <summary>
-/// Everything that has to be checked happens here, before the tray icon appears. There are no
-/// windows: the reason to stop goes to the log at ERROR, so it is visible at any setting.
-///
-/// It stops in the same places GameOverlay did: the wrong Windows, the wrong processor, an
-/// unreadable config, sensors that did not open, a missing driver. The one concession is fans
-/// that were not found: without them three cells out of twenty go, and the rest still works.
-/// </summary>
+// Everything that has to be checked happens here, before the tray icon appears.
 internal static class Preflight
 {
     private const string ConfigDoc = "sample.conf in the project root";
@@ -48,17 +41,18 @@ internal static class Preflight
                          "confusion — only the one in your profile applies.");
         }
 
-        // No level configured — this run goes at Info while Warn is written to the file.
-        bool levelWasMissing = cfg.LogLevel is null;
-        if (levelWasMissing)
+        // No switch in the config — the first run. It is logged in full, and the file that gets
+        // written afterwards carries the switch turned off.
+        bool switchWasMissing = cfg.Debug is null;
+        if (switchWasMissing)
         {
-            cfg.LogLevel = Diagnostics.LogLevel.Warn;
-            Log.Info("no log level in the config: this run is logged entirely as Info, " +
-                     "and Warn is written to the file");
+            cfg.Debug = false;
+            Log.Info("no Debug switch in the config: this run is logged in full, and the switch " +
+                     "is written off into the file");
         }
         else
         {
-            Log.SetLevel(cfg.LogLevel!.Value);
+            Log.SetVerbose(cfg.Debug ?? false);
         }
 
         if (cfg.LoadError is { Length: > 0 } configError)
@@ -117,7 +111,7 @@ internal static class Preflight
         Log.Info($"fans: {cfg.Fans.Summary.Replace("\n", "; ")}");
 
         // 7. The write is collected here rather than in the branches: there are several reasons to save.
-        if (fansScanned || levelWasMissing) SaveConfig(cfg);
+        if (fansScanned || switchWasMissing) SaveConfig(cfg);
 
         return PreflightResult.Start(cfg, hw);
     }

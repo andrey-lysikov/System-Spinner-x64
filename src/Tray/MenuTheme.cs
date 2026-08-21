@@ -3,14 +3,7 @@ using System.Windows.Forms;
 
 namespace SystemSpinnerX64.Tray;
 
-/// <summary>
-/// Colours of the tray menu, matched to the Windows theme.
-///
-/// The menu is WinForms — there is no other way to get a menu on a tray icon — and WinForms knows
-/// nothing of themes: its menu is white on a dark system and on a light one. Windows will not do
-/// this for us, so every colour is set here by hand, all fifteen of them: a missed one shows up
-/// as a light stripe on a dark background.
-/// </summary>
+// Colours of the tray menu, matched to the Windows theme.
 internal sealed class MenuColors : ProfessionalColorTable
 {
     private readonly bool _dark;
@@ -54,11 +47,9 @@ internal sealed class MenuColors : ProfessionalColorTable
     public override Color CheckPressedBackground => Hover;
 }
 
-/// <summary>
-/// The menu renderer. It differs from the standard one in two things: the text colour and the
-/// check mark colour — the colour table sets neither, they are taken from the item itself, and
-/// WinForms puts the system black there whatever the theme.
-/// </summary>
+// The menu renderer. It differs from the standard one in two things: the text colour and the check
+// mark colour — the colour table sets neither, they are taken from the item itself, and WinForms
+// puts the system black there whatever the theme.
 internal sealed class MenuRenderer : ToolStripProfessionalRenderer
 {
     private readonly bool _dark;
@@ -70,7 +61,7 @@ internal sealed class MenuRenderer : ToolStripProfessionalRenderer
 
     public Color Foreground => _dark ? Color.FromArgb(0xF0, 0xF0, 0xF0) : Color.FromArgb(0x1A, 0x1A, 0x1A);
 
-    /// <summary>A disabled item: the same colour at half strength.</summary>
+    // A disabled item: the same colour at half strength.
     public Color Disabled => _dark ? Color.FromArgb(0x88, 0x88, 0x88) : Color.FromArgb(0x8A, 0x8A, 0x8A);
 
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)

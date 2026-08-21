@@ -6,22 +6,13 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Devices;
 
-/// <summary>
-/// DDC/CI — the very channel the macOS version drives an external monitor through. The commands
-/// travel the same wires as the picture: HDMI, DisplayPort, DVI and USB-C. The monitor decides
-/// what it can do: almost all support brightness, only those that have speakers support their
-/// volume.
-///
-/// In Windows this is <c>dxva2.dll</c>: the monitor handle gives out "physical monitors" (one
-/// handle can have several — when cloning, for instance), and each of them is sent the command.
-/// The handles have to be released: while they are open the DDC channel is held.
-/// </summary>
+// DDC/CI — the very channel the macOS version drives an external monitor through.
 internal static class MonitorControl
 {
-    /// <summary>Brightness code in the monitor command set. The same as <c>luminance</c> on macOS.</summary>
+    // Brightness code in the monitor command set.
     public const byte VcpBrightness = 0x10;
 
-    /// <summary>Code for the volume of the built-in speakers.</summary>
+    // Code for the volume of the built-in speakers.
     public const byte VcpSpeakerVolume = 0x62;
 
     private const int MonitorNameLength = 128;
@@ -108,7 +99,7 @@ internal static class MonitorControl
     private static extern bool EnumDisplayDevicesW(string? device, uint index,
         ref DisplayDeviceInfo info, uint flags);
 
-    /// <summary>Handles of every attached monitor, in the order the system gives them.</summary>
+    // Handles of every attached monitor, in the order the system gives them.
     public static List<IntPtr> Handles()
     {
         var handles = new List<IntPtr>();
@@ -133,10 +124,7 @@ internal static class MonitorControl
         return handles;
     }
 
-    /// <summary>
-    /// The monitor name as the system gives it: "Dell U2720Q". Many monitors report nothing but
-    /// "Generic PnP Monitor" — then the name of the video output is returned.
-    /// </summary>
+    // The monitor name as the system gives it: "Dell U2720Q".
     public static string DescribeMonitor(IntPtr monitor)
     {
         var info = new MonitorInfoEx { cbSize = Marshal.SizeOf<MonitorInfoEx>() };
@@ -152,7 +140,7 @@ internal static class MonitorControl
         return info.DeviceName;
     }
 
-    /// <summary>Whether the handle belongs to a built-in laptop panel.</summary>
+    // Whether the handle belongs to a built-in laptop panel.
     public static bool IsInternal(IntPtr monitor)
     {
         var info = new MonitorInfoEx { cbSize = Marshal.SizeOf<MonitorInfoEx>() };
@@ -168,10 +156,7 @@ internal static class MonitorControl
                device.DeviceID.Contains("LCD", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Opens the physical monitors behind a handle. They must be closed through
-    /// <see cref="Close"/>: while they are open the DDC channel is busy.
-    /// </summary>
+    // Opens the physical monitors behind a handle.
     public static PhysicalMonitor[] Open(IntPtr monitor)
     {
         try
@@ -200,7 +185,7 @@ internal static class MonitorControl
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"DDC handles were not closed: {ex.Message}"); }
     }
 
-    /// <summary>Monitor brightness in percent, or null when it does not answer the command.</summary>
+    // Monitor brightness in percent, or null when it does not answer the command.
     public static double? Brightness(IntPtr physical)
     {
         try
@@ -217,7 +202,7 @@ internal static class MonitorControl
         }
     }
 
-    /// <summary>Sets the brightness in percent. false means the monitor has no DDC/CI.</summary>
+    // Sets the brightness in percent.
     public static bool SetBrightness(IntPtr physical, double percent)
     {
         try
@@ -235,7 +220,7 @@ internal static class MonitorControl
         }
     }
 
-    /// <summary>Value of an arbitrary command as a percentage of its maximum, or null.</summary>
+    // Value of an arbitrary command as a percentage of its maximum, or null.
     public static double? Feature(IntPtr physical, byte code)
     {
         try
@@ -252,7 +237,7 @@ internal static class MonitorControl
         }
     }
 
-    /// <summary>Sets an arbitrary command by percentage of its maximum.</summary>
+    // Sets an arbitrary command by percentage of its maximum.
     public static bool SetFeature(IntPtr physical, byte code, double percent)
     {
         try
@@ -270,7 +255,7 @@ internal static class MonitorControl
         }
     }
 
-    /// <summary>Line for the log: what the monitor can actually do.</summary>
+    // Line for the log: what the monitor can actually do.
     public static string Describe(IntPtr physical)
     {
         var text = new StringBuilder();

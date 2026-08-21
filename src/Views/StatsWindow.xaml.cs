@@ -16,19 +16,7 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Views;
 
-/// <summary>
-/// The status window — what a click on the menu bar icon opens in the macOS version. A headline
-/// with the number, a bar under it, a caption with the details, six times over. Neither charts
-/// nor a process list live here on purpose: this window is opened for a second to see the
-/// numbers, while history and processes live in <see cref="DetailWindow"/> behind the chart icon.
-///
-/// Every value appears exactly once. Clock and power stand as the caption under their own load,
-/// temperatures are rows of their own with a bar, fan speeds are a caption under the CPU row;
-/// nothing is repeated further down.
-///
-/// The window lives for as long as the app does and is only shown and hidden. While it is closed
-/// <see cref="MetricsService"/> collects neither the process list nor the chart history.
-/// </summary>
+// The status window — what a click on the menu bar icon opens in the macOS version.
 public partial class StatsWindow : Window
 {
     private readonly AppConfig _cfg;
@@ -42,7 +30,7 @@ public partial class StatsWindow : Window
     private DetailWindow? _detail;
     private bool _prepared;
 
-    /// <summary>The window was hidden — time to switch the detailed poll off.</summary>
+    // The window was hidden — time to switch the detailed poll off.
     public event Action? Hidden;
 
     public StatsWindow(AppConfig cfg)
@@ -75,10 +63,7 @@ public partial class StatsWindow : Window
         Dwm.ApplyAcrylic(new WindowInteropHelper(this).Handle, Theme.AreWindowsDark());
     }
 
-    /// <summary>
-    /// Re-reads the theme and repaints the window. Called both on creation and when the system
-    /// was switched between light and dark on the fly.
-    /// </summary>
+    // Re-reads the theme and repaints the window.
     public void ApplyTheme()
     {
         bool dark = Theme.AreWindowsDark();
@@ -129,23 +114,21 @@ public partial class StatsWindow : Window
 
         MemLevel.CriticalLevel = _cfg.Warn.SysMem;
         GpuMemLevel.CriticalLevel = _cfg.Warn.GpuMem;
-        SwapLevel.CriticalLevel = _cfg.Warn.Swap;
+        SwapLevel.CriticalLevel = _cfg.Warn.SwapMem;
 
         // Load has no threshold in the config: a highlight that is on all the time says nothing.
-        CpuLevel.CriticalLevel = _cfg.Warn.CpuLoad;
-        GpuLevel.CriticalLevel = _cfg.Warn.GpuLoad;
+        CpuLevel.CriticalLevel = _cfg.Warn.CpuUsage;
+        GpuLevel.CriticalLevel = _cfg.Warn.GpuUsage;
     }
 
-    /// <summary>Shows the window by the taskbar and asks for the detailed poll.</summary>
+    // Shows the window by the taskbar and asks for the detailed poll.
     public void ShowStats()
     {
         ApplyLabels();
         Apply(_latest);
 
-        // The window sizes to its content, and before the first layout its height is unknown: rows
-        // without a sensor are hidden entirely. So it is shown first — off screen and transparent —
-        // and placed once the real height is known. Otherwise it would flash where Windows decided
-        // to open it and only then jump to the tray.
+        // The height is only known after the first layout — rows without a sensor are hidden. So:
+        // shown off screen and transparent, then placed, or it would flash and jump to the tray.
         Opacity = 0;
         Left = AppParameters.Layout.OffScreen;
         Top = AppParameters.Layout.OffScreen;
@@ -159,10 +142,7 @@ public partial class StatsWindow : Window
         Opacity = 1;
     }
 
-    /// <summary>
-    /// Builds the window without showing it: the handle, the first layout and the backdrop. Doing
-    /// all that on the first click is the pause between pressing the icon and seeing the numbers.
-    /// </summary>
+    // Builds the window without showing it: the handle, the first layout and the backdrop.
     public void Prepare()
     {
         if (IsVisible || _prepared) return;
@@ -186,7 +166,7 @@ public partial class StatsWindow : Window
         Hidden?.Invoke();
     }
 
-    /// <summary>New readings. Called only while the window is open.</summary>
+    // New readings. Called only while the window is open.
     public void Apply(MetricsSnapshot snapshot)
     {
         _latest = snapshot;
@@ -203,8 +183,15 @@ public partial class StatsWindow : Window
 
         GpuTitle.Text = Headline(Text.StatsGpu, r.GpuLoad, "%");
         GpuLevel.Value = r.GpuLoad ?? 0;
-        Note(GpuNote, Join(Unit(r.GpuClockMhz, "MHz"), Unit(r.GpuPowerW, "W"),
-                           Unit(r.GpuFanRpm, Text.Rpm)));
+
+        // Integrated graphics have nothing of their own to put under the bar: the clock that does
+        // arrive belongs to the processor package and would read as the card own. Power or a fan
+        // means a card of its own even when the memory sensor stays silent.
+        bool ownCard = r.GpuHasOwnMemory || r.GpuPowerW is not null || r.GpuFanRpm is not null;
+
+        Note(GpuNote, ownCard
+            ? Join(Unit(r.GpuClockMhz, "MHz"), Unit(r.GpuPowerW, "W"), Unit(r.GpuFanRpm, Text.Rpm))
+            : "");
 
         Row(CpuTempTitle, CpuTempLevel, Text.StatsCpuTemp, r.CpuTempC, "°C", Percent(r.CpuTempC));
         Row(GpuTempTitle, GpuTempLevel, Text.StatsGpuTemp, r.GpuTempC, "°C", Percent(r.GpuTempC));
@@ -212,8 +199,9 @@ public partial class StatsWindow : Window
         MemTitle.Text = Headline(Text.StatsMemory, r.MemLoadPercent, "%");
         MemLevel.Value = r.MemLoadPercent ?? 0;
 
-        GpuMemTitle.Text = Headline(Text.StatsGpuMemory, r.GpuMemLoadPercent, "%");
-        GpuMemLevel.Value = r.GpuMemLoadPercent ?? 0;
+        // Shared memory means no row: the same gigabytes already stand above, under Memory.
+        Row(GpuMemTitle, GpuMemLevel, Text.StatsGpuMemory,
+            r.GpuHasOwnMemory ? r.GpuMemLoadPercent : null, "%", r.GpuMemLoadPercent ?? 0);
 
         // The page file is read a poll later than everything else, and a machine can have none at
         // all. The row stays either way, at zero until a figure arrives: a scale that comes and
@@ -222,8 +210,10 @@ public partial class StatsWindow : Window
         SwapTitle.Text = Headline(Text.StatsSwap, swap, "%");
         SwapLevel.Value = swap;
 
-        NetAddress.Text = snapshot.Network.Address is { Length: > 0 } address ? address : Text.StatsNoAddress;
-        NetSpeed.Text = $"↓ {snapshot.Network.Inbound.Describe()}  |  ↑ {snapshot.Network.Outbound.Describe()}";
+        NetAddress.Text = snapshot.Network.Address is { Length: > 0 } address
+            ? $"ip: {address}"
+            : Text.StatsNoAddress;
+        NetSpeed.Text = $"▼ {snapshot.Network.Inbound.Describe()}  |  ▲ {snapshot.Network.Outbound.Describe()}";
 
         _detail?.Apply(snapshot);
     }
@@ -269,10 +259,7 @@ public partial class StatsWindow : Window
         return joined.Length == 0 ? null : joined;
     }
 
-    /// <summary>
-    /// Fan speeds with tags: "CPU 903 · AIO 2210 · SYS 1200". The tags are not translated — those
-    /// three words are printed on the board next to the headers, and a translation would diverge.
-    /// </summary>
+    // Fan speeds with tags: "CPU 903 · AIO 2210 · SYS 1200".
     private static string? Fans(Readings r)
     {
         var found = new List<(string Tag, double Rpm)>();
@@ -319,7 +306,7 @@ public partial class StatsWindow : Window
         _detail.ShowDetail(kind, _latest);
     }
 
-    /// <summary>Places the window again — after a screen was attached, detached or rescaled.</summary>
+    // Places the window again — after a screen was attached, detached or rescaled.
     public void Reposition() => Place();
 
     private void Place()
@@ -332,21 +319,16 @@ public partial class StatsWindow : Window
         _detail?.Reposition();
     }
 
-    /// <summary>
-    /// The window was moved to a screen at another scale — its size in pixels changed with it, so
-    /// the corner it was placed by is no longer where it was put.
-    /// </summary>
+    // The window was moved to a screen at another scale — its size in pixels changed with it, so
+    // the corner it was placed by is no longer where it was put.
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
     {
         base.OnDpiChanged(oldDpi, newDpi);
         Place();
     }
 
-    /// <summary>
-    /// The height changes as it runs: a row without a sensor hides, fan speeds appear, the address
-    /// takes two lines instead of one. The window has to be placed again each time, or its bottom
-    /// edge — the very thing the placement counts from — would creep under the taskbar.
-    /// </summary>
+    // The height changes as it runs: a row without a sensor hides, fan speeds appear, the address
+    // takes two lines instead of one.
     protected override void OnRenderSizeChanged(SizeChangedInfo info)
     {
         base.OnRenderSizeChanged(info);

@@ -1,10 +1,17 @@
-# Everything the compiler produces lives in build — that is set in Directory.Build.props.
-# icon.ico is there too: the icon is built from icon.png by build.ps1 and is not a source —
-# one picture kept in two forms eventually means an exe with the old icon.
+# The finished exe, and what the compiler leaves next to the sources — build.ps1 clears the
+# latter after every run, so these are here for builds started from an IDE.
 build/
+bin/
+obj/
 
-# Files the app itself creates while it runs.
+# Visual Studio and Rider leave their own state next to the sources.
+.vs/
+.idea/
+*.user
+*.suo
+
+# Files the app itself creates while it runs, next to the exe or in the project root.
 config.conf
-SystemSpinnerX64.log
-SystemSpinnerX64.log.old
+System-Spinner.log
+System-Spinner.log.old
 sensors-found.txt

@@ -7,7 +7,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <AssemblyName>SystemSpinnerX64</AssemblyName>
+    <AssemblyName>System-Spinner</AssemblyName>
     <RootNamespace>SystemSpinnerX64</RootNamespace>
   </PropertyGroup>
 
@@ -16,17 +16,17 @@
     <Product>System Spinner x64</Product>
     <Company>lysnet.ru</Company>
     <Authors>Andrey.Lysikov and Claude</Authors>
-    <Copyright>© 2026 Andrey Lysikov, lysnet.ru. Apache 2.0 licence.</Copyright>
+    <Copyright>© Andrey Lysikov, Apache 2.0 licence.</Copyright>
     <Description>System monitoring: an overlay over games and an animated tray icon outside them.</Description>
-    <Version>0.1.0</Version>
+    <Version>0.5.0</Version>
   </PropertyGroup>
 
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- The exe icon. The .ico is not a source but a build result: build.ps1 makes it from the
-         single icon.png and puts it in build, next to the exe. Keeping the same picture in src
-         as well would eventually mean an exe with the old icon. -->
-    <IconFile>$(MSBuildThisFileDirectory)..\build\icon.ico</IconFile>
+    <!-- One icon file for everything: the exe, the tray and the readme. It lives in the project
+         root as a multi-size .ico — the format Windows wants — rather than as a picture the build
+         has to convert every time. -->
+    <IconFile>$(MSBuildThisFileDirectory)..\icon.ico</IconFile>
     <ApplicationIcon>$(IconFile)</ApplicationIcon>
     <!-- The minimum of Windows 11 (build 22000) is checked at run time, in PlatformGuard.cs.
          It cannot be declared through SupportedOSPlatformVersion: that property needs a versioned
@@ -73,7 +73,7 @@
   <ItemGroup>
     <!-- The same icon inside the assembly: NotifyIcon reads it from the resources, and it must
          not sit next to the exe as a separate file — one exe was promised. -->
-    <EmbeddedResource Include="$(IconFile)" LogicalName="SystemSpinnerX64.icon.ico" />
+    <EmbeddedResource Include="$(IconFile)" LogicalName="System-Spinner.icon.ico" />
 
     <!-- Tray animation frames: one folder per set directly in Assets, frame numbers from zero
          inside. The resource name is built from the path ("Spinners/Blue Ball/3.png"), with the
@@ -88,11 +88,5 @@
          shaping the program around the way it is verified. -->
     <InternalsVisibleTo Include="SystemSpinnerX64.Tests" />
   </ItemGroup>
-
-  <!-- No icon means the build was started around build.ps1. Better to explain that here than
-       to let the compiler complain about a missing resource file. -->
-  <Target Name="CheckIcon" BeforeTargets="PrepareForBuild" Condition="!Exists('$(IconFile)')">
-    <Error Text="$(IconFile) not found. The icon is built from icon.png by build.ps1 — run it: powershell -ExecutionPolicy Bypass -File .\build.ps1" />
-  </Target>
 
 </Project>

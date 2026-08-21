@@ -5,20 +5,14 @@ using SystemSpinnerX64.Localization;
 
 namespace SystemSpinnerX64.Startup;
 
-/// <summary>
-/// Autostart through a Task Scheduler task rather than a Startup folder shortcut: the app needs
-/// administrator rights, and a shortcut would raise a UAC prompt at every sign-in, while a task
-/// with highest privileges starts without questions — decided once, when it is created.
-///
-/// Driven by <c>schtasks.exe</c>: part of Windows, with no reference to the scheduler COM libraries.
-/// </summary>
+// Autostart through a Task Scheduler task rather than a Startup folder shortcut: the app needs
+// administrator rights, and a shortcut would raise a UAC prompt at every sign-in, while a task with
+// highest privileges starts without questions — decided once, when it is created.
 internal static class AutoStart
 {
-    private const string TaskName = "SystemSpinnerX64";
+    public static bool IsEnabled() => Run("/Query", "/TN", AppParameters.Identity.TaskName) == 0;
 
-    public static bool IsEnabled() => Run("/Query", "/TN", TaskName) == 0;
-
-    /// <summary>Creates or recreates the task. Returns an error text, or null on success.</summary>
+    // Creates or recreates the task.
     public static string? Enable()
     {
         string? exe = Environment.ProcessPath;
@@ -26,12 +20,12 @@ internal static class AutoStart
 
         // /RL HIGHEST — with highest privileges, the whole point of this.
         // /F — replace an existing task silently: simpler than comparing its parameters.
-        int code = Run("/Create", "/TN", TaskName, "/TR", $"\"{exe}\"",
+        int code = Run("/Create", "/TN", AppParameters.Identity.TaskName, "/TR", $"\"{exe}\"",
                        "/SC", "ONLOGON", "/RL", "HIGHEST", "/F");
 
         if (code == 0)
         {
-            Log.Info($"autostart enabled: task \"{TaskName}\" → {exe}");
+            Log.Info($"autostart enabled: task \"{AppParameters.Identity.TaskName}\" → {exe}");
             return null;
         }
 
@@ -39,10 +33,10 @@ internal static class AutoStart
         return Text.SchedulerRefused(code);
     }
 
-    /// <summary>Removes the task. Returns an error text, or null on success.</summary>
+    // Removes the task. Returns an error text, or null on success.
     public static string? Disable()
     {
-        int code = Run("/Delete", "/TN", TaskName, "/F");
+        int code = Run("/Delete", "/TN", AppParameters.Identity.TaskName, "/F");
 
         if (code == 0)
         {
@@ -54,7 +48,7 @@ internal static class AutoStart
         return Text.SchedulerRefused(code);
     }
 
-    /// <summary>Runs schtasks without a console window and returns its exit code.</summary>
+    // Runs schtasks without a console window and returns its exit code.
     private static int Run(params string[] arguments)
     {
         var start = new ProcessStartInfo("schtasks.exe")

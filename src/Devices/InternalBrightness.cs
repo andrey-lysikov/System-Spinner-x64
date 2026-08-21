@@ -5,21 +5,15 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Devices;
 
-/// <summary>
-/// Brightness of the built-in laptop panel. DDC/CI does not reach it — the panel hangs off
-/// a ribbon cable, not a monitor cable, and understands no monitor commands; Windows drives it
-/// through WMI, the same path the notification-centre slider uses.
-///
-/// On a desktop the class simply does not exist, and the calls return null. That is not an error.
-/// </summary>
+// Brightness of the built-in laptop panel.
 internal static class InternalBrightness
 {
     private const string Scope = @"root\WMI";
 
-    /// <summary>Seconds Windows gives the panel to fade. Zero means at once.</summary>
+    // Seconds Windows gives the panel to fade.
     private const uint Instant = 0;
 
-    /// <summary>Current brightness in percent, or null when there is no built-in panel.</summary>
+    // Current brightness in percent, or null when there is no built-in panel.
     public static double? Get()
     {
         try
@@ -49,7 +43,7 @@ internal static class InternalBrightness
         return null;
     }
 
-    /// <summary>Sets the built-in panel brightness. false means no panel, or WMI refused.</summary>
+    // Sets the built-in panel brightness.
     public static bool Set(double percent)
     {
         byte value = (byte)Math.Clamp(Math.Round(percent), 0, 100);
@@ -85,6 +79,6 @@ internal static class InternalBrightness
         }
     }
 
-    /// <summary>Whether there is a built-in panel that can be driven at all.</summary>
+    // Whether there is a built-in panel that can be driven at all.
     public static bool IsAvailable => Get() is not null;
 }

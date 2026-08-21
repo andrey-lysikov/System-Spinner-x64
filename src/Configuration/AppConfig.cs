@@ -8,44 +8,30 @@ using SystemSpinnerX64.Localization;
 
 namespace SystemSpinnerX64.Configuration;
 
-/// <summary>
-/// Every setting the app has; parameter descriptions live in sample.conf. Everything except the
-/// fan names has a default: fan headers are only known on the spot, so the first run fills them
-/// in by scanning (see Startup/Preflight.cs).
-///
-/// The file is looked for next to the exe (portable, wins) and otherwise
-/// in %LOCALAPPDATA%\SystemSpinnerX64.
-/// </summary>
+// Every setting the app has; parameter descriptions live in sample.conf.
 public sealed class AppConfig
 {
     public Language Language { get; set; } = Language.Auto;
 
-    /// <summary>How often the sensors are polled and the panel redrawn, milliseconds.</summary>
+    // How often the sensors are polled and the panel redrawn, milliseconds.
     public int UpdateIntervalMs { get; set; } = 1000;
 
-    /// <summary>Which GPU to show when there are several. The discrete one comes first.</summary>
+    // Which GPU to show when there are several.
     public int GpuIndex { get; set; }
 
-    /// <summary>
-    /// Show the overlay over full-screen apps. Off leaves only the tray icon — that is, exactly
-    /// System Spinner without the overlay.
-    /// </summary>
+    // Show the overlay over full-screen apps.
     public bool ShowOverlayInGames { get; set; } = true;
 
-    /// <summary>
-    /// Keep the tray icon spinning outside full-screen apps too. Off leaves the first frame
-    /// standing still until a game starts.
-    /// </summary>
+    // Keep the tray icon spinning outside full-screen apps too.
     public bool SpinOnDesktop { get; set; } = true;
 
     public SensorNamesConfig Sensors { get; set; } = new();
 
-    // null means the parameter was absent: such a run is logged entirely at Info, and Warn is
-    // written to the file, so later runs are quiet.
-    public LogLevel? LogLevel { get; set; }
+    // Detailed logging. null means the parameter was absent — the very first run, which is
+    // logged in full and then writes the switch off into the file it creates.
+    public bool? Debug { get; set; }
 
     public FanConfig Fans { get; set; } = new();
-    public FpsConfig Fps { get; set; } = new();
     public WarnConfig Warn { get; set; } = new();
     public AppearanceConfig Appearance { get; set; } = new();
     public SpinnerConfig Spinner { get; set; } = new();
@@ -73,17 +59,13 @@ public sealed class AppConfig
     // The file exists but could not be read — that has to be said, not silently ignored.
     public string? LoadError { get; private set; }
 
-    public const string FileName = "config.conf";
-
-    public const string AppFolder = "SystemSpinnerX64";
-
     // The config next to the exe wins, so the folder can be carried around.
     public static string PortablePath =>
-        System.IO.Path.Combine(AppContext.BaseDirectory, FileName);
+        System.IO.Path.Combine(AppContext.BaseDirectory, AppParameters.Identity.ConfigFile);
 
     public static string UserPath => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        AppFolder, FileName);
+        AppParameters.Identity.AppFolder, AppParameters.Identity.ConfigFile);
 
     // The test is not «can it be written» but «does it belong here»: the app runs as administrator
     // and writing to Program Files succeeds, so checking for failure never triggered.
@@ -143,14 +125,14 @@ public sealed class AppConfig
         }
     }
 
-    /// <summary>Writes the config to the given path and keeps working with it.</summary>
+    // Writes the config to the given path and keeps working with it.
     public bool SaveAs(string path)
     {
         Path = path;
         return Save();
     }
 
-    /// <summary>Writes the config where it was read from, otherwise per Candidates(). Path or null.</summary>
+    // Writes the config where it was read from, otherwise per Candidates().
     public string? SaveSomewhere()
     {
         IEnumerable<string> candidates = LoadedFromFile

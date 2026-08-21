@@ -1,9 +1,6 @@
 namespace SystemSpinnerX64.Configuration;
 
-/// <summary>
-/// Highlighting for values past a threshold; zero disables one. One colour for all of them: the
-/// point is to catch the eye, and one difference from the rest is enough.
-/// </summary>
+// Highlighting for values past a threshold; zero disables one.
 public sealed class WarnConfig
 {
     public string Color { get; set; } = "#FF6A52";
@@ -11,20 +8,18 @@ public sealed class WarnConfig
     public double CpuTemp { get; set; } = 85;
     public double GpuTemp { get; set; } = 83;
 
-    /// <summary>Used memory, per cent of the installed total. Colours the bar in the status window.</summary>
+    // Used memory, per cent of the installed total.
     public double SysMem { get; set; } = 90;
 
-    /// <summary>Used video memory, per cent of the whole.</summary>
+    // Used video memory, per cent of the whole.
     public double GpuMem { get; set; } = 90;
 
-    /// <summary>Page file in use, per cent of its size.</summary>
-    public double Swap { get; set; } = 90;
+    // Page file in use, per cent of its size.
+    public double SwapMem { get; set; } = 90;
 
-    /// <summary>
-    /// Load thresholds. Not in the config and left at zero, which means off: 99 % in a game is
-    /// normal rather than alarming, and a highlight that is always on says nothing.
-    /// </summary>
-    public double CpuLoad { get; set; }
+    // Load, per cent. Higher than the memory thresholds: in a game the load sits near the top all
+    // the time, and a highlight that is always on says nothing.
+    public double CpuUsage { get; set; } = 95;
 
-    public double GpuLoad { get; set; }
+    public double GpuUsage { get; set; } = 95;
 }
