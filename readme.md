@@ -8,6 +8,8 @@ System monitoring with two faces: a tray icon outside and/or panel inside game.
 [![Release](https://img.shields.io/github/v/release/andrey-lysikov/System-Spinner-x64)](https://github.com/andrey-lysikov/System-Spinner-x64/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011%20x64-blue)](https://github.com/andrey-lysikov/System-Spinner-x64/releases/latest)
 
+This is Windows version, if you looking for MacOS go to [System Spinner](https://github.com/andrey-lysikov/System-Spinner)
+
 While a full-screen application is in front of you, this is an overlay. The moment it is gone, this is a tray icon.
 
 ## Features
