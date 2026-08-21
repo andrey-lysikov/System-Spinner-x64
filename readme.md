@@ -37,8 +37,4 @@ While a full-screen application is in front of you, this is an overlay. The mome
 
 ## Tech
 
-Written on c#, Windows 11 and newer, .NET Desktop Runtime 10 or newer, **PawnIO** — [pawnio.eu](https://pawnio.eu)
-
-## For macOS
-
-This is the Windows counterpart of the original — [System Spinner](https://github.com/andrey-lysikov/System-Spinner) for macOS: [download](https://github.com/andrey-lysikov/System-Spinner/releases/latest).
+Written on C#, Windows 11 and newer, .NET Desktop Runtime 10 or newer, **PawnIO** — [pawnio.eu](https://pawnio.eu)
