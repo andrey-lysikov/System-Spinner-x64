@@ -41,13 +41,13 @@ internal static class SpinnerFrames
 
         try
         {
-            Rectangle[] drawn = Content(sources);
-            double scale = Scale(drawn, size);
+            Rectangle content = Content(sources);
+            double scale = Scale(content, size);
 
             var frames = new List<Bitmap>(sources.Count);
 
-            for (int index = 0; index < sources.Count; index++)
-                frames.Add(Fit(sources[index], drawn[index], scale, size,
+            foreach (Bitmap source in sources)
+                frames.Add(Fit(source, content, scale, size,
                                style.SupportsEffect ? effect : SpinnerEffect.Original, lightTheme));
 
             return frames;
@@ -58,35 +58,31 @@ internal static class SpinnerFrames
         }
     }
 
-    // The part of each frame that is actually drawn on.
-    internal static Rectangle[] Content(IReadOnlyList<Bitmap> frames)
+    // The part of the sheet that is drawn on anywhere in the set: every frame's own outline taken
+    // together. One rectangle for the whole set, and deliberately so — cropping each frame to
+    // itself would re-centre it on its own outline, and a drawing that shifts inside its frame
+    // as it turns would then swim about the icon instead of spinning on the spot.
+    internal static Rectangle Content(IReadOnlyList<Bitmap> frames)
     {
-        var drawn = new Rectangle[frames.Count];
+        Rectangle content = Rectangle.Empty;
 
-        for (int index = 0; index < frames.Count; index++)
-            drawn[index] = Bounds(frames[index])
-                           ?? new Rectangle(0, 0, frames[index].Width, frames[index].Height);
-
-        return drawn;
-    }
-
-    // One scale for the whole set: the widest frame and the tallest one together decide it, and
-    // every frame is then reduced by that same amount.
-    internal static double Scale(IReadOnlyList<Rectangle> drawn, int size)
-    {
-        int width = 0, height = 0;
-
-        foreach (Rectangle rect in drawn)
+        foreach (Bitmap frame in frames)
         {
-            width = Math.Max(width, rect.Width);
-            height = Math.Max(height, rect.Height);
+            Rectangle drawn = Bounds(frame) ?? new Rectangle(0, 0, frame.Width, frame.Height);
+            content = content.IsEmpty ? drawn : Rectangle.Union(content, drawn);
         }
 
-        if (width <= 0 || height <= 0) return 1;
+        return content;
+    }
+
+    // By how much that rectangle is reduced to land in the icon square.
+    internal static double Scale(Rectangle content, int size)
+    {
+        if (content.Width <= 0 || content.Height <= 0) return 1;
 
         // Proportions are kept: the "Cat" frame is wider than it is tall, and a cat stretched to
         // a square looks squashed.
-        return Math.Min((double)size / width, (double)size / height);
+        return Math.Min((double)size / content.Width, (double)size / content.Height);
     }
 
     // The drawn-on part of one frame, or null when it is empty.
@@ -142,13 +138,23 @@ internal static class SpinnerFrames
     {
         var target = new Bitmap(size, size, PixelFormat.Format32bppArgb);
 
-        // Only the drawn-on part is taken, at the scale the whole set shares, centred in the icon.
-        Rectangle from = Rectangle.Intersect(content, new Rectangle(0, 0, source.Width, source.Height));
-        if (from.Width <= 0 || from.Height <= 0) from = new Rectangle(0, 0, source.Width, source.Height);
+        // The set's rectangle, reduced and centred in the icon: the same box for every frame, so
+        // each drawing keeps the place it holds on the sheet.
+        int width = Math.Max(1, (int)Math.Round(content.Width * scale));
+        int height = Math.Max(1, (int)Math.Round(content.Height * scale));
+        int left = (size - width) / 2, top = (size - height) / 2;
 
-        int width = Math.Max(1, (int)Math.Round(from.Width * scale));
-        int height = Math.Max(1, (int)Math.Round(from.Height * scale));
-        var box = new Rectangle((size - width) / 2, (size - height) / 2, width, height);
+        // The frames of a set need not share a canvas, so the rectangle can reach past this one.
+        // Then only the overlap is drawn, at the place inside the box it belongs to — trimming the
+        // rectangle and centring what is left would put the frame back to swimming.
+        Rectangle from = Rectangle.Intersect(content, new Rectangle(0, 0, source.Width, source.Height));
+        if (from.Width <= 0 || from.Height <= 0) return target;
+
+        var box = new Rectangle(
+            left + (int)Math.Round((from.X - content.X) * scale),
+            top + (int)Math.Round((from.Y - content.Y) * scale),
+            Math.Max(1, (int)Math.Round(from.Width * scale)),
+            Math.Max(1, (int)Math.Round(from.Height * scale)));
 
         using var g = Graphics.FromImage(target);
         g.InterpolationMode = InterpolationMode.HighQualityBicubic;
