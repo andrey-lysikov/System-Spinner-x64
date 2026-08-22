@@ -92,17 +92,33 @@ internal static class HdrControl
             {
                 DisplayConfig.Luid adapter = path.TargetInfo.AdapterId;
                 uint target = path.TargetInfo.Id;
-
-                if (Read(adapter, target) is not { Supported: true } state) continue;
+                uint technology = path.TargetInfo.OutputTechnology;
 
                 string name = DisplayConfig.TargetName(adapter, target);
+                if (name.Length == 0) name = "Display";
+
+                (bool Supported, bool Enabled)? state = Read(adapter, target);
+
+                // The whole decision on one line: what the screen hangs on, what it answered, and
+                // what was made of it. Anything else and a menu entry that refuses to switch has
+                // nothing behind it in the log.
+                Log.Info($"HDR on \"{name}\": {DisplayConfig.TechnologyName(technology)}, " +
+                         $"supported={Yes(state?.Supported)} on={Yes(state?.Enabled)}");
+
+                // A screen with no output of the graphics card behind it is left out of the menu
+                // rather than shown greyed out: the virtual display of a remote session claims
+                // advanced colour and takes no switch, and an entry that never works is worse than
+                // no entry at all — the "unavailable" line then says the true thing.
+                if (DisplayConfig.IsVirtual(technology)) continue;
+
+                if (state is not { Supported: true }) continue;
 
                 found.Add(new HdrDisplay
                 {
-                    Name = name.Length > 0 ? name : "Display",
+                    Name = name,
                     AdapterId = adapter,
                     TargetId = target,
-                    Enabled = state.Enabled
+                    Enabled = state.Value.Enabled
                 });
             }
         }
@@ -175,6 +191,9 @@ internal static class HdrControl
             return false;
         }
     }
+
+    // For the log: a screen that would not answer at all is not the same as one that answered no.
+    private static string Yes(bool? value) => value is null ? "?" : value.Value ? "1" : "0";
 
     // Whether the screen carries HDR and whether it is on, or null when it cannot be asked.
     private static (bool Supported, bool Enabled)? Read(DisplayConfig.Luid adapter, uint target)

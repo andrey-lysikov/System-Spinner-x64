@@ -71,7 +71,16 @@ internal sealed class DisplayDevice : IDisposable
         device.ControlsSpeakerVolume = volume is not null;
         device.SpeakerVolume = volume ?? 0;
 
-        Log.Info($"display \"{name}\": {(isInternal ? "built-in panel" : "external, DDC/CI")}, " +
+        // "DDC/CI" is what the monitor answered to, not what the screen is called. A handle is not
+        // an answer: Windows hands one out for the virtual display of a remote session as readily
+        // as for a panel on a wire, and that one takes no command at all. Saying it has DDC/CI
+        // sends the next reader looking for the wrong fault.
+        string link = isInternal ? "built-in panel"
+                      : physical.Length == 0 ? "external, no DDC/CI"
+                      : brightness is null && volume is null ? "external, DDC/CI unanswered"
+                      : "external, DDC/CI";
+
+        Log.Info($"display \"{name}\": {link}, " +
                  $"brightness {Show(brightness)}, monitor speakers {Show(volume)}" +
                  $"{(carriesAudio ? ", carries audio" : "")}");
 

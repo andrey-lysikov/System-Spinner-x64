@@ -22,6 +22,13 @@ internal static class Preflight
 
         Log.Info($"Windows {Environment.OSVersion.Version}");
 
+        // A remote desktop explains at a glance half of what the log shows afterwards: one screen
+        // instead of the monitors on the card, no brightness, no HDR. Without this line all of it
+        // reads as a failure.
+        if (Win32.IsRemoteSession)
+            Log.Info("remote session: the desktop is on the virtual display of the remote adapter — " +
+                     "the monitors on the graphics card are out of reach, and with them DDC/CI and HDR");
+
         // 2. The config.
         var cfg = AppConfig.Load();
         Log.Info(cfg.LoadedFromFile ? $"config loaded: {cfg.Path}" : "no config, using defaults");

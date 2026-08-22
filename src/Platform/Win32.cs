@@ -170,6 +170,17 @@ internal static class Win32
     public static double ScaleAt(int x, int y) =>
         ScaleOf(MonitorFromPoint(new POINT { X = x, Y = y }, MONITOR_DEFAULTTONEAREST));
 
+    // Whether the desktop of this session is being drawn by a remote client — RDP. Then the
+    // session hangs on the virtual display of the remote adapter, and the monitors on the graphics
+    // card belong to nobody: no handle from EnumDisplayMonitors leads to them, DDC/CI has no wire
+    // to travel down, and the HDR switch has nothing to switch.
+    public static bool IsRemoteSession => GetSystemMetrics(SM_REMOTESESSION) != 0;
+
+    private const int SM_REMOTESESSION = 0x1000;
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
     // The monitor the pointer is on — the screen being looked at.
     public static IntPtr MonitorUnderPointer() =>
         GetCursorPos(out POINT pointer)
