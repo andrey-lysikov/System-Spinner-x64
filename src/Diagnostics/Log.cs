@@ -96,7 +96,11 @@ public static class Log
         Add(LogLevel.Error, text.ToString());
     }
 
-    private static void Add(LogLevel level, string message)
+    // A key seen by the hook or read from the raw input. Part of the full record, and only written
+    // with it — but under a tag of its own: a line per press would drown the rest otherwise.
+    public static void Key(string message) => Add(LogLevel.Info, message, "KEY  ");
+
+    private static void Add(LogLevel level, string message, string? tag = null)
     {
         lock (Gate)
         {
@@ -106,7 +110,7 @@ public static class Log
 
             // Multi-line explanations are indented to the margin, or the log is unreadable by eye.
             string[] lines = message.Replace("\r\n", "\n").Split('\n');
-            Write($"{stamp} {Tag(level)} {lines[0]}");
+            Write($"{stamp} {tag ?? Tag(level)} {lines[0]}");
             for (int i = 1; i < lines.Length; i++) Write($"{new string(' ', 30)}{lines[i]}");
         }
     }

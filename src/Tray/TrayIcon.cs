@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using SystemSpinnerX64.Configuration;
+using SystemSpinnerX64.Devices;
 using SystemSpinnerX64.Diagnostics;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Platform;
@@ -24,6 +25,7 @@ public sealed class TrayIcon : IDisposable
 
     private readonly ToolStripMenuItem _autoStartItem;
     private readonly ToolStripMenuItem _displaysItem;
+    private readonly ToolStripMenuItem _hdrItem;
     private readonly ToolStripMenuItem _alwaysOsdItem;
     private readonly ToolStripMenuItem _languageItem;
     private readonly ToolStripMenuItem _externalAddressItem;
@@ -55,6 +57,7 @@ public sealed class TrayIcon : IDisposable
         _overlayItem = Check(Text.MenuOverlay, _cfg.ShowOverlayInGames);
 
         _displaysItem = new ToolStripMenuItem(Text.MenuDisplays);
+        _hdrItem = new ToolStripMenuItem(Text.MenuHdr);
 
         WireItems();
         BuildMenu();
@@ -118,9 +121,10 @@ public sealed class TrayIcon : IDisposable
         _autoStartItem.CheckedChanged += OnAutoStartChanged;
     }
 
-    // Fills the submenu with the list of attached screens. The names are shown greyed out: they
-    // are what was found, not something to pick.
-    public void ShowDisplays(IReadOnlyList<string> displays)
+    // Fills the submenu with the list of attached screens. Nothing here is to be picked — it is
+    // what was found — so a name only says whether that screen answers over DDC: one that does
+    // stands in the ordinary colour, one that does not is greyed out.
+    public void ShowDisplays(IReadOnlyList<(string Name, bool Controllable)> displays)
     {
         // The list is rebuilt whenever the screens are looked at again — hourly at the least, so
         // the old items are let go of rather than left for the collector.
@@ -129,8 +133,57 @@ public sealed class TrayIcon : IDisposable
 
         _displaysItem.DropDownItems.Clear();
 
-        foreach (string display in displays)
-            _displaysItem.DropDownItems.Add(new ToolStripMenuItem(display) { Enabled = false });
+        foreach ((string name, bool controllable) in displays)
+            _displaysItem.DropDownItems.Add(new ToolStripMenuItem(name) { Enabled = controllable });
+
+        Repaint(_displaysItem);
+    }
+
+    // Fills the HDR submenu: one tick per screen that carries HDR, showing whether it is on. The
+    // switch is the one Windows itself keeps — the same the display settings write to — so the
+    // list is asked for anew after every change and whenever the screens are looked at.
+    public void ShowHdr()
+    {
+        foreach (ToolStripItem item in _hdrItem.DropDownItems.Cast<ToolStripItem>().ToList())
+            item.Dispose();
+
+        _hdrItem.DropDownItems.Clear();
+
+        IReadOnlyList<HdrControl.HdrDisplay> displays = HdrControl.Capable();
+
+        // Nothing carries HDR: the submenu says so rather than standing empty. The item itself
+        // stays reachable — a screen that carries HDR may be attached later.
+        if (displays.Count == 0)
+        {
+            _hdrItem.DropDownItems.Add(new ToolStripMenuItem(Text.HdrUnavailable) { Enabled = false });
+            Repaint(_hdrItem);
+            return;
+        }
+
+        foreach (HdrControl.HdrDisplay display in displays)
+        {
+            var item = new ToolStripMenuItem(display.Name) { Checked = display.Enabled };
+
+            // CheckOnClick is left off on purpose: the tick is worth moving only once Windows has
+            // agreed to the change, and it may well refuse.
+            item.Click += (_, _) => ToggleHdr(display);
+
+            _hdrItem.DropDownItems.Add(item);
+        }
+
+        Repaint(_hdrItem);
+    }
+
+    // Asks Windows for the switch and then reads the screens again: the answer alone does not say
+    // where the screen ended up, and a refused change must not leave a tick moved.
+    private void ToggleHdr(HdrControl.HdrDisplay display)
+    {
+        bool wanted = !display.Enabled;
+
+        if (!HdrControl.Set(display, wanted)) Notify(Text.HdrFailed(display.Name));
+        else Log.Info($"HDR on \"{display.Name}\" switched {(wanted ? "on" : "off")}");
+
+        ShowHdr();
     }
 
     // A notification in the Windows action centre. With a link, a click on it opens that link —
@@ -200,6 +253,7 @@ public sealed class TrayIcon : IDisposable
     {
         _autoStartItem.Text = Text.MenuAutoStart;
         _displaysItem.Text = Text.MenuDisplays;
+        _hdrItem.Text = Text.MenuHdr;
         _alwaysOsdItem.Text = Text.MenuAlwaysCustomOsd;
         _languageItem.Text = Text.MenuSystemLanguage;
         _externalAddressItem.Text = Text.MenuExternalAddress;
@@ -238,6 +292,7 @@ public sealed class TrayIcon : IDisposable
             _externalAddressItem,
             new ToolStripSeparator(),
             _displaysItem,
+            _hdrItem,
             StepsMenu(),
             _alwaysOsdItem,
             new ToolStripSeparator(),
@@ -255,7 +310,11 @@ public sealed class TrayIcon : IDisposable
         });
 
         // Empty until the screens are polled.
-        ShowDisplays(Array.Empty<string>());
+        ShowDisplays(Array.Empty<(string, bool)>());
+
+        // HDR is read straight away: unlike the screen names it is not waited on by anyone else,
+        // and an empty submenu at the first opening would look like a broken item.
+        ShowHdr();
     }
 
     // Opens the menu at the pointer.
@@ -460,10 +519,15 @@ public sealed class TrayIcon : IDisposable
         ShowAutoStart(Startup.AutoStart.IsEnabled());
     }
 
+    // The renderer the menu was last painted with. The submenus of screens and of HDR are filled
+    // after the painting and have to be brought to the same colours by themselves.
+    private MenuRenderer? _renderer;
+
     // Paints the menu to match the Windows theme.
     public void ApplyTheme()
     {
         var renderer = new MenuRenderer(Theme.AreWindowsDark());
+        _renderer = renderer;
 
         // Arabic reads right to left: the menu mirrors along with the windows.
         _menu.RightToLeft = Text.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No;
@@ -488,6 +552,16 @@ public sealed class TrayIcon : IDisposable
             parent.DropDown.Renderer = renderer;
             Paint(parent.DropDownItems, renderer);
         }
+    }
+
+    // Brings one rebuilt submenu to the colours the menu already carries.
+    private void Repaint(ToolStripMenuItem item)
+    {
+        if (_renderer is null) return;
+
+        item.DropDown.RenderMode = ToolStripRenderMode.Professional;
+        item.DropDown.Renderer = _renderer;
+        Paint(item.DropDownItems, _renderer);
     }
 
     private static ToolStripMenuItem Check(string title, bool state) =>
@@ -562,7 +636,7 @@ public sealed class TrayIcon : IDisposable
         var permanent = new HashSet<ToolStripItem>
         {
             _overlayItem, _autoStartItem, _languageItem, _externalAddressItem,
-            _displaysItem, _alwaysOsdItem, _invertItem
+            _displaysItem, _hdrItem, _alwaysOsdItem, _invertItem
         };
 
         foreach (ToolStripItem item in _menu.Items.Cast<ToolStripItem>().ToList())

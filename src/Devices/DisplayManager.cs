@@ -19,12 +19,27 @@ public sealed class DisplayManager : IDisposable
         _cfg = cfg;
     }
 
-    // Names of the attached screens — the tray menu shows these.
-    public IReadOnlyList<string> DisplayNames =>
-        _displays.Select(d => d.IsInternal ? d.Name + " (built-in)" : d.Name).ToList();
+    // For the tray menu: the name, and whether the screen answers anything at all. One that
+    // answers nothing is greyed out.
+    public IReadOnlyList<(string Name, bool Controllable)> DisplayNames =>
+        _displays.Select(d => (d.IsInternal ? d.Name + " (built-in)" : d.Name,
+                               d.ControlsBrightness || d.ControlsSpeakerVolume)).ToList();
 
-    // Whether there is anything to drive by brightness.
     public bool HasBrightnessControl => _displays.Any(d => d.ControlsBrightness);
+
+    // What the custom OSD is for. Without a monitor driven over DDC, Windows does the job itself
+    // and shows its own panel — ours would only repeat it — so the keys are left alone.
+    private bool DrivesBrightnessOverDdc =>
+        _cfg.ControlExternalBrightness && _displays.Any(d => !d.IsInternal && d.ControlsBrightness);
+
+    private bool DrivesVolumeOverDdc => _cfg.ControlExternalVolume && MonitorSpeakers() is not null;
+
+    // The numbers held here are what the app last set; the buttons on the monitor answer to nobody.
+    // The reading goes to the DDC queue and lands when it lands.
+    public void RereadValues()
+    {
+        foreach (DisplayDevice display in _displays) display.Reread();
+    }
 
     // Polls the attached screens again.
     public void Refresh()
@@ -59,64 +74,87 @@ public sealed class DisplayManager : IDisposable
         return Math.Clamp(stepped, 0, 100);
     }
 
-    // Changes the brightness of every screen that drives it. "shown" is what the OSD displays: the
-    // screen the pointer is on, or the first one driven.
+    // Moves the brightness of one screen: the one the pointer is on.
     public MediaKeyResult AdjustBrightness(bool up, out double shown)
     {
         shown = 0;
 
-        if (!_cfg.ControlExternalBrightness && !InternalBrightness.IsAvailable)
-            return _cfg.AlwaysUseCustomOsd ? MediaKeyResult.Consumed : MediaKeyResult.PassThrough;
+        if (!MediaKeyRules.Takes(DrivesBrightnessOverDdc, _cfg.AlwaysUseCustomOsd))
+            return MediaKeyResult.PassThrough;
 
-        bool applied = false;
+        DisplayDevice? screen = BrightnessTarget();
 
-        // With several screens attached their brightness need not agree, and the OSD can only
-        // show one number: it shows the screen being looked at — the one the pointer is on.
-        IntPtr active = Win32.MonitorUnderPointer();
-        bool shownIsActive = false;
+        // HDR is asked about the screen being looked at, not about the one that can be driven: in
+        // HDR a monitor may stop answering the brightness command, and then there is no such screen.
+        DisplayDevice? looked = InFront();
+        bool hdr = looked is not null && HdrControl.IsOn(looked.GdiName);
 
-        foreach (DisplayDevice display in _displays)
-        {
-            if (!display.ControlsBrightness) continue;
-            if (!display.IsInternal && !_cfg.ControlExternalBrightness) continue;
+        MediaKeyResult result = MediaKeyRules.Brightness(DrivesBrightnessOverDdc, _cfg.AlwaysUseCustomOsd,
+                                                         screen is not null, hdr);
 
-            double value = Next(display.Brightness ?? 0, up);
-            display.SetBrightness(value);
+        // Only with the full record: a line per press, and it is what says which way the decision
+        // went when the keys do something other than what was expected.
+        Log.Info($"brightness key: ddc={Yes(DrivesBrightnessOverDdc)} always={Yes(_cfg.AlwaysUseCustomOsd)} " +
+                 $"target=\"{screen?.GdiName ?? "none"}\" screen=\"{looked?.GdiName ?? "none"}\" " +
+                 $"hdr={Yes(hdr)} -> {result}");
 
-            if (!applied || (!shownIsActive && display.Monitor == active))
-            {
-                shown = value;
-                shownIsActive = display.Monitor == active;
-            }
+        if (result != MediaKeyResult.Consumed || screen is null) return result;
 
-            applied = true;
-        }
+        shown = Next(screen.Brightness, up);
+        screen.SetBrightness(shown);
 
-        // Nothing to drive: let Windows handle brightness, unless the custom OSD was demanded
-        // in every case.
-        if (!applied && !_cfg.AlwaysUseCustomOsd) return MediaKeyResult.PassThrough;
-
-        return MediaKeyResult.Consumed;
+        return result;
     }
 
-    // Changes the volume. By default this is the Windows output device volume — it works with any
-    // output, headphones included.
+    // The screen being looked at, driveable or not: the one the pointer is on.
+    private DisplayDevice? InFront()
+    {
+        IntPtr active = Win32.MonitorUnderPointer();
+
+        return _displays.FirstOrDefault(d => d.Monitor == active) ?? _displays.FirstOrDefault();
+    }
+
+    // The screen under the pointer where it can be driven, otherwise the first that can.
+    private DisplayDevice? BrightnessTarget()
+    {
+        IntPtr active = Win32.MonitorUnderPointer();
+
+        return _displays.FirstOrDefault(d => d.Monitor == active && Drivable(d))
+               ?? _displays.FirstOrDefault(Drivable);
+
+        bool Drivable(DisplayDevice display) =>
+            display.ControlsBrightness && (display.IsInternal || _cfg.ControlExternalBrightness);
+    }
+
+    // The sound passes through two attenuators — the Windows mixer and the monitor's own volume —
+    // and they are moved together, to the same number. Driving one behind the other would leave a
+    // second attenuator nothing on screen shows.
     public MediaKeyResult AdjustVolume(bool up, out double shown)
     {
         shown = 0;
 
-        if (_cfg.ControlExternalVolume && MonitorSpeakers() is DisplayDevice speakers)
+        DisplayDevice? speakers = _cfg.ControlExternalVolume ? MonitorSpeakers() : null;
+
+        if (!MediaKeyRules.Takes(speakers is not null, _cfg.AlwaysUseCustomOsd))
+            return MediaKeyResult.PassThrough;
+
+        double? mixer = AudioEndpoint.Volume();
+
+        // The step is taken from the mixer: the finer scale, and the one everything else agrees
+        // with. Found apart, the two are brought together by the first press.
+        double current = mixer ?? speakers?.SpeakerVolume ?? 0;
+
+        shown = Next(current, up);
+
+        bool moved = mixer is not null && AudioEndpoint.SetVolume(shown);
+
+        if (speakers is not null)
         {
-            shown = Next(speakers.SpeakerVolume ?? 0, up);
             speakers.SetSpeakerVolume(shown);
-            return MediaKeyResult.Consumed;
+            moved = true;
         }
 
-        double? current = AudioEndpoint.Volume();
-        if (current is null) return _cfg.AlwaysUseCustomOsd ? MediaKeyResult.Consumed : MediaKeyResult.PassThrough;
-
-        shown = Next(current.Value, up);
-        return AudioEndpoint.SetVolume(shown) ? MediaKeyResult.Consumed : MediaKeyResult.PassThrough;
+        return MediaKeyRules.Volume(moved, _cfg.AlwaysUseCustomOsd);
     }
 
     // Toggles mute. The OSD then shows zero, or the previous volume.
@@ -124,27 +162,43 @@ public sealed class DisplayManager : IDisposable
     {
         shown = 0;
 
-        bool? muted = AudioEndpoint.ToggleMute();
-        if (muted is null) return _cfg.AlwaysUseCustomOsd ? MediaKeyResult.Consumed : MediaKeyResult.PassThrough;
+        if (!MediaKeyRules.Takes(DrivesVolumeOverDdc, _cfg.AlwaysUseCustomOsd)) return MediaKeyResult.PassThrough;
 
-        // Muted means zero on the scale: the "sound off" icon without a zero scale would read as
-        // "the volume is unchanged but inaudible", and that is exactly what has to be shown.
+        bool? muted = AudioEndpoint.ToggleMute();
+        if (muted is null) return MediaKeyRules.Volume(false, _cfg.AlwaysUseCustomOsd);
+
+        // Muted means zero on the scale, or "unchanged but inaudible" is what it would read as.
         shown = muted.Value ? 0 : AudioEndpoint.Volume() ?? 0;
         return MediaKeyResult.Consumed;
     }
 
-    // The monitor the sound goes to: the Windows output device name contains the monitor name
-    // when the sound is handed over HDMI or DisplayPort.
+    // The monitor the sound goes to. Windows names a display output after the screen it ends at —
+    // "XV320QU LV (NVIDIA High Definition Audio)" — so the name before the brackets is matched
+    // whole: as a substring, a screen called "PC" would match half the sound devices on a machine.
+    // The connection has to carry sound as well; a monitor on DVI cannot receive any.
     private DisplayDevice? MonitorSpeakers()
     {
         string output = AudioEndpoint.DefaultDeviceName();
         if (output.Length == 0) return null;
 
-        return _displays.FirstOrDefault(d =>
-                   d.ControlsSpeakerVolume &&
-                   (output.Contains(d.Name, StringComparison.OrdinalIgnoreCase) ||
-                    d.Name.Contains(output, StringComparison.OrdinalIgnoreCase)))
-               ?? _displays.FirstOrDefault(d => d.ControlsSpeakerVolume);
+        string label = ScreenLabel(output);
+
+        return _displays.FirstOrDefault(d => Speaks(d) && d.Name.Equals(label, StringComparison.OrdinalIgnoreCase))
+               // Not every driver names its output that way: one name inside the other is still
+               // worth trying, now that a silent connection can no longer be what it lands on.
+               ?? _displays.FirstOrDefault(d => Speaks(d) &&
+                                                (output.Contains(d.Name, StringComparison.OrdinalIgnoreCase) ||
+                                                 d.Name.Contains(output, StringComparison.OrdinalIgnoreCase)));
+
+        static bool Speaks(DisplayDevice display) => display.ControlsSpeakerVolume && display.CarriesAudio;
+    }
+
+    private static string Yes(bool value) => value ? "1" : "0";
+
+    private static string ScreenLabel(string output)
+    {
+        int bracket = output.LastIndexOf('(');
+        return bracket > 0 ? output[..bracket].Trim() : output.Trim();
     }
 
     private void Release()

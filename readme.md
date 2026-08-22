@@ -14,7 +14,9 @@ This is the Windows version. If you are looking for macOS, go to [System Spinner
 
 - CPU usage shown by the animated tray icon
 - Audio and brightness control for external monitors (over HDMI/DVI/USB-C, with the standard media keys)
-- Custom OSD for volume and brightness
+- HDR switch in the tray menu for every screen that carries it
+- Custom OSD for volume and brightness, shown in place of the Windows one rather than alongside it
+- Monitor brightness driven by the brightness keys of the keyboard: Windows makes no key of them and acts on them nowhere
 - Adjustable number of steps for more accurate volume and brightness control
 - Top CPU/memory processes in the popup window
 - Memory statistics with swap

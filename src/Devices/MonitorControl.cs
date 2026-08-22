@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Text;
 using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Devices;
@@ -9,9 +8,6 @@ namespace SystemSpinnerX64.Devices;
 // DDC/CI — the very channel the macOS version drives an external monitor through.
 internal static class MonitorControl
 {
-    // Brightness code in the monitor command set.
-    public const byte VcpBrightness = 0x10;
-
     // Code for the volume of the built-in speakers.
     public const byte VcpSpeakerVolume = 0x62;
 
@@ -124,20 +120,27 @@ internal static class MonitorControl
         return handles;
     }
 
-    // The monitor name as the system gives it: "Dell U2720Q".
-    public static string DescribeMonitor(IntPtr monitor)
+    // What the system says about a monitor: the name — "Dell U2720Q" — the name the rest of
+    // Windows knows it by, and whether its connection can carry sound. All from one enumeration.
+    public static (string Name, string GdiName, bool CarriesAudio) Describe(IntPtr monitor)
     {
         var info = new MonitorInfoEx { cbSize = Marshal.SizeOf<MonitorInfoEx>() };
-        if (!GetMonitorInfoW(monitor, ref info)) return "Display";
+        if (!GetMonitorInfoW(monitor, ref info)) return ("Display", string.Empty, false);
+
+        // The display configuration knows the screen by the name shown in the Windows display
+        // settings — "XV320QU LV". It is asked first: the older enumeration below answers for most
+        // screens with the driver name, and that is "Generic PnP Monitor" for nearly all of them.
+        if (DisplayConfig.ByGdiDevice().TryGetValue(info.DeviceName, out DisplayConfig.Screen screen))
+            return (screen.Name, info.DeviceName, screen.CarriesAudio);
 
         var device = new DisplayDeviceInfo { cb = Marshal.SizeOf<DisplayDeviceInfo>() };
         if (EnumDisplayDevicesW(info.DeviceName, 0, ref device, 0) &&
             device.DeviceString is { Length: > 0 })
         {
-            return device.DeviceString;
+            return (device.DeviceString, info.DeviceName, false);
         }
 
-        return info.DeviceName;
+        return (info.DeviceName, info.DeviceName, false);
     }
 
     // Whether the handle belongs to a built-in laptop panel.
@@ -253,14 +256,5 @@ internal static class MonitorControl
             System.Diagnostics.Debug.WriteLine($"VCP {code:X2} was not set: {ex.Message}");
             return false;
         }
-    }
-
-    // Line for the log: what the monitor can actually do.
-    public static string Describe(IntPtr physical)
-    {
-        var text = new StringBuilder();
-        text.Append("brightness ").Append(Brightness(physical) is double b ? $"{b:0} %" : "no");
-        text.Append(", volume ").Append(Feature(physical, VcpSpeakerVolume) is double v ? $"{v:0} %" : "no");
-        return text.ToString();
     }
 }

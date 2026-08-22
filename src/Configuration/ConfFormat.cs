@@ -46,8 +46,6 @@ internal static class ConfFormat
         osd.AdjustmentSteps = file.Whole(General, "AdjustmentStepsOsd") ?? osd.AdjustmentSteps;
         osd.ControlExternalBrightness = file.Flag(General, nameof(osd.ControlExternalBrightness)) ?? osd.ControlExternalBrightness;
         osd.ControlExternalVolume = file.Flag(General, nameof(osd.ControlExternalVolume)) ?? osd.ControlExternalVolume;
-        osd.BrightnessUpKey = file.Text(General, nameof(osd.BrightnessUpKey)) ?? osd.BrightnessUpKey;
-        osd.BrightnessDownKey = file.Text(General, nameof(osd.BrightnessDownKey)) ?? osd.BrightnessDownKey;
 
         StatsConfig stats = cfg.Stats;
         stats.ShowExternalAddress = file.Flag(General, nameof(stats.ShowExternalAddress)) ?? stats.ShowExternalAddress;
@@ -174,19 +172,22 @@ internal static class ConfFormat
                "The first run — the one that creates this file — is always logged in full.")
          .Value(nameof(cfg.Debug), cfg.Debug ?? false).Blank();
 
-        w.Note("Use the app's own OSD even when there is nothing to control (false).")
+        w.Note("Take the volume and brightness keys even when no monitor answers over DDC (false).",
+               "Off, those keys are left to Windows whenever there is nothing to drive over DDC:",
+               "it changes the volume or the brightness itself and shows its own panel, and a",
+               "second panel of ours would only repeat it. On, the app takes the keys in every",
+               "case and shows its own panel for them — the Windows one is then kept out of sight.")
          .Value(nameof(o.AlwaysUseCustomOsd), o.AlwaysUseCustomOsd).Blank();
 
         w.Note("Steps from zero to full for volume and brightness (16).")
          .Value("AdjustmentStepsOsd", o.AdjustmentSteps).Blank();
 
-        w.Note("Drive an external monitor over DDC/CI, brightness and its own speakers (both on).")
+        w.Note("Drive an external monitor over DDC/CI: its brightness, and its own speakers",
+               "(both on). The monitor's volume is kept in step with the Windows mixer — both",
+               "carry the same number, so one press is one step whichever of the two the sound",
+               "is listened through.")
          .Value(nameof(o.ControlExternalBrightness), o.ControlExternalBrightness)
          .Value(nameof(o.ControlExternalVolume), o.ControlExternalVolume).Blank();
-
-        w.Note("Brightness keys: Windows has none of its own. Write off to leave it to the system.")
-         .Value(nameof(o.BrightnessUpKey), o.BrightnessUpKey)
-         .Value(nameof(o.BrightnessDownKey), o.BrightnessDownKey).Blank();
 
         w.Note("Look up the external address through checkip.dyndns.org (true).")
          .Value(nameof(st.ShowExternalAddress), st.ShowExternalAddress).Blank();

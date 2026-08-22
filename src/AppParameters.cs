@@ -33,8 +33,8 @@ internal static class AppParameters
         // The mutex that keeps a second copy from starting.
         public const string SingleInstanceMutex = "System-Spinner.SingleInstance";
 
-        // The invisible window that receives the brightness hot keys.
-        public const string HotKeyWindow = "System-Spinner.HotKeys";
+        // The invisible window that receives the raw input — the brightness keys of the keyboard.
+        public const string MessageWindow = "System-Spinner.Messages";
 
         // The icon inside the assembly — the tray and the About window read it from there rather
         // than from a file beside the exe.
@@ -86,6 +86,9 @@ internal static class AppParameters
         // How long to wait after the machine wakes up. Windows says "resumed" before the screens
         // have come back: asked straight away, a monitor answers nothing over DDC.
         public static readonly TimeSpan ResumeDelay = TimeSpan.FromSeconds(5);
+
+        // How many times a screen that answers nothing over DDC is asked again after a mode change.
+        public const int SettleTries = 4;
     }
 
     // Looking for a newer version.

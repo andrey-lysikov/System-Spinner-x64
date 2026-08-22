@@ -23,7 +23,7 @@ public class ConfFormatTests
             Sensors = { CpuLoad = { "CPU Core Max" }, GpuMemory = { "D3D Dedicated Memory Used" } },
             Fans = { Cpu = { "CPU Fan" }, Extra = { "System Fan #2", "PSU Fan" }, AverageCpu = true },
             Warn = { Color = "Gold", CpuTemp = 90, GpuTemp = 0, SysMem = 75, GpuMem = 80 },
-            Osd = { AdjustmentSteps = 24, BrightnessUpKey = "Ctrl+PageUp" },
+            Osd = { AdjustmentSteps = 24, ControlExternalBrightness = false },
             Stats = { HistoryPoints = 300, TopProcesses = 5, ShowExternalAddress = false },
             Appearance = { FontFamily = "Consolas", TextColor = "#00FF00", Margin = 24 }
         };
@@ -45,7 +45,7 @@ public class ConfFormatTests
         Assert.Equal(75, read.Warn.SysMem);      // written as "75 %", read back as a number
         Assert.Equal(80, read.Warn.GpuMem);
         Assert.Equal(24, read.Osd.AdjustmentSteps);
-        Assert.Equal("Ctrl+PageUp", read.Osd.BrightnessUpKey);
+        Assert.False(read.Osd.ControlExternalBrightness);
         Assert.Equal(300, read.Stats.HistoryPoints);
         Assert.Equal(5, read.Stats.TopProcesses);
         Assert.False(read.Stats.ShowExternalAddress);

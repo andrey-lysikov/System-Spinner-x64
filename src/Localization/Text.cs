@@ -68,7 +68,7 @@ internal static class Text
         "Pas de réglage", "Einstellschritte", "Passi di regolazione", "調整ステップ数");
 
     public static string MenuAlwaysCustomOsd => S(
-        "Always use custom OSD", "Всегда своё экранное меню", "استخدام العرض المخصص دائمًا",
+        "Always use custom OSD", "Всегда кастомный OSD", "استخدام العرض المخصص دائمًا",
         "始终使用自定义提示", "Toujours l'affichage personnalisé", "Immer eigene Anzeige",
         "Usa sempre l'OSD personalizzato", "常にカスタム OSD を使う");
 
@@ -104,6 +104,28 @@ internal static class Text
         "Full-screen overlay", "Полноэкранный оверлей", "طبقة ملء الشاشة", "全屏叠加层",
         "Superposition plein écran", "Vollbild-Overlay", "Overlay a schermo intero",
         "全画面オーバーレイ");
+
+    // HDR is written the same way everywhere — the submenu title only says what it belongs to.
+    public static string MenuHdr => S(
+        "HDR", "HDR", "‏HDR", "HDR",
+        "HDR", "HDR", "HDR", "HDR");
+
+    // Stands in the HDR submenu when not a single screen carries it: an empty greyed-out submenu
+    // would read as a broken menu item.
+    public static string HdrUnavailable => S(
+        "Not supported", "Не поддерживается", "غير مدعوم", "不支持",
+        "Non pris en charge", "Nicht unterstützt", "Non supportato", "非対応");
+
+    // Windows refused the switch: a duplicated desktop or a mode that does not carry HDR.
+    public static string HdrFailed(string display) => S(
+        $"Windows did not switch HDR on \"{display}\"",
+        $"Windows не переключила HDR на «{display}»",
+        $"لم يبدّل Windows‏ HDR على «{display}»",
+        $"Windows 未能切换“{display}”的 HDR",
+        $"Windows n'a pas basculé le HDR sur « {display} »",
+        $"Windows hat HDR auf „{display}“ nicht umgeschaltet",
+        $"Windows non ha commutato l'HDR su «{display}»",
+        $"Windows は「{display}」の HDR を切り替えませんでした");
 
     public static string MenuOpenConfig => S(
         "Open config.conf", "Открыть config.conf", "فتح config.conf", "打开 config.conf",
@@ -287,15 +309,6 @@ internal static class Text
         "Der Pfad zur eigenen exe konnte nicht ermittelt werden",
         "impossibile determinare il percorso dell'exe dell'applicazione",
         "アプリ自身の exe のパスを特定できませんでした");
-
-    public static string HotKeyRefused(string problem) => S(
-        $"The brightness keys were not taken: {problem}",
-        $"Клавиши яркости не заняты приложением: {problem}",
-        $"لم يتم أخذ مفاتيح السطوع: {problem}", $"未能占用亮度快捷键：{problem}",
-        $"Les touches de luminosité n'ont pas été prises : {problem}",
-        $"Die Helligkeitstasten wurden nicht belegt: {problem}",
-        $"I tasti della luminosità non sono stati presi: {problem}",
-        $"明るさキーを取得できませんでした: {problem}");
 
     // --- The panel notice line ---
 

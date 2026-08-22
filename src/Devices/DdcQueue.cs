@@ -5,19 +5,24 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Devices;
 
-// One queue for every monitor command: DDC is serial and will not take two at once, and each
-// exchange takes tens of milliseconds — too long for the key hook to wait.
+// One queue for every monitor command: DDC is serial and each exchange takes tens of milliseconds
+// — too long for the key hook to wait. A newer command replaces an older one waiting under the
+// same name: a held key steps faster than a monitor answers, and the values in between are waste.
 internal static class DdcQueue
 {
-    private static readonly BlockingCollection<Action> Work = new();
+    private static readonly ConcurrentDictionary<string, Action> Pending = new();
+    private static readonly BlockingCollection<string> Waiting = new();
     private static readonly Lazy<Thread> Worker = new(StartWorker, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    // Queues a command and returns immediately.
-    public static void Run(Action command)
+    // The name is what makes two commands the same thing. Reads and writes carry different ones,
+    // or a read would swallow the write it was meant to follow.
+    public static void Run(string name, Action command)
     {
         _ = Worker.Value;
 
-        try { Work.Add(command); }
+        Pending[name] = command;
+
+        try { Waiting.Add(name); }
         catch (InvalidOperationException) { /* queue closed: the app is exiting */ }
     }
 
@@ -34,8 +39,11 @@ internal static class DdcQueue
 
     private static void Pump()
     {
-        foreach (Action command in Work.GetConsumingEnumerable())
+        foreach (string name in Waiting.GetConsumingEnumerable())
         {
+            // Nothing under that name: the stale ticket of a command that was overtaken.
+            if (!Pending.TryRemove(name, out Action? command)) continue;
+
             try
             {
                 command();
@@ -51,7 +59,7 @@ internal static class DdcQueue
     // Closes the queue: what is already in it still runs, nothing new is accepted.
     public static void Stop()
     {
-        try { Work.CompleteAdding(); }
+        try { Waiting.CompleteAdding(); }
         catch (ObjectDisposedException) { /* already closed */ }
     }
 }

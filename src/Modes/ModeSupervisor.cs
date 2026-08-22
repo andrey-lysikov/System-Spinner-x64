@@ -60,6 +60,10 @@ public sealed class ModeSupervisor : IDisposable
     // asking the system is a walk of the monitor list.
     private int _screenCount = 1;
     private DateTime _lastRescan = DateTime.MinValue;
+
+    // Why the screens are being asked again, and how many more times to ask while they stay silent.
+    private string _settleReason = "";
+    private int _settleTries;
     private DateTime _lastReadingsLog = DateTime.MinValue;
 
     public ModeSupervisor(AppConfig cfg, HardwareMonitor hardware)
@@ -96,14 +100,17 @@ public sealed class ModeSupervisor : IDisposable
         _displayTimer.Interval = AppParameters.Displays.AudioCheckPeriod;
         _displayTimer.Tick += (_, _) => WatchDisplays();
 
-        // Waking up: the screens come back a moment after the message, and one asked too early
-        // answers nothing over DDC.
+        // A screen that has just changed mode — woken up, come out of HDR — answers nothing over
+        // DDC for a few seconds, and one asked too early is written off as unable until the hourly
+        // look. So it is asked again after a pause, and again while it stays silent.
         _wakeTimer.Interval = AppParameters.Displays.ResumeDelay;
         _wakeTimer.Tick += (_, _) =>
         {
             _wakeTimer.Stop();
             _audioDevice = AudioEndpoint.DefaultDeviceName();
-            RescanDisplays("the machine woke up");
+            RescanDisplays(_settleReason);
+
+            if (--_settleTries > 0 && !_displays.HasBrightnessControl) _wakeTimer.Start();
         };
 
         // The first check waits, then one a day — the same rhythm as the macOS version.
@@ -362,19 +369,25 @@ public sealed class ModeSupervisor : IDisposable
     private void StartMediaKeys()
     {
         _keys.Handler = OnMediaKey;
+        // Every key into the log goes with the full record: it is a line per press, and someone
+        // who asked for the whole course of work asked for this too.
+        _keys.Trace = _cfg.Debug ?? false;
         _keys.StartVolumeKeys();
 
-        HotKey? up = HotKey.Parse(_cfg.Osd.BrightnessUpKey, out string? upProblem);
-        HotKey? down = HotKey.Parse(_cfg.Osd.BrightnessDownKey, out string? downProblem);
+        // The brightness keys of the keyboard. Windows makes no virtual key of them and acts on
+        // them nowhere, so they are read as raw HID input — the only place they show up at all.
+        // Whether a press then changes anything is decided where the volume keys decide it: by
+        // what there is to drive, not by a switch of its own.
+        _keys.StartMediaUsages();
 
-        foreach (string? problem in new[] { upProblem, downProblem })
-            if (problem is { Length: > 0 }) Log.Warn($"Osd brightness key: {problem}");
+        // The panel Windows draws for the same keys. It is only ever touched right after a press
+        // we have already answered with our own panel.
+        ShellFlyout.Watch();
 
-        if (_keys.StartBrightnessKeys(up, down) is { Length: > 0 } taken)
-        {
-            Log.Warn($"brightness keys: {taken}");
-            _tray.Notify(Text.HotKeyRefused(taken));
-        }
+        // Said out loud: someone reading a log full of KEY lines has to know where they come from
+        // and how to stop them.
+        if (_keys.Trace)
+            Log.Info("every key press goes into the log as a KEY line while Debug is on");
     }
 
     private MediaKeyResult OnMediaKey(MediaKey key)
@@ -406,8 +419,8 @@ public sealed class ModeSupervisor : IDisposable
                 return MediaKeyResult.PassThrough;
         }
 
-        // There was nothing to drive — the key goes to the system and it shows its own panel.
-        // Showing ours on top of the system one would mean showing two.
+        // Nothing to drive: the key goes to the system, which shows its own panel. Silent means it
+        // is ours but there is nothing true to show — a monitor in HDR ignores brightness commands.
         if (result == MediaKeyResult.Consumed) _osd.Show(value, kind);
 
         return result;
@@ -446,6 +459,7 @@ public sealed class ModeSupervisor : IDisposable
         {
             _tray.Rebuild();
             _tray.ShowDisplays(_displays.DisplayNames);
+            _tray.ShowHdr();
         };
 
         _tray.ExitRequested += () => System.Windows.Application.Current.Shutdown();
@@ -480,6 +494,11 @@ public sealed class ModeSupervisor : IDisposable
 
         if (soundChanged) RescanDisplays($"the sound device is now \"{device}\"");
         else if (due) RescanDisplays("the hourly look");
+
+        // Between the full rescans the screens are only asked what they stand at. That is cheap
+        // next to opening them all again, and it is what keeps the OSD honest when the brightness
+        // was moved by the buttons on the monitor.
+        else _displays.RereadValues();
     }
 
     private void RescanDisplays(string why)
@@ -489,6 +508,10 @@ public sealed class ModeSupervisor : IDisposable
 
         _displays.Refresh();
         _tray.ShowDisplays(_displays.DisplayNames);
+
+        // HDR is switched elsewhere too — in the display settings, by a game, by the screen being
+        // swapped — so the ticks are read anew along with the screens rather than remembered.
+        _tray.ShowHdr();
 
         Log.Info($"displays rescanned: {why}");
     }
@@ -533,7 +556,17 @@ public sealed class ModeSupervisor : IDisposable
 
         // One timer for every wake-up rather than a new one each time: a machine can report
         // resuming twice in a row, and each of those would otherwise leave a timer behind.
-        _ = _overlay.Dispatcher.BeginInvoke(() => _wakeTimer.Start());
+        _ = _overlay.Dispatcher.BeginInvoke(() => Settle("the machine woke up"));
+    }
+
+    // Asks the screens again in a while, and goes on asking while they answer nothing over DDC.
+    private void Settle(string why)
+    {
+        _settleReason = why;
+        _settleTries = AppParameters.Displays.SettleTries;
+
+        _wakeTimer.Stop();
+        _wakeTimer.Start();
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) =>
@@ -550,6 +583,10 @@ public sealed class ModeSupervisor : IDisposable
             _stats?.Reposition();
 
             RescanDisplays("the screen configuration changed");
+
+            // The mode may still be settling — coming out of HDR a monitor goes quiet over DDC for
+            // a few seconds — so the screens are asked again in a while.
+            Settle("the screen configuration settled");
         });
 
     private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
@@ -581,6 +618,7 @@ public sealed class ModeSupervisor : IDisposable
         _stats?.Close();
         _overlay.Close();
 
+        ShellFlyout.Stop();
         _keys.Dispose();
         _osd.Dispose();
         _displays.Dispose();

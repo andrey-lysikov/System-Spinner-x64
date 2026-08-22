@@ -88,6 +88,10 @@ public partial class App : Application
             // The process cannot be saved here — the point is to write the line in time.
             if (args.ExceptionObject is Exception ex) Log.Crash("a background thread", ex);
             else Log.Error($"UNHANDLED in a background thread: {args.ExceptionObject}");
+
+            // The Windows volume panel is kept out of sight by changing the shell's own window.
+            // Nobody else will put it back, and the process is not going to reach OnExit.
+            Devices.ShellFlyout.Stop();
         };
 
         TaskScheduler.UnobservedTaskException += (_, args) =>

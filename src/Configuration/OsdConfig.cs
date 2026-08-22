@@ -12,11 +12,9 @@ public sealed class OsdConfig
     // Drive external monitor brightness over DDC/CI.
     public bool ControlExternalBrightness { get; set; } = true;
 
-    // Send volume to the monitor's own speakers over DDC/CI instead of the Windows mixer.
+    // Move the monitor's own volume over DDC/CI in step with the Windows mixer. Both carry the
+    // same number then: the mixer alone would leave the monitor as a second attenuator nothing on
+    // screen shows, and the monitor alone would leave the Windows slider standing still while the
+    // sound changed. With no monitor to drive this makes no difference — the mixer is all there is.
     public bool ControlExternalVolume { get; set; } = true;
-
-    // Key combination for brightness up.
-    public string BrightnessUpKey { get; set; } = "Ctrl+Alt+F2";
-
-    public string BrightnessDownKey { get; set; } = "Ctrl+Alt+F1";
 }
