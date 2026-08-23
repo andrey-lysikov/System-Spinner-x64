@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 namespace SystemSpinnerX64.Spinner;
 
 // How the animation frames are coloured.

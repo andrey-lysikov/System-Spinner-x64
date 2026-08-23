@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 using System;
 using SystemSpinnerX64.Platform;
 using Xunit;

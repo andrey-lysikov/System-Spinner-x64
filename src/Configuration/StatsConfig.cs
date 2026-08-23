@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 namespace SystemSpinnerX64.Configuration;
 
 // The status window, opened by a left click on the tray icon.

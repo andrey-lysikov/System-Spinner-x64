@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 using System.Collections.ObjectModel;
 
 namespace SystemSpinnerX64.ViewModels;

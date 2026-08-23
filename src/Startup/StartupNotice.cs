@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 using System;
 using System.Diagnostics;
 using System.Drawing;

@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 namespace SystemSpinnerX64.Monitoring;
 
 // What a fan is for. Detected sensors are sorted into the panel slots by this.

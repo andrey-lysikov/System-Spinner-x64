@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 namespace SystemSpinnerX64.Devices;
 
 // Who answers a media key: the app, or Windows. The decision alone — nothing here touches a screen

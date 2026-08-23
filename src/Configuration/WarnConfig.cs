@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 namespace SystemSpinnerX64.Configuration;
 
 // Highlighting for values past a threshold; zero disables one.

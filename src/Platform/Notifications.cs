@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 using System;
 using Microsoft.Win32;
 using SystemSpinnerX64.Diagnostics;

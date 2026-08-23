@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 namespace SystemSpinnerX64.Diagnostics;
 
 // The kind of a log line. The order matters: a line is written when its level is not above the

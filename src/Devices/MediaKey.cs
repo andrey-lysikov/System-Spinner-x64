@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 namespace SystemSpinnerX64.Devices;
 
 // Which key was pressed. The macOS set minus the keyboard backlight.

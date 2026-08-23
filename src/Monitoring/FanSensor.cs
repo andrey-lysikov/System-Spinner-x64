@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 namespace SystemSpinnerX64.Monitoring;
 
 // One detected fan sensor: what it is, where it sits and what it read while scanning.

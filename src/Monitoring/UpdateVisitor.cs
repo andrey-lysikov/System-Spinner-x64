@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 using LibreHardwareMonitor.Hardware;
 
 namespace SystemSpinnerX64.Monitoring;

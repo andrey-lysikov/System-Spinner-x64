@@ -1,3 +1,6 @@
+//  Copyright © AndreyLysikov
+//  SPDX-License-Identifier: Apache-2.0
+
 using SystemSpinnerX64.Spinner;
 
 namespace SystemSpinnerX64.Configuration;
