@@ -112,13 +112,64 @@ public class FanConfigTests
     }
 
     [Fact]
-    public void Дополнительные_вентиляторы_сканирование_не_трогает()
+    public void Готовый_список_дополнительных_сканирование_не_трогает()
     {
-        // The Extra list is filled by a person only: a rescan must not wipe it.
+        // A list written by hand outranks the scan: a rescan must not rearrange it.
         var config = new FanConfig { Extra = { "System Fan #2" } };
 
-        config.ApplyDetected(new List<FanSensor> { Fan("CPU Fan", FanRole.Cpu, 540) });
+        config.ApplyDetected(new List<FanSensor>
+        {
+            Fan("CPU Fan", FanRole.Cpu, 540),
+            Fan("Chassis Fan", FanRole.Case, 700)
+        });
 
         Assert.Equal(new[] { "System Fan #2" }, config.Extra);
+    }
+
+    [Fact]
+    public void Корпусные_получают_свои_ячейки()
+    {
+        var config = new FanConfig();
+
+        config.ApplyDetected(new List<FanSensor>
+        {
+            Fan("CPU Fan", FanRole.Cpu, 540),
+            Fan("Chassis Fan", FanRole.Case, 700),
+            Fan("Chassis Fan #2", FanRole.Case, 900)
+        });
+
+        // The faster one first, as everywhere else.
+        Assert.Equal(new[] { "Chassis Fan #2", "Chassis Fan" }, config.Extra);
+    }
+
+    [Fact]
+    public void Пустые_разъёмы_ячеек_не_получают()
+    {
+        // A board with seven headers and two fans in them: five steady zeros would be five cells
+        // that say nothing.
+        var config = new FanConfig();
+
+        config.ApplyDetected(new List<FanSensor>
+        {
+            Fan("Fan #1", FanRole.Case, 782),
+            Fan("Fan #2", FanRole.Case, 600),
+            Fan("Fan #3", FanRole.Case, 0),
+            Fan("Fan #4", FanRole.Case, 0)
+        });
+
+        // Fan #1 is what the processor slot shows, so it is not repeated as a case fan.
+        Assert.Equal(new[] { "Fan #1", "Fan #2", "Fan #3", "Fan #4" }, config.Cpu);
+        Assert.Equal(new[] { "Fan #2" }, config.Extra);
+    }
+
+    [Fact]
+    public void Показанный_как_процессорный_не_повторяется()
+    {
+        var config = new FanConfig();
+
+        config.ApplyDetected(new List<FanSensor> { Fan("Chassis Fan", FanRole.Case, 700) });
+
+        Assert.Equal(new[] { "Chassis Fan" }, config.Cpu);
+        Assert.Empty(config.Extra);
     }
 }

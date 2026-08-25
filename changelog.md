@@ -2,6 +2,13 @@
 
 
 
+## 0.6.2
+
+* Fix system fan in CPU string
+* Fix the sensor list not being saved on the first run
+
+
+
 ## 0.6.1
 
 * Fix monitor speakers over USB-C and docking stations: the connection was read as a silent one

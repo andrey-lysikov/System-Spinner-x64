@@ -189,12 +189,15 @@ internal static class Preflight
     // The tray icon may never appear, and that is exactly when the dump is needed most.
     private static void SaveSensorDump(AppConfig cfg, HardwareMonitor hw)
     {
-        string path = System.IO.Path.Combine(
-            System.IO.Path.GetDirectoryName(cfg.Path) ?? AppContext.BaseDirectory,
-            "sensors-found.txt");
+        string folder = System.IO.Path.GetDirectoryName(cfg.Path) ?? AppContext.BaseDirectory;
+        string path = System.IO.Path.Combine(folder, "sensors-found.txt");
 
         try
         {
+            // On the first run the config has not been written yet, so the folder it is headed for
+            // need not exist. This dump is asked for exactly when something did not work, and
+            // losing it to a missing folder would lose the one thing worth looking at.
+            System.IO.Directory.CreateDirectory(folder);
             System.IO.File.WriteAllText(path, hw.DumpSensors());
             Log.Info($"full sensor list: {path}");
         }

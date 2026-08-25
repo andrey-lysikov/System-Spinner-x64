@@ -18,7 +18,8 @@ public sealed class FanConfig
 
     public List<string> Gpu { get; set; } = new();
 
-    // The user's own list — auto-detection never touches it.
+    // Case fans, a cell each. A list written by hand is never touched; an empty one is filled by
+    // the scan, or the case fans would have nowhere to show.
     public List<string> Extra { get; set; } = new();
 
     public bool AverageCpu { get; set; }
@@ -44,8 +45,23 @@ public sealed class FanConfig
         // exactly the right one.
         Aio = Pick(fans, FanRole.Aio);
         Cpu = cpu.Concat(rest).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        if (Extra.Count == 0) Extra = Case(fans, shownAsCpu: Cpu.FirstOrDefault());
+
         return true;
     }
+
+    // The case fans that deserve a cell. Boards that call every header "Fan #1" give no CPU fan
+    // at all, so all seven land in the processor slot and only the first of them is ever read —
+    // the rest would be lost without this. Silent ones are left out: an empty header reads as
+    // a steady zero, and five such cells would say nothing.
+    private static List<string> Case(IReadOnlyList<FanSensor> fans, string? shownAsCpu) =>
+        fans.Where(f => f.Role == FanRole.Case && f.Rpm is null or >= 1)
+            .OrderByDescending(f => f.Rpm ?? -1)
+            .Select(f => f.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(name => !name.Equals(shownAsCpu, StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
     // Spinning ones first, silent ones after.
     private static List<string> Pick(IReadOnlyList<FanSensor> fans, FanRole role) =>
@@ -60,7 +76,7 @@ public sealed class FanConfig
 
     // Summary for the log. Never written to the file — it is not a setting.
     public string Summary =>
-        $"CPU: {Describe(Cpu)}\nAIO: {Describe(Aio)}\nGPU: {Describe(Gpu)}";
+        $"CPU: {Describe(Cpu)}\nAIO: {Describe(Aio)}\nGPU: {Describe(Gpu)}\nSYS: {Describe(Extra)}";
 
     private static string Describe(IReadOnlyList<string> names) =>
         names.Count == 0 ? "not found" : string.Join(", ", names);
