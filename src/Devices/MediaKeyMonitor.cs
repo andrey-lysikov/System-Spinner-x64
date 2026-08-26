@@ -55,6 +55,14 @@ internal sealed class MediaKeyMonitor : IDisposable
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int virtualKey);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint virtualKey);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UnregisterHotKey(IntPtr window, int id);
+
     // Who decides what to do with a key.
     public Func<MediaKey, MediaKeyResult>? Handler { get; set; }
 
@@ -124,6 +132,55 @@ internal sealed class MediaKeyMonitor : IDisposable
     }
 
     private bool _raw;
+
+    // --- The stand-in for keys the keyboard has not got ---
+
+    private const int WmHotKey = 0x0312;
+    private const int HotKeyDown = 1;
+    private const int HotKeyUp = 2;
+
+    private bool _hotKeys;
+
+    // Told once, when the keyboard turns out to have brightness keys of its own after all.
+    public Action? NativeKeysSeen { get; set; }
+
+    // Registers the pair from the config. Both keys or neither: half a pair would dim the screen
+    // with no way back.
+    public bool StartBrightnessKeys(HotKeySpec spec)
+    {
+        if (_hotKeys) return true;
+
+        IntPtr window = Messages().Handle;
+        uint modifiers = spec.Modifiers | HotKeySpec.ModNoRepeat;
+
+        if (!RegisterHotKey(window, HotKeyDown, modifiers, (uint)spec.DownKey))
+        {
+            Log.Warn($"{spec.Describe} is taken by something else — the brightness keys are not registered");
+            return false;
+        }
+
+        if (!RegisterHotKey(window, HotKeyUp, modifiers, (uint)spec.UpKey))
+        {
+            UnregisterHotKey(window, HotKeyDown);
+            Log.Warn($"{spec.Describe} is taken by something else — the brightness keys are not registered");
+            return false;
+        }
+
+        _hotKeys = true;
+        return true;
+    }
+
+    // Given up as soon as the real keys show themselves: two ways to the same place, one of them
+    // holding a combination other applications could use.
+    public void StopBrightnessKeys()
+    {
+        if (!_hotKeys) return;
+
+        IntPtr window = Messages().Handle;
+        UnregisterHotKey(window, HotKeyDown);
+        UnregisterHotKey(window, HotKeyUp);
+        _hotKeys = false;
+    }
 
     private IntPtr OnKey(int code, IntPtr wParam, IntPtr lParam)
     {
@@ -278,6 +335,14 @@ internal sealed class MediaKeyMonitor : IDisposable
 
             if (key is null) continue;
 
+            // The keyboard has the real thing, so the stand-in combination is handed back to
+            // whoever else wants it.
+            if (_hotKeys)
+            {
+                StopBrightnessKeys();
+                NativeKeysSeen?.Invoke();
+            }
+
             try { Handler?.Invoke(key.Value); }
             catch (Exception ex) { Log.Error($"handling the {key} key failed", ex); }
         }
@@ -286,6 +351,16 @@ internal sealed class MediaKeyMonitor : IDisposable
     private IntPtr OnWindowMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WmInput) OnRawInput(lParam);
+
+        if (msg == WmHotKey && (int)wParam is HotKeyDown or HotKeyUp)
+        {
+            MediaKey key = (int)wParam == HotKeyUp ? MediaKey.BrightnessUp : MediaKey.BrightnessDown;
+
+            if (Trace) Log.Key($"HOT  {key}");
+
+            try { Handler?.Invoke(key); }
+            catch (Exception ex) { Log.Error($"handling the {key} key failed", ex); }
+        }
 
         // Never marked as handled: raw input is a copy of the press, and stopping the message here
         // would only keep the window from doing what it does with the rest of them.
@@ -305,6 +380,10 @@ internal sealed class MediaKeyMonitor : IDisposable
             RawInput.Stop();
             _raw = false;
         }
+
+        // Before the window goes: a hotkey outlives the process that registered it only as far as
+        // the window it was registered on.
+        StopBrightnessKeys();
 
         if (_messages is not null)
         {

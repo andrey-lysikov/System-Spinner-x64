@@ -84,7 +84,7 @@ internal static class Preflight
             if (Environment.GetCommandLineArgs()
                            .Any(a => a.Equals("--list-sensors", StringComparison.OrdinalIgnoreCase)))
             {
-                SaveSensorDump(cfg, hw);
+                LogSensors(hw);
             }
         }
         catch (Exception ex)
@@ -165,7 +165,7 @@ internal static class Preflight
             Log.Warn("no fan sensors were found at all. The monitoring chip of this motherboard " +
                      "is apparently not supported by the sensor library, or the PawnIO driver is " +
                      "missing. Everything except the fan cells keeps working.");
-            SaveSensorDump(cfg, hw);
+            LogSensors(hw);
             return;
         }
 
@@ -182,28 +182,25 @@ internal static class Preflight
                 Log.Warn("PawnIO is installed, so it is not the cause: check the full sensor " +
                          "list — the monitoring chip of this board may not be supported.");
 
-            SaveSensorDump(cfg, hw);
+            LogSensors(hw);
         }
     }
 
-    // The tray icon may never appear, and that is exactly when the dump is needed most.
-    private static void SaveSensorDump(AppConfig cfg, HardwareMonitor hw)
+    // Everything the sensor library sees, into the log. A file of its own would be one more thing
+    // to find and send: the fan lines above are already here, and this belongs with them.
+    private static void LogSensors(HardwareMonitor hw)
     {
-        string folder = System.IO.Path.GetDirectoryName(cfg.Path) ?? AppContext.BaseDirectory;
-        string path = System.IO.Path.Combine(folder, "sensors-found.txt");
-
         try
         {
-            // On the first run the config has not been written yet, so the folder it is headed for
-            // need not exist. This dump is asked for exactly when something did not work, and
-            // losing it to a missing folder would lose the one thing worth looking at.
-            System.IO.Directory.CreateDirectory(folder);
-            System.IO.File.WriteAllText(path, hw.DumpSensors());
-            Log.Info($"full sensor list: {path}");
+            Log.Info("full sensor list:");
+
+            foreach (string line in hw.DumpSensors()
+                                      .Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                Log.Info("  " + line.TrimEnd());
         }
         catch (Exception ex)
         {
-            Log.Error($"could not save {path}", ex);
+            Log.Error("the sensor list was not read", ex);
         }
     }
 }

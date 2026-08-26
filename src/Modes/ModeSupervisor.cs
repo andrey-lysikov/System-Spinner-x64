@@ -191,8 +191,14 @@ public sealed class ModeSupervisor : IDisposable
         else _gameScreen = null;
 
         _inGame = inGame;
+
+        // What actually happened, not what usually happens: with a second monitor the tray icon
+        // stays in sight and the animation with it, and a line claiming otherwise sends the next
+        // reader hunting for a fault that is not there.
         Log.Info(inGame
-            ? "a full-screen application is active — spinner stopped"
+            ? "a full-screen application is active — spinner " +
+              (TrayHidden ? "stopped: the tray icon is covered"
+                          : $"still running: the tray icon is in sight on {_screenCount} screens")
             : "no full-screen application — spinner running");
 
         if (inGame) EnterGame();
@@ -232,7 +238,13 @@ public sealed class ModeSupervisor : IDisposable
     // with the panel switched off there is nowhere to show them.
     private void ShowOverlay()
     {
-        if (!_cfg.ShowOverlayInGames) return;
+        // Said once and out loud: a log that shows a game being entered and then nothing about
+        // the panel leaves it unclear whether it failed or was never asked for.
+        if (!_cfg.ShowOverlayInGames)
+        {
+            Log.Info("the panel is off in the config — nothing is shown over the game");
+            return;
+        }
 
         _overlay.ApplyLayout();
         _overlay.Visibility = Visibility.Visible;
@@ -305,9 +317,15 @@ public sealed class ModeSupervisor : IDisposable
 
         _lastReadingsLog = DateTime.UtcNow;
 
+        // The case fans join the line as they are: without them a log cannot tell an empty
+        // ExtraFan list from a fan that is named there and reads nothing.
+        string sys = r.ExtraFanRpm.Count == 0
+            ? ""
+            : " SYS " + string.Join("·", r.ExtraFanRpm.Select(rpm => Show(rpm)));
+
         Log.Info($"readings: CPU {Show(r.CpuLoad)} % {Show(r.CpuTempC)} °C {Show(r.CpuPowerW)} W " +
                  $"{Show(r.CpuClockMhz)} MHz {Show(r.SysMemUsedGb, 1)} GB " +
-                 $"{Show(r.CpuFanRpm)}/{Show(r.AioFanRpm)} RPM | " +
+                 $"{Show(r.CpuFanRpm)}/{Show(r.AioFanRpm)} RPM{sys} | " +
                  $"GPU {Show(r.GpuLoad)} % {Show(r.GpuTempC)} °C {Show(r.GpuPowerW)} W " +
                  $"{Show(r.GpuClockMhz)} MHz {Show(r.GpuMemUsedGb, 1)} GB {Show(r.GpuFanRpm)} RPM");
 
@@ -383,6 +401,8 @@ public sealed class ModeSupervisor : IDisposable
         // what there is to drive, not by a switch of its own.
         _keys.StartMediaUsages();
 
+        StartBrightnessKeys();
+
         // The panel Windows draws for the same keys. It is only ever touched right after a press
         // we have already answered with our own panel.
         ShellFlyout.Watch();
@@ -391,6 +411,51 @@ public sealed class ModeSupervisor : IDisposable
         // and how to stop them.
         if (_keys.Trace)
             Log.Info("every key press goes into the log as a KEY line while Debug is on");
+    }
+
+    // A keyboard without brightness keys leaves the screen with no way to be dimmed from it at
+    // all: the pair from the config stands in until the real keys turn up.
+    private void StartBrightnessKeys()
+    {
+        string wanted = _cfg.Osd.BrightnessKeys;
+
+        if (wanted.Trim().Equals(OsdConfig.NativeKeys, StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Info("brightness keys: the keyboard's own");
+            return;
+        }
+
+        HotKeySpec? spec = HotKeySpec.Parse(wanted, out string? problem);
+
+        if (problem is not null)
+        {
+            Log.Warn($"[General] BrightnessKeys: {problem} — no keys are registered");
+            return;
+        }
+
+        if (spec is null)
+        {
+            Log.Info("brightness keys: turned off");
+            return;
+        }
+
+        _keys.NativeKeysSeen = OnNativeBrightnessKeys;
+
+        if (_keys.StartBrightnessKeys(spec.Value))
+            Log.Info($"brightness keys: {spec.Value.Describe}, until the keyboard's own are pressed");
+    }
+
+    // The keyboard has the real keys after all. The combination is already given back; what is
+    // left is to remember it, so the next run does not hold it aside again.
+    private void OnNativeBrightnessKeys()
+    {
+        _keys.NativeKeysSeen = null;
+        _cfg.Osd.BrightnessKeys = OsdConfig.NativeKeys;
+
+        Log.Info("the keyboard has brightness keys of its own: the stand-in keys are released");
+
+        if (_cfg.SaveSomewhere() is null)
+            Log.Warn("could not write the config — the stand-in keys will be registered again next time");
     }
 
     private MediaKeyResult OnMediaKey(MediaKey key)

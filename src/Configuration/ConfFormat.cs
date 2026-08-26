@@ -49,6 +49,7 @@ internal static class ConfFormat
         osd.AdjustmentSteps = file.Whole(General, "AdjustmentStepsOsd") ?? osd.AdjustmentSteps;
         osd.ControlExternalBrightness = file.Flag(General, nameof(osd.ControlExternalBrightness)) ?? osd.ControlExternalBrightness;
         osd.ControlExternalVolume = file.Flag(General, nameof(osd.ControlExternalVolume)) ?? osd.ControlExternalVolume;
+        osd.BrightnessKeys = file.Text(General, nameof(osd.BrightnessKeys)) ?? osd.BrightnessKeys;
 
         StatsConfig stats = cfg.Stats;
         stats.ShowExternalAddress = file.Flag(General, nameof(stats.ShowExternalAddress)) ?? stats.ShowExternalAddress;
@@ -192,6 +193,13 @@ internal static class ConfFormat
          .Value(nameof(o.ControlExternalBrightness), o.ControlExternalBrightness)
          .Value(nameof(o.ControlExternalVolume), o.ControlExternalVolume).Blank();
 
+        w.Note("Keys standing in for the brightness keys a keyboard has not got (Ctrl+F1/F2),",
+               "dimmer first. Ctrl, Alt, Shift and Win can be combined, F1 to F24; \"none\" turns",
+               "them off. A modifier is required — a bare key would be taken from every other",
+               "application. As soon as the keyboard's own brightness keys are pressed, \"native\"",
+               "is written here and nothing is registered any more.")
+         .Value(nameof(o.BrightnessKeys), o.BrightnessKeys).Blank();
+
         w.Note("Look up the external address through checkip.dyndns.org (true).")
          .Value(nameof(st.ShowExternalAddress), st.ShowExternalAddress).Blank();
 
@@ -205,8 +213,8 @@ internal static class ConfFormat
         w.Section(Hardware);
 
         w.Note("Sensor names the readings come from; the Intel and the AMD ones stand together.",
-               "Change a name when its value shows a dash: what your machine reports goes to",
-               "sensors-found.txt next to this file.").Blank();
+               "Change a name when its value shows a dash: what your machine reports is written",
+               "into the log (Debug = true).").Blank();
 
         w.Note("Which GPU when there are several (0). The discrete one comes first.")
          .Value(nameof(cfg.GpuIndex), cfg.GpuIndex).Blank();

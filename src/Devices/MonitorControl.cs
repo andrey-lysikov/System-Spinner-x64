@@ -191,15 +191,25 @@ internal static class MonitorControl
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"DDC handles were not closed: {ex.Message}"); }
     }
 
+    // Brightness as the monitor itself calls it: VCP 0x10, Luminance.
+    public const byte VcpLuminance = 0x10;
+
     // Monitor brightness in percent, or null when it does not answer the command.
     public static double? Brightness(IntPtr physical)
     {
         try
         {
-            if (!GetMonitorBrightness(physical, out uint min, out uint current, out uint max)) return null;
-            if (max <= min) return null;
+            bool answered = GetMonitorBrightness(physical, out uint min, out uint current, out uint max);
+            string why = answered ? "it reported no range" : LastError();
 
-            return (current - min) * 100.0 / (max - min);
+            if (answered && max > min) return (current - min) * 100.0 / (max - min);
+
+            // GetMonitorBrightness is the polite way round and plenty of monitors refuse it: it
+            // asks for the capabilities string first and gives up when that is malformed, missing
+            // or too slow to arrive. The same panel usually answers command 0x10 without a murmur,
+            // so the brightness is asked for a second time, directly.
+            Log.Info($"the high-level brightness call failed ({why}), asking VCP 10 instead");
+            return Feature(physical, VcpLuminance);
         }
         catch (Exception ex)
         {
@@ -213,11 +223,15 @@ internal static class MonitorControl
     {
         try
         {
-            if (!GetMonitorBrightness(physical, out uint min, out uint _, out uint max)) return false;
-            if (max <= min) return false;
+            if (GetMonitorBrightness(physical, out uint min, out uint _, out uint max) && max > min)
+            {
+                uint value = (uint)Math.Round(min + (max - min) * Math.Clamp(percent, 0, 100) / 100.0);
+                return SetMonitorBrightness(physical, value);
+            }
 
-            uint value = (uint)Math.Round(min + (max - min) * Math.Clamp(percent, 0, 100) / 100.0);
-            return SetMonitorBrightness(physical, value);
+            // The same way round as reading it: what would not answer the high-level call is
+            // driven by the command itself.
+            return SetFeature(physical, VcpLuminance, percent);
         }
         catch (Exception ex)
         {
@@ -225,6 +239,11 @@ internal static class MonitorControl
             return false;
         }
     }
+
+    // What Windows blamed the last failed dxva2 call on — worth a line, since a monitor that
+    // drives nothing is the thing people ask about.
+    private static string LastError() =>
+        new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message.Trim();
 
     // Value of an arbitrary command as a percentage of its maximum, or null.
     public static double? Feature(IntPtr physical, byte code)

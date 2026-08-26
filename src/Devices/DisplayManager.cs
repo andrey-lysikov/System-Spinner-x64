@@ -23,10 +23,20 @@ public sealed class DisplayManager : IDisposable
     }
 
     // For the tray menu: the name, and whether the screen answers anything at all. One that
-    // answers nothing is greyed out.
+    // answers nothing is greyed out and marked "(off)" — an external monitor that takes no command
+    // has DDC/CI switched off in its own menu far more often than it lacks it, and a greyed name
+    // alone reads as a fault of ours rather than something to go and turn on.
     public IReadOnlyList<(string Name, bool Controllable)> DisplayNames =>
-        _displays.Select(d => (d.IsInternal ? d.Name + " (built-in)" : d.Name,
-                               d.ControlsBrightness || d.ControlsSpeakerVolume)).ToList();
+        _displays.Select(d => (Label(d), d.ControlsBrightness || d.ControlsSpeakerVolume)).ToList();
+
+    private static string Label(DisplayDevice display)
+    {
+        if (display.IsInternal) return display.Name + " (built-in)";
+
+        return display.ControlsBrightness || display.ControlsSpeakerVolume
+            ? display.Name
+            : display.Name + " (off)";
+    }
 
     public bool HasBrightnessControl => _displays.Any(d => d.ControlsBrightness);
 

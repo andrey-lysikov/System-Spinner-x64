@@ -2,6 +2,14 @@
 
 
 
+## 0.7.0
+
+* Read the brightness of monitors that refuse the high-level call, over VCP 10
+* Add Ctrl+F1/F2 for keyboards without brightness keys, configurable in BrightnessKeys
+* Show the case fan speeds in the readings line of the log
+
+
+
 ## 0.6.2
 
 * Fix system fan in CPU string

@@ -20,4 +20,12 @@ public sealed class OsdConfig
     // screen shows, and the monitor alone would leave the Windows slider standing still while the
     // sound changed. With no monitor to drive this makes no difference — the mixer is all there is.
     public bool ControlExternalVolume { get; set; } = true;
+
+    // The pair standing in for brightness keys the keyboard has not got, dimmer first. "native"
+    // is written here as soon as the real keys are seen, and then nothing is registered — a
+    // keyboard with its own keys needs no combination held aside for it.
+    public string BrightnessKeys { get; set; } = "Ctrl+F1/F2";
+
+    // What the value means when the keyboard turns out to have the real keys.
+    public const string NativeKeys = "native";
 }

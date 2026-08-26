@@ -17,61 +17,65 @@ internal static class AudioEndpoint
     [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
     private class MMDeviceEnumerator { }
 
+    // Every method below is marked PreserveSig on purpose. Without it the runtime turns a failing
+    // HRESULT into an exception, and the returned int is marshalled from a slot the callee never
+    // wrote — the checks in this file would then compare rubbish and a sleeping monitor with
+    // speakers on it would throw out of the key handler instead of answering "no device".
     [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IMMDeviceEnumerator
     {
-        int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
-        int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
-        int GetDevice([MarshalAs(UnmanagedType.LPWStr)] string id, out IMMDevice device);
-        int RegisterEndpointNotificationCallback(IntPtr client);
-        int UnregisterEndpointNotificationCallback(IntPtr client);
+        [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
+        [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
+        [PreserveSig] int GetDevice([MarshalAs(UnmanagedType.LPWStr)] string id, out IMMDevice device);
+        [PreserveSig] int RegisterEndpointNotificationCallback(IntPtr client);
+        [PreserveSig] int UnregisterEndpointNotificationCallback(IntPtr client);
     }
 
     [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IMMDevice
     {
-        int Activate(ref Guid iid, uint clsCtx, IntPtr activationParams,
+        [PreserveSig] int Activate(ref Guid iid, uint clsCtx, IntPtr activationParams,
                      [MarshalAs(UnmanagedType.IUnknown)] out object instance);
-        int OpenPropertyStore(uint access, out IPropertyStore store);
-        int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
-        int GetState(out uint state);
+        [PreserveSig] int OpenPropertyStore(uint access, out IPropertyStore store);
+        [PreserveSig] int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
+        [PreserveSig] int GetState(out uint state);
     }
 
     [ComImport, Guid("886d8eeb-8cf2-4446-8d02-cdba1dbdcf99"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IPropertyStore
     {
-        int GetCount(out uint count);
-        int GetAt(uint index, out PropertyKey key);
-        int GetValue(ref PropertyKey key, out PropVariant value);
-        int SetValue(ref PropertyKey key, ref PropVariant value);
-        int Commit();
+        [PreserveSig] int GetCount(out uint count);
+        [PreserveSig] int GetAt(uint index, out PropertyKey key);
+        [PreserveSig] int GetValue(ref PropertyKey key, out PropVariant value);
+        [PreserveSig] int SetValue(ref PropertyKey key, ref PropVariant value);
+        [PreserveSig] int Commit();
     }
 
     [ComImport, Guid("5CDF2C82-841E-4546-9722-0CF74078229A"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IAudioEndpointVolume
     {
-        int RegisterControlChangeNotify(IntPtr notify);
-        int UnregisterControlChangeNotify(IntPtr notify);
-        int GetChannelCount(out uint count);
-        int SetMasterVolumeLevel(float level, ref Guid eventContext);
-        int SetMasterVolumeLevelScalar(float level, ref Guid eventContext);
-        int GetMasterVolumeLevel(out float level);
-        int GetMasterVolumeLevelScalar(out float level);
-        int SetChannelVolumeLevel(uint channel, float level, ref Guid eventContext);
-        int SetChannelVolumeLevelScalar(uint channel, float level, ref Guid eventContext);
-        int GetChannelVolumeLevel(uint channel, out float level);
-        int GetChannelVolumeLevelScalar(uint channel, out float level);
-        int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid eventContext);
-        int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
-        int GetVolumeStepInfo(out uint step, out uint stepCount);
-        int VolumeStepUp(ref Guid eventContext);
-        int VolumeStepDown(ref Guid eventContext);
-        int QueryHardwareSupport(out uint mask);
-        int GetVolumeRange(out float min, out float max, out float increment);
+        [PreserveSig] int RegisterControlChangeNotify(IntPtr notify);
+        [PreserveSig] int UnregisterControlChangeNotify(IntPtr notify);
+        [PreserveSig] int GetChannelCount(out uint count);
+        [PreserveSig] int SetMasterVolumeLevel(float level, ref Guid eventContext);
+        [PreserveSig] int SetMasterVolumeLevelScalar(float level, ref Guid eventContext);
+        [PreserveSig] int GetMasterVolumeLevel(out float level);
+        [PreserveSig] int GetMasterVolumeLevelScalar(out float level);
+        [PreserveSig] int SetChannelVolumeLevel(uint channel, float level, ref Guid eventContext);
+        [PreserveSig] int SetChannelVolumeLevelScalar(uint channel, float level, ref Guid eventContext);
+        [PreserveSig] int GetChannelVolumeLevel(uint channel, out float level);
+        [PreserveSig] int GetChannelVolumeLevelScalar(uint channel, out float level);
+        [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid eventContext);
+        [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
+        [PreserveSig] int GetVolumeStepInfo(out uint step, out uint stepCount);
+        [PreserveSig] int VolumeStepUp(ref Guid eventContext);
+        [PreserveSig] int VolumeStepDown(ref Guid eventContext);
+        [PreserveSig] int QueryHardwareSupport(out uint mask);
+        [PreserveSig] int GetVolumeRange(out float min, out float max, out float increment);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -153,8 +157,22 @@ internal static class AudioEndpoint
         IAudioEndpointVolume? volume = Open(out _);
         if (volume is null) return whenUnavailable;
 
-        try { return use(volume); }
-        finally { Release(volume); }
+        try
+        {
+            return use(volume);
+        }
+        catch (COMException ex)
+        {
+            // The device answered when it was opened and stopped answering a moment later: the
+            // screen carrying the sound went to sleep, the dock was unplugged. Nothing here can
+            // be done about it, and throwing would take the key hook down with it.
+            Log.Warn($"the audio device stopped answering: {ex.Message.Trim()}");
+            return whenUnavailable;
+        }
+        finally
+        {
+            Release(volume);
+        }
     }
 
     private static string ReadName(IMMDevice device)

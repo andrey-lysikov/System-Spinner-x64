@@ -87,6 +87,15 @@ internal sealed class DisplayDevice : IDisposable
                  $"brightness {Show(brightness)}, monitor speakers {Show(volume)}" +
                  $"{(carriesAudio ? ", carries audio" : "")}");
 
+        // The handle was given out and the monitor still answered nothing worth having. On most
+        // panels that is a switch in their own menu, off from the factory, and no amount of asking
+        // from here will turn it on.
+        if (!isInternal && physical.Length > 0 && brightness is null && volume is null)
+            Log.Info($"\"{name}\" is on a wire that carries DDC/CI but answers none of it: look " +
+                     "for DDC/CI (HP calls it \"DDC/CI\", LG \"DDC/CI\" or \"Auto\", Dell \"DDC/CI\") " +
+                     "in the monitor's own menu and turn it on. A dock, a KVM or a DP/HDMI adapter " +
+                     "in the way can swallow it just as thoroughly.");
+
         return device;
 
         static string Show(double? value) => value is null ? "no" : $"{value.Value:0} %";
