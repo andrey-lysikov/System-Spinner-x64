@@ -2,11 +2,19 @@
 
 
 
+## 1.0.0
+
+* Now we have installs
+* Fix GPU Mem sensor
+
+
+
 ## 0.7.0
 
 * Read the brightness of monitors that refuse the high-level call, over VCP 10
 * Add Ctrl+F1/F2 for keyboards without brightness keys, configurable in BrightnessKeys
 * Show the case fan speeds in the readings line of the log
+* Ship an msi installer: it carries the PawnIO driver, asks whether to install for everyone or for you alone, where to put it, which shortcuts to make, and offers to start the app when it finishes
 
 
 

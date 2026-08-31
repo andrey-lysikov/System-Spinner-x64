@@ -1,6 +1,6 @@
 name: Rebuild
 
-# Replaces the exe attached to a release with one built from the current state of the branch.
+# Replaces the installer attached to a release with one built from the current state of the branch.
 # Started by hand only: the version, the tag and the description of the release stay as they are —
 # the only thing that changes is the file itself, and the link to the list of commits, which is
 # pointed at what was actually built.
@@ -21,13 +21,13 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The whole history: the description of the release links to the commits, and that link
           # is rewritten below.
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.x'
 
@@ -41,21 +41,31 @@ jobs:
           if (-not $tag) { $tag = gh release view --json tagName --jq '.tagName' }
           if ($LASTEXITCODE -ne 0 -or -not $tag) { throw 'No release to rebuild.' }
 
-          Write-Host "Rebuilding the exe of $tag from $($env:GITHUB_SHA)"
-          "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host "Rebuilding the installer of $tag from $($env:GITHUB_SHA)"
+
+          # The installer carries a version of its own, and it has to be the one on the release
+          # page rather than whatever the branch has moved on to.
+          $version = $tag -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "The tag $tag is not a version." }
+
+          "tag=$tag"         >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Build
         shell: pwsh
-        # The same script a developer runs: tests first, then the single-file exe in build.
-        run: ./build.ps1
+        # The same script a developer runs: tests first, then the exe, then the installer around
+        # it. The version is the one of the release being rebuilt rather than of the branch: the
+        # tag stays as it is, and an installer announcing another number would contradict the
+        # page it hangs on.
+        run: ./build.ps1 -Installer -Version ${{ steps.target.outputs.version }}
 
-      - name: Replace the exe
+      - name: Replace the installer
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload ${{ steps.target.outputs.tag }} 'build/System-Spinner.exe' --clobber
-          if ($LASTEXITCODE -ne 0) { throw 'The exe was not uploaded.' }
+          gh release upload ${{ steps.target.outputs.tag }} 'build/System-Spinner.msi' --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'The installer was not uploaded.' }
 
       - name: Point the list of commits at what was built
         shell: pwsh
@@ -84,7 +94,7 @@ jobs:
 
           if (-not $changed) {
             Write-Host 'No link to the commits in the description — it is left as it is.'
-            "## Rebuilt`n`nThe exe of $tag was replaced with a build of $sha." >> $env:GITHUB_STEP_SUMMARY
+            "## Rebuilt`n`nThe installer of $tag was replaced with a build of $sha." >> $env:GITHUB_STEP_SUMMARY
             exit 0
           }
 
@@ -92,4 +102,4 @@ jobs:
           gh release edit $tag --notes-file release-notes.md
           if ($LASTEXITCODE -ne 0) { throw 'The description was not updated.' }
 
-          "## Rebuilt`n`nThe exe of $tag was replaced with a build of $sha, and the list of commits now ends there." >> $env:GITHUB_STEP_SUMMARY
+          "## Rebuilt`n`nThe installer of $tag was replaced with a build of $sha, and the list of commits now ends there." >> $env:GITHUB_STEP_SUMMARY

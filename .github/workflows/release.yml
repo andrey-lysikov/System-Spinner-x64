@@ -17,13 +17,13 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The whole history: the previous version is the newest tag, and the release notes
           # link to the commits since it.
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.x'
 
@@ -80,8 +80,8 @@ jobs:
       - name: Build
         if: steps.check.outputs.release == 'true'
         shell: pwsh
-        # The same script a developer runs: tests first, then the single-file exe in build.
-        run: ./build.ps1
+        # The same script a developer runs: tests first, then the exe, then the installer around it.
+        run: ./build.ps1 -Installer -Version ${{ steps.check.outputs.version }}
 
       - name: Publish the release
         if: steps.check.outputs.release == 'true'
@@ -90,7 +90,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create ${{ steps.check.outputs.tag }} `
-            'build/System-Spinner.exe' `
+            'build/System-Spinner.msi' `
             --title '${{ steps.check.outputs.tag }}' `
             --notes-file release-notes.md `
             --target ${{ github.sha }}

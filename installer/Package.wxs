@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  The installer. It asks where the app should go: into the profile of the person installing —
+  what it offers first — beside the config and log the app already keeps there, or into
+  "Program Files" for everyone.
+
+  Administrator rights are asked for once either way, by Windows, when the questions are over and
+  the install begins. They are not a formality: the sensors are read through a driver, the driver
+  is installed here, and nothing machine-wide can be done without them.
+
+  Built by build.ps1, which takes the version and the publisher from the csproj so that the
+  installer cannot say one thing while the exe says another:
+      wix build -arch x64 -d Version=0.7.0 -d Manufacturer=lysnet.ru -d Exe=...
+-->
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="System Spinner x64"
+           Manufacturer="$(Manufacturer)"
+           Version="$(Version)"
+           UpgradeCode="D993C858-1615-4986-B456-173BEFEDA37C"
+           Scope="perMachine"
+           Compressed="yes">
+
+    <!-- One file in one cab inside the msi: there is nothing to stream separately. -->
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- An older version is replaced rather than added beside: two tray icons of the same app
+         would poll the same sensors twice. The same version counts as an upgrade too — without
+         that, installing a rebuild of the number already there leaves both, and during a run of
+         testing that happens more often than a version change does. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of System Spinner x64 is already installed." />
+
+    <Icon Id="AppIcon.ico" SourceFile="$(Icon)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/andrey-lysikov/System-Spinner-x64" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+    <!-- Where to put it: the dialog that asks stands on these two. The folder name is the same
+         either way — only the place it hangs from changes, and the profile of the person
+         installing is what it offers first. Both are machine-wide installs; the choice is the
+         folder, not who may run the app. -->
+    <Property Id="ApplicationFolderName" Value="System-Spinner" />
+    <Property Id="WixAppFolder" Value="WixPerUserFolder" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="APPLICATIONFOLDER" Name="System-Spinner" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <!-- "Just me" would otherwise land in AppData\Local\Apps\System-Spinner. The app keeps its
+         config and log in AppData\Local\System-Spinner, and having the exe one folder deeper than
+         its own settings is a puzzle for whoever goes looking for either. -->
+    <SetProperty Id="WixPerUserFolder"
+                 Value="[LocalAppDataFolder]System-Spinner"
+                 After="WixSetDefaultPerUserFolder"
+                 Sequence="both" />
+
+    <!-- And "for everyone" would otherwise land in Program Files (x86): the folder the dialog
+         suggests comes from ProgramFilesFolder, which means the 32-bit one even in a 64-bit
+         package. This app is x64 and belongs in Program Files proper. -->
+    <SetProperty Id="WixPerMachineFolder"
+                 Value="[ProgramFiles64Folder]System-Spinner"
+                 After="WixSetDefaultPerMachineFolder"
+                 Sequence="both" />
+
+    <!-- Both shortcuts are named after the exe rather than after the project: the file is
+         System-Spinner.exe, and a menu entry calling itself something else is one more thing to
+         match up when looking for what is running. -->
+    <?define ShortcutName = "System-Spinner" ?>
+    <?define ShortcutNote = "System monitoring in the tray and over full-screen applications" ?>
+
+    <!-- The app is a single self-contained exe. Beside it goes the PawnIO setup: it has to be a
+         file on disk with a name of its own, not a stream inside the package, because it is
+         sometimes started by hand — and because a driver setup asks for administrator rights, and
+         what asks for them has to be something Windows can show a prompt for. -->
+    <ComponentGroup Id="AppFiles" Directory="APPLICATIONFOLDER">
+      <Component Id="MainExe" Guid="0F8D272E-1348-400B-A2CF-93B2527E70DF">
+        <File Id="SystemSpinnerExe" Source="$(Exe)" Name="System-Spinner.exe" KeyPath="yes" />
+      </Component>
+
+      <Component Id="PawnIoSetupFile" Guid="6B1F3A7C-2E14-4B0D-95C6-2A0B7F3D9E58">
+        <File Id="PawnIoSetupExe" Source="$(PawnIo)" Name="PawnIO_setup.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- The shortcut sits directly in the menu rather than in a folder of its own: one entry does
+         not deserve a folder to be opened first. Not advertised — an advertised shortcut shows no
+         icon unless one is named in the msi, and it drags the repair machinery in behind it for
+         a single file that either exists or does not. -->
+    <ComponentGroup Id="StartMenuShortcutFiles" Directory="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="C0D8CE73-8C33-4E5C-9A24-7C5A03FFB1CE">
+        <Shortcut Id="StartMenuShortcutEntry"
+                  Name="$(ShortcutName)"
+                  Description="$(ShortcutNote)"
+                  Target="[APPLICATIONFOLDER]System-Spinner.exe"
+                  WorkingDirectory="APPLICATIONFOLDER"
+                  Icon="AppIcon.ico" />
+
+        <!-- A shortcut cannot be a key path, so the mark of the component lives in the registry,
+             under the user who asked for it. -->
+        <RegistryValue Root="HKCU"
+                       Key="Software\System-Spinner"
+                       Name="StartMenuShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="DesktopShortcutFiles" Directory="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="395728B0-E5F2-4C43-AB40-1EE36C820CC9">
+        <Shortcut Id="DesktopShortcutEntry"
+                  Name="$(ShortcutName)"
+                  Description="$(ShortcutNote)"
+                  Target="[APPLICATIONFOLDER]System-Spinner.exe"
+                  WorkingDirectory="APPLICATIONFOLDER"
+                  Icon="AppIcon.ico" />
+
+        <RegistryValue Root="HKCU"
+                       Key="Software\System-Spinner"
+                       Name="DesktopShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- The two checkboxes, on by default. Each drives a feature of its own rather than a
+         condition on the component: a feature left out at install is remembered as left out, and
+         a component switched off by a condition would go looking for that condition again when
+         the time comes to remove it. -->
+    <Property Id="INSTALLSTARTMENUSHORTCUT" Value="1" />
+    <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" />
+
+    <Feature Id="Main"
+             Title="System Spinner x64"
+             Description="The application itself."
+             Level="1"
+             AllowAbsent="no"
+             ConfigurableDirectory="APPLICATIONFOLDER">
+      <ComponentGroupRef Id="AppFiles" />
+
+      <Feature Id="StartMenu" Title="Start menu shortcut"
+               Description="A shortcut in the Start menu." Level="1">
+        <ComponentGroupRef Id="StartMenuShortcutFiles" />
+        <Level Value="0" Condition="INSTALLSTARTMENUSHORTCUT &lt;&gt; 1" />
+      </Feature>
+
+      <Feature Id="Desktop" Title="Desktop shortcut"
+               Description="A shortcut on the desktop." Level="1">
+        <ComponentGroupRef Id="DesktopShortcutFiles" />
+        <Level Value="0" Condition="INSTALLDESKTOPSHORTCUT &lt;&gt; 1" />
+      </Feature>
+    </Feature>
+
+    <!-- PawnIO is what LibreHardwareMonitor reads the sensors through: without it there are no
+         temperatures, no power and no fan speeds, and the app refuses to start. It is left in
+         place when the app is removed: other applications use the same driver, and taking it away
+         with us would break them.
+
+         The same key the app itself looks at, in the 64-bit view of the registry. -->
+    <Property Id="PAWNIOINSTALLED">
+      <RegistrySearch Id="PawnIoSearch"
+                      Root="HKLM"
+                      Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO"
+                      Name="DisplayName"
+                      Type="raw"
+                      Bitness="always64" />
+    </Property>
+
+    <!-- A driver is machine-wide, and installing one takes administrator rights. This package is
+         machine-wide too, whichever folder was chosen, so those rights are asked for once — by
+         Windows, when the install itself begins, after every question has been answered — and the
+         driver goes in silently in the installer's own elevated service.
+
+         The first attempt at this had the package installing for one person and no rights at all,
+         and the log said so plainly: error 1721, the setup "could not be run". An action of the
+         installer cannot raise a prompt of its own; either the whole install has the rights or
+         nothing here does. -->
+    <CustomAction Id="InstallPawnIo"
+                  FileRef="PawnIoSetupExe"
+                  ExeCommand="-install -silent"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
+    <!-- The autostart entry is a scheduled task the app makes for itself, so the app is what the
+         installer knows nothing about — it is removed here, and a failure is not worth stopping
+         an uninstall over. -->
+    <CustomAction Id="RemoveAutostartTask"
+                  Directory="APPLICATIONFOLDER"
+                  ExeCommand="[System64Folder]schtasks.exe /delete /tn &quot;System-Spinner&quot; /f"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="InstallPawnIo" After="InstallFiles"
+              Condition="NOT Installed AND NOT PAWNIOINSTALLED" />
+      <Custom Action="RemoveAutostartTask" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
+
+    <!-- The advanced set is the one that asks whom the install is for, and brings the folder page
+         with it: for everyone or for me, and where it goes. -->
+    <ui:WixUI Id="WixUI_Advanced" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(License)" />
+
+    <!-- The app is started when the installer closes, unless the checkbox on the shortcuts page
+         says otherwise. There is nothing to see after an install otherwise: the app has no window,
+         only an icon in the notification area, and someone who has just installed it wants to look
+         at it now rather than hunt for the shortcut.
+
+         Through the shell rather than started directly: the app demands administrator rights, and
+         a program started by the installer itself never gets the prompt for them — it simply
+         fails, which is what error 1631 in the log was. The shell shows the prompt.
+
+         The last page belongs to the part of the installer that runs as the person installing,
+         not to the elevated half, so the app comes up as them and reads their config. -->
+    <Property Id="LAUNCHAFTERINSTALL" Value="1" />
+
+    <CustomAction Id="SetAppTarget" Property="WixShellExecTarget" Value="[#SystemSpinnerExe]" />
+    <CustomAction Id="LaunchApplication" DllEntry="WixShellExec" BinaryRef="Wix4UtilCA_X64" Impersonate="yes" />
+
+    <!-- Our page of shortcuts, put between the folder page and the last one.
+
+         Where a button already carries a jump of the stock set, ours has to come after it: several
+         events on one button run in order of Ordering, and of two that both name a next dialog the
+         later one decides. Hence the tens — the set uses one to seven.
+
+         The first page is left alone: "Install" installs there and then, with everything at its
+         default — for the person installing, into their profile, with both shortcuts — and
+         "Advanced" opens the questions below. -->
+    <UI>
+      <!-- After the choice of whom it is for, the stock set goes to the folder page when the
+           install is for everyone and skips to the feature tree otherwise. That other half is
+           claimed here, so both ways reach the folder and the shortcuts behind it. -->
+      <!-- The install is machine-wide whichever folder was chosen, so the driver can be put in
+           without asking anyone anything. The stock page clears that flag for "just me" — this
+           puts it back, later in the order and therefore last. -->
+      <Publish Dialog="InstallScopeDlg" Control="Next" Property="ALLUSERS" Value="1" Order="8" />
+
+      <Publish Dialog="InstallScopeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg"
+               Condition="WixAppFolder = &quot;WixPerUserFolder&quot;" Order="10" />
+
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ShortcutsDlg" Order="10" />
+      <Publish Dialog="ShortcutsDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" />
+      <Publish Dialog="ShortcutsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+
+      <!-- The way back is only claimed while installing. During maintenance the last page is
+           reached from the repair-or-remove page and has to return there, and a page about
+           shortcuts to be created has nothing to say then. -->
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ShortcutsDlg"
+               Condition="NOT Installed" Order="10" />
+
+      <!-- Only after a fresh install: the same page ends a repair and an uninstall too, and
+           starting the app at the end of its own removal would be a poor joke. The stock event
+           that closes the page sits at 999, so both of these run before it. -->
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="SetAppTarget"
+               Condition="LAUNCHAFTERINSTALL = 1 AND NOT Installed" Order="1" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"
+               Condition="LAUNCHAFTERINSTALL = 1 AND NOT Installed" Order="2" />
+    </UI>
+  </Package>
+</Wix>
