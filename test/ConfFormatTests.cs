@@ -123,6 +123,27 @@ public class ConfFormatTests
         Assert.Equal(Normalize(ConfFormat.Write(new AppConfig())), Normalize(sample));
     }
 
+    [Fact]
+    public void Прежний_порядок_датчиков_видеопамяти_заменяется()
+    {
+        // What older versions wrote, word for word. The card's own count of used memory sticks at
+        // the peak on NVIDIA, so a file carrying that order is carrying a fault, not a decision.
+        AppConfig read = ConfFormat.Read(
+            "[Hardware]\nGpuMemory = GPU Memory Used, D3D Dedicated Memory Used, GPU Memory Dedicated Used\n");
+
+        Assert.Equal("D3D Dedicated Memory Used", read.Sensors.GpuMemory[0]);
+    }
+
+    [Fact]
+    public void Выбранный_вручную_датчик_видеопамяти_остаётся()
+    {
+        // Anything but that exact list is somebody's own choice and is left alone — including
+        // the very sensor the default moved away from.
+        AppConfig read = ConfFormat.Read("[Hardware]\nGpuMemory = GPU Memory Used\n");
+
+        Assert.Equal(new[] { "GPU Memory Used" }, read.Sensors.GpuMemory);
+    }
+
     private static string Normalize(string text) => text.Replace("\r\n", "\n").TrimEnd();
 
     private static string FindSample()

@@ -42,7 +42,15 @@ public sealed class SensorNamesConfig
 
     public List<string> GpuClock { get; set; } = new() { "GPU Core", "GPU Graphics" };
 
-    public List<string> GpuMemory { get; set; } = new() { "GPU Memory Used", "D3D Dedicated Memory Used", "GPU Memory Dedicated Used" };
+    // Used video memory. The Direct3D counter comes first on purpose: it is the one Windows shows
+    // in the Task Manager, and it follows the memory back down when an application lets it go.
+    // "GPU Memory Used" is the card's own count of what is not free, and on NVIDIA that figure has
+    // been seen to stick at the peak — a card left reading full while nothing is running.
+    public List<string> GpuMemory { get; set; } = new() { "D3D Dedicated Memory Used", "GPU Memory Used", "GPU Memory Dedicated Used" };
+
+    // What the list above said before, and what a config file written by an older version still
+    // carries. Replaced on reading: the value it names goes stale, and nobody chose it on purpose.
+    internal static readonly string[] StaleGpuMemory = { "GPU Memory Used", "D3D Dedicated Memory Used", "GPU Memory Dedicated Used" };
 
     // Total video memory. Only the status window needs it: without a ceiling the megabytes have
     // nothing to be compared against, and a scale without one is meaningless.

@@ -70,6 +70,16 @@ internal static class ConfFormat
         s.GpuPower = file.List(Hardware, nameof(s.GpuPower)) ?? s.GpuPower;
         s.GpuClock = file.List(Hardware, nameof(s.GpuClock)) ?? s.GpuClock;
         s.GpuMemory = file.List(Hardware, nameof(s.GpuMemory)) ?? s.GpuMemory;
+
+        // The order that used to be the default put the card's own count first, and that count
+        // sticks at the peak on NVIDIA. A file still carrying it word for word is carrying what an
+        // older version wrote, not a choice — the new order takes over, and says so.
+        if (s.GpuMemory.SequenceEqual(SensorNamesConfig.StaleGpuMemory, StringComparer.OrdinalIgnoreCase))
+        {
+            s.GpuMemory = new SensorNamesConfig().GpuMemory;
+            Log.Info($"[{Hardware}] GpuMemory: the old order is replaced by {string.Join(", ", s.GpuMemory)} — " +
+                     "the card's own count of used memory stays at the peak once it gets there");
+        }
         s.GpuMemoryTotal = file.List(Hardware, nameof(s.GpuMemoryTotal)) ?? s.GpuMemoryTotal;
 
         FanConfig f = cfg.Fans;

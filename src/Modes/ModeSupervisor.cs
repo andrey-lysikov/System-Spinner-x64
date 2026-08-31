@@ -327,7 +327,8 @@ public sealed class ModeSupervisor : IDisposable
                  $"{Show(r.CpuClockMhz)} MHz {Show(r.SysMemUsedGb, 1)} GB " +
                  $"{Show(r.CpuFanRpm)}/{Show(r.AioFanRpm)} RPM{sys} | " +
                  $"GPU {Show(r.GpuLoad)} % {Show(r.GpuTempC)} °C {Show(r.GpuPowerW)} W " +
-                 $"{Show(r.GpuClockMhz)} MHz {Show(r.GpuMemUsedGb, 1)} GB {Show(r.GpuFanRpm)} RPM");
+                 $"{Show(r.GpuClockMhz)} MHz {Show(r.GpuMemUsedGb, 1)}/{Show(r.GpuMemTotalGb, 1)} GB " +
+                 $"{Show(r.GpuFanRpm)} RPM");
 
         static string Show(double? value, int decimals = 0) =>
             value is null ? "—" : value.Value.ToString("F" + decimals, CultureInfo.InvariantCulture);

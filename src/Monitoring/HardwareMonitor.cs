@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using SystemSpinnerX64.Configuration;
@@ -124,7 +125,82 @@ public sealed class HardwareMonitor : IDisposable
         r.GpuMemUsedGb = Find(_gpu, SensorType.SmallData, names.GpuMemory) / 1024.0;
         r.GpuMemTotalGb = Find(_gpu, SensorType.SmallData, names.GpuMemoryTotal) / 1024.0;
 
+        LogSensorChoice(names);
+        LogMemoryStall(r);
+
         return r;
+    }
+
+    private bool _memoryStallLogged;
+
+    // Video memory reading full is the shape the fault takes: the card is idle, nothing holds the
+    // memory, and the number stays where the last heavy application left it. Whether it is the
+    // sensor or the memory is answered by the other sensors, and only at that moment — so they are
+    // written down the first time it happens, and not again.
+    private void LogMemoryStall(Readings r)
+    {
+        if (_memoryStallLogged) return;
+        if (r.GpuMemTotalGb is not double total || total <= 0) return;
+        if (r.GpuMemUsedGb is not double used || used < total) return;
+
+        _memoryStallLogged = true;
+
+        Log.Warn($"video memory reads full: {used:0.#} of {total:0.#} GB with the card at " +
+                 $"{r.GpuLoad ?? 0:0} % — every video memory sensor as it stands:");
+        LogVideoMemory();
+    }
+
+    private bool _sensorChoiceLogged;
+
+    // Once per run: which sensor each configurable reading actually came from, and what it said.
+    // A number that looks wrong is nearly always the wrong sensor behind it — video memory shown
+    // full while the card is idle means "used" and "total" landed on sensors that do not belong
+    // together — and no amount of staring at the percentage tells you which.
+    private void LogSensorChoice(SensorNamesConfig names)
+    {
+        if (_sensorChoiceLogged) return;
+        _sensorChoiceLogged = true;
+
+        Log.Info("sensors in use:");
+
+        Report("CpuLoad", _cpu, SensorType.Load, names.CpuLoad);
+        Report("CpuTemp", _cpu, SensorType.Temperature, names.CpuTemp);
+        Report("CpuPower", _cpu, SensorType.Power, names.CpuPower);
+        Report("MemoryUsed", _memory, SensorType.Data, names.MemoryUsed);
+        Report("MemoryAvailable", _memory, SensorType.Data, names.MemoryAvailable);
+        Report("GpuLoad", _gpu, SensorType.Load, names.GpuLoad);
+        Report("GpuTemp", _gpu, SensorType.Temperature, names.GpuTemp);
+        Report("GpuPower", _gpu, SensorType.Power, names.GpuPower);
+        Report("GpuClock", _gpu, SensorType.Clock, names.GpuClock);
+        Report("GpuMemory", _gpu, SensorType.SmallData, names.GpuMemory);
+        Report("GpuMemoryTotal", _gpu, SensorType.SmallData, names.GpuMemoryTotal);
+
+        LogVideoMemory();
+
+        void Report(string setting, IHardware? hw, SensorType type, IReadOnlyList<string> wanted)
+        {
+            ISensor? sensor = FindSensor(hw, type, wanted);
+
+            Log.Info(sensor is null
+                ? $"  {setting}: nothing matched {string.Join(", ", wanted)}"
+                : $"  {setting}: \"{sensor.Name}\" ({sensor.SensorType}) = " +
+                  $"{sensor.Value?.ToString("0.##", CultureInfo.InvariantCulture) ?? "—"}");
+        }
+    }
+
+    // Every video-memory sensor the card offers, whatever it is called. The pair above is chosen
+    // from names, and when the choice is wrong this is the list to choose from.
+    private void LogVideoMemory()
+    {
+        if (_gpu is null) return;
+
+        foreach (ISensor sensor in Collect(_gpu, SensorType.SmallData)
+                                   .Concat(Collect(_gpu, SensorType.Data))
+                                   .Where(s => s.Name.Contains("memory", StringComparison.OrdinalIgnoreCase)))
+        {
+            Log.Info($"  video memory sensor \"{sensor.Name}\" ({sensor.SensorType}) = " +
+                     $"{sensor.Value?.ToString("0.##", CultureInfo.InvariantCulture) ?? "—"}");
+        }
     }
 
     private IEnumerable<IHardware> Prepend(IHardware first)
@@ -134,8 +210,13 @@ public sealed class HardwareMonitor : IDisposable
         foreach (var hw in _fanSources) yield return hw;
     }
 
-    // An exact match across the whole list first, then a substring.
-    private static double? Find(IHardware? hw, SensorType type, IReadOnlyList<string> names)
+    private static double? Find(IHardware? hw, SensorType type, IReadOnlyList<string> names) =>
+        FindSensor(hw, type, names)?.Value;
+
+    // An exact match across the whole list first, then a substring. The sensor is returned rather
+    // than its value: which name a reading came from is the first thing to know when the number
+    // looks wrong, and only the sensor carries that.
+    private static ISensor? FindSensor(IHardware? hw, SensorType type, IReadOnlyList<string> names)
     {
         if (hw is null) return null;
         var sensors = Collect(hw, type).ToList();
@@ -145,13 +226,13 @@ public sealed class HardwareMonitor : IDisposable
         {
             var exact = sensors.FirstOrDefault(s =>
                 s.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && s.Value.HasValue);
-            if (exact?.Value is float v) return v;
+            if (exact is not null) return exact;
         }
         foreach (var name in names)
         {
             var partial = sensors.FirstOrDefault(s =>
                 s.Name.Contains(name, StringComparison.OrdinalIgnoreCase) && s.Value.HasValue);
-            if (partial?.Value is float v) return v;
+            if (partial is not null) return partial;
         }
         return null;
     }
