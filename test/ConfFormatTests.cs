@@ -28,7 +28,8 @@ public class ConfFormatTests
             Warn = { Color = "Gold", CpuTemp = 90, GpuTemp = 0, SysMem = 75, GpuMem = 80 },
             Osd = { AdjustmentSteps = 24, ControlExternalBrightness = false },
             Stats = { HistoryPoints = 300, TopProcesses = 5, ShowExternalAddress = false },
-            Appearance = { FontFamily = "Consolas", TextColor = "#00FF00", Margin = 24 }
+            Appearance = { FontFamily = "Consolas", TextColor = "#00FF00", Margin = 24,
+                           BlackListApplications = new() { "SnippingTool*", "HandBrake.exe" } }
         };
 
         AppConfig read = ConfFormat.Read(ConfFormat.Write(written));
@@ -55,12 +56,51 @@ public class ConfFormatTests
         Assert.Equal("Consolas", read.Appearance.FontFamily);
         Assert.Equal("#00FF00", read.Appearance.TextColor);
         Assert.Equal(24, read.Appearance.Margin);
+        Assert.Equal(new[] { "SnippingTool*", "HandBrake.exe" }, read.Appearance.BlackListApplications);
+    }
+
+    [Fact]
+    public void Пустой_чёрный_список_никого_не_исключает()
+    {
+        // "BlackListApplications =" means "keep away from nothing", not "take the standard list".
+        AppConfig cfg = ConfFormat.Read("[FullScreenOverlay]\nBlackListApplications =\n");
+
+        Assert.Empty(cfg.Appearance.BlackListApplications);
+        Assert.Empty(ProcessPattern.Compile(cfg.Appearance.BlackListApplications));
+    }
+
+    [Fact]
+    public void Без_параметра_действует_стандартный_чёрный_список()
+    {
+        AppConfig cfg = ConfFormat.Read("[FullScreenOverlay]\nMargin = 4\n");
+
+        Assert.Equal(AppearanceConfig.DefaultBlackList(), cfg.Appearance.BlackListApplications);
+        Assert.Contains("SnippingTool*", cfg.Appearance.BlackListApplications);
+    }
+
+    [Fact]
+    public void Панель_выключается_параметром_Enable()
+    {
+        Assert.False(ConfFormat.Read("[FullScreenOverlay]\nEnable = false\n").ShowOverlayInGames);
+
+        // The old name under [General] is not read any more: the section is written in anew instead.
+        Assert.True(ConfFormat.Read("[General]\nShowOverlayInGames = false\n").ShowOverlayInGames);
+    }
+
+    [Fact]
+    public void Недостающие_секции_называются_по_имени()
+    {
+        // What 1.0.0 wrote has no [FullScreenOverlay]; the startup writes the file back with it.
+        AppConfig old = ConfFormat.Read("[General]\nDebug = false\n[Hardware]\nGpuIndex = 0\n[Spinner]\nStyle = Loader\n");
+
+        Assert.Equal(new[] { "FullScreenOverlay" }, old.MissingSections);
+        Assert.Empty(ConfFormat.Read(ConfFormat.Write(new AppConfig())).MissingSections);
     }
 
     [Fact]
     public void Решётка_внутри_значения_не_считается_комментарием()
     {
-        AppConfig cfg = ConfFormat.Read("[AppearanceFullScreen]\nTextColor = #FFAA00\n");
+        AppConfig cfg = ConfFormat.Read("[FullScreenOverlay]\nTextColor = #FFAA00\n");
 
         Assert.Equal("#FFAA00", cfg.Appearance.TextColor);
     }
@@ -82,8 +122,8 @@ public class ConfFormatTests
     [Fact]
     public void Дробное_число_принимается_и_с_запятой()
     {
-        Assert.Equal(0.5, ConfFormat.Read("[AppearanceFullScreen]\nTextOpacity = 0,5\n").Appearance.TextOpacity);
-        Assert.Equal(0.5, ConfFormat.Read("[AppearanceFullScreen]\nTextOpacity = 0.5\n").Appearance.TextOpacity);
+        Assert.Equal(0.5, ConfFormat.Read("[FullScreenOverlay]\nTextOpacity = 0,5\n").Appearance.TextOpacity);
+        Assert.Equal(0.5, ConfFormat.Read("[FullScreenOverlay]\nTextOpacity = 0.5\n").Appearance.TextOpacity);
     }
 
     [Fact]
@@ -107,7 +147,7 @@ public class ConfFormatTests
 
     [Theory]
     [InlineData("[Hardware]\nGpuIndex = не число\n")]
-    [InlineData("[General]\nShowOverlayInGames = ага\n")]
+    [InlineData("[FullScreenOverlay]\nEnable = ага\n")]
     [InlineData("[General]\nDebug = ага\n")]
     [InlineData("[General\nGpuIndex = 1\n")]
     [InlineData("GpuIndex = 1\n")]                       // a value outside any section

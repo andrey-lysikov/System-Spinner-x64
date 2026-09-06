@@ -56,6 +56,13 @@ public sealed class ModeSupervisor : IDisposable
     // The screen the overlay was last put on. Kept to notice the game moving to another monitor.
     private Win32.RECT? _gameScreen;
 
+    // The full-screen window last named, and whether it is one the panel is kept away from.
+    private IntPtr _gameWindow;
+    private bool _overlayExcluded;
+
+    // BlackListApplications from the config, compiled once at startup.
+    private readonly List<ProcessPattern> _excludedApps;
+
     private string _fpsApi = "";
     private string _audioDevice = "";
 
@@ -73,6 +80,7 @@ public sealed class ModeSupervisor : IDisposable
     {
         _cfg = cfg;
         _hardware = hardware;
+        _excludedApps = ProcessPattern.Compile(cfg.Appearance.BlackListApplications);
 
         _metrics = new MetricsService(cfg, hardware);
         _fps = new FpsCounter();
@@ -156,6 +164,9 @@ public sealed class ModeSupervisor : IDisposable
         _updateTimer.Start();
         _displayTimer.Start();
 
+        if (_excludedApps.Count > 0)
+            Log.Info("the panel is kept away from: " + string.Join(", ", _excludedApps.Select(p => p.Text)));
+
         // The first check right away rather than in a second: the app may have been started from a game.
         UpdateMode();
 
@@ -171,11 +182,21 @@ public sealed class ModeSupervisor : IDisposable
 
         // Full screen is decided on its own, without asking whether the panel is wanted: the tray
         // icon is hidden behind a game either way, and an animation nobody can see is pure waste.
-        bool inGame = Win32.TryFullscreenArea(out screen, out scale);
+        bool inGame = Win32.TryFullscreenArea(out screen, out scale, out IntPtr window);
 
         if (inGame == _inGame)
         {
-            if (_inGame && _cfg.ShowOverlayInGames)
+            if (!_inGame) return;
+
+            // Alt-Tab from one full-screen application to another: one may be on the list.
+            if (window != _gameWindow && LookAtGame(window) != _overlayExcluded)
+            {
+                _overlayExcluded = !_overlayExcluded;
+                if (_overlayExcluded) HideOverlay();
+                else ShowOverlay();
+            }
+
+            if (OverlayWanted)
             {
                 // The game can move to another monitor without ever ceasing to be full screen,
                 // and the panel goes with it.
@@ -201,9 +222,37 @@ public sealed class ModeSupervisor : IDisposable
                           : $"still running: the tray icon is in sight on {_screenCount} screens")
             : "no full-screen application — spinner running");
 
+        _overlayExcluded = inGame && LookAtGame(window);
+        if (!inGame) _gameWindow = IntPtr.Zero;
+
         if (inGame) EnterGame();
         else EnterDesktop();
     }
+
+    // Names the full-screen application in the log — that is where the name for the list
+    // comes from — and says whether the panel is kept away from it.
+    private bool LookAtGame(IntPtr window)
+    {
+        _gameWindow = window;
+
+        string? path = Win32.ProcessPathOf(window);
+        if (path is null)
+        {
+            Log.Info("the full-screen application would not tell its name");
+            return false;
+        }
+
+        ProcessPattern? hit = ProcessPattern.Find(_excludedApps, path);
+
+        Log.Info(hit is null
+            ? $"full-screen application: {path}"
+            : $"full-screen application: {path} — on the black list as \"{hit.Text}\", no panel over it");
+
+        return hit is not null;
+    }
+
+    // Whether the panel is up: over a game, switched on, and not over an application on the list.
+    private bool OverlayWanted => _inGame && _cfg.ShowOverlayInGames && !_overlayExcluded;
 
     private void MoveOverlay(Win32.RECT screen, double scale)
     {
@@ -246,6 +295,12 @@ public sealed class ModeSupervisor : IDisposable
             return;
         }
 
+        if (_overlayExcluded)
+        {
+            Log.Info("the application is on the black list — nothing is shown over it");
+            return;
+        }
+
         _overlay.ApplyLayout();
         _overlay.Visibility = Visibility.Visible;
         _overlay.KeepOnTop();
@@ -279,7 +334,7 @@ public sealed class ModeSupervisor : IDisposable
     {
         Readings r = snapshot.Readings;
 
-        if (_inGame && _cfg.ShowOverlayInGames) _overlayModel.Apply(r);
+        if (OverlayWanted) _overlayModel.Apply(r);
 
         // Checked every poll rather than at the change of face alone: a monitor can be unplugged
         // mid-game, and then the icon goes behind the game after all.

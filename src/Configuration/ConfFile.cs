@@ -54,6 +54,8 @@ internal sealed class ConfFile
         return file;
     }
 
+    public bool HasSection(string section) => _sections.ContainsKey(section);
+
     private string? Raw(string section, string key) =>
         _sections.TryGetValue(section, out var values) && values.TryGetValue(key, out string? value) && value.Length > 0
             ? value

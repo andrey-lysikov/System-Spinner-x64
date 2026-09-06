@@ -40,4 +40,19 @@ public sealed class AppearanceConfig
 
     // The rows and the order of the values along them — Row1, Row2, … in the file.
     public List<OverlayRow> Rows { get; set; } = OverlayRow.Default();
+
+    // Full-screen applications the panel is not shown over: exe names with * and ? in them.
+    public List<string> BlackListApplications { get; set; } = DefaultBlackList();
+
+    // What goes full screen without being a game: screenshot tools, the lock screen, players,
+    // browsers with a video, a slide show, a remote desktop, video calls. Anyone can cross a name off.
+    public static List<string> DefaultBlackList() => new()
+    {
+        "SnippingTool*", "ScreenClippingHost", "ShareX", "Greenshot", "Lightshot",
+        "LockApp", "LogonUI",
+        "vlc", "mpv", "mpc-hc*", "mpc-be*", "PotPlayer*", "wmplayer", "Video.UI", "Photos", "Microsoft.Photos",
+        "chrome", "msedge", "firefox", "brave", "opera", "vivaldi",
+        "POWERPNT", "mstsc", "HandBrake",
+        "Zoom", "Teams", "ms-teams", "ktalk*", "TrueConf"
+    };
 }

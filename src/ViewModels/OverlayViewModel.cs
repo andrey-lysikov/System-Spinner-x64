@@ -11,7 +11,7 @@ using SystemSpinnerX64.Monitoring;
 namespace SystemSpinnerX64.ViewModels;
 
 // The panel rows. Which values stand where comes from the config: the rows and their order are
-// AppearanceFullScreen/Row1, Row2, …
+// FullScreenOverlay/Row1, Row2, …
 public sealed class OverlayViewModel : Observable
 {
     private string? _notice;

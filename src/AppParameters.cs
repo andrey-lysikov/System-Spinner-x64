@@ -43,16 +43,15 @@ internal static class AppParameters
         // than from a file beside the exe.
         public const string IconResource = "System-Spinner.icon.ico";
 
-        // The version of the running exe, three numbers. The assembly always carries four — .NET
-        // adds the revision itself — and the fourth means nothing here: the tags, the changelog
-        // and the update check all speak in three.
+        // The version of the running exe, two numbers. The assembly always carries four — .NET
+        // fills the rest itself — and the tags, the changelog and the update check speak in two.
         public static string Version { get; } = ReadVersion();
 
         private static string ReadVersion()
         {
             System.Version? version = Assembly.GetExecutingAssembly().GetName().Version;
 
-            return version is null ? "0.0.0" : $"{version.Major}.{version.Minor}.{version.Build}";
+            return version is null ? "0.0" : $"{version.Major}.{version.Minor}";
         }
     }
 

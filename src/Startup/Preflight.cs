@@ -65,6 +65,12 @@ internal static class Preflight
             Log.SetVerbose(cfg.Debug ?? false);
         }
 
+        // A section the file has not got — a new version brought it — is written in with defaults.
+        bool sectionsMissing = cfg.MissingSections.Count > 0;
+        if (sectionsMissing)
+            Log.Info("no [" + string.Join("], [", cfg.MissingSections) + "] in the config: " +
+                     "written in with the standard settings");
+
         if (cfg.LoadError is { Length: > 0 } configError)
         {
             return PreflightResult.Stop(
@@ -121,7 +127,7 @@ internal static class Preflight
         Log.Info($"fans: {cfg.Fans.Summary.Replace("\n", "; ")}");
 
         // 7. The write is collected here rather than in the branches: there are several reasons to save.
-        if (fansScanned || switchWasMissing) SaveConfig(cfg);
+        if (fansScanned || switchWasMissing || sectionsMissing) SaveConfig(cfg);
 
         return PreflightResult.Start(cfg, hw);
     }

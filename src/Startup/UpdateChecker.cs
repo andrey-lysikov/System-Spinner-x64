@@ -72,5 +72,9 @@ internal static class UpdateChecker
     internal static bool IsNewer(string latest, string current) =>
         Version.TryParse(latest, out Version? l) &&
         Version.TryParse(current, out Version? c) &&
-        l > c;
+        Padded(l) > Padded(c);
+
+    // "1.1" and "1.1.0" are one and the same: a number left off counts as zero, not as less.
+    private static Version Padded(Version v) =>
+        new(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
 }

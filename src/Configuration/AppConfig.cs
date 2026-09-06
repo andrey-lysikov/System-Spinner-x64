@@ -22,7 +22,7 @@ public sealed class AppConfig
     // Which GPU to show when there are several.
     public int GpuIndex { get; set; }
 
-    // Show the overlay over full-screen apps.
+    // Show the overlay over full-screen apps — Enable under [FullScreenOverlay].
     public bool ShowOverlayInGames { get; set; } = true;
 
     // Keep the tray icon spinning outside full-screen apps too.
@@ -58,6 +58,9 @@ public sealed class AppConfig
     public string Path { get; private set; } = UserPath;
 
     public bool LoadedFromFile { get; private set; }
+
+    // Sections the file has not got — an older file, or one trimmed by hand. Written back at startup.
+    public IReadOnlyList<string> MissingSections { get; internal set; } = Array.Empty<string>();
 
     // The file exists but could not be read — that has to be said, not silently ignored.
     public string? LoadError { get; private set; }

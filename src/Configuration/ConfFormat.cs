@@ -16,7 +16,11 @@ internal static class ConfFormat
 {
     private const string General = "General";
     private const string Hardware = "Hardware";
-    private const string AppearanceSection = "AppearanceFullScreen";
+    private const string OverlaySection = "FullScreenOverlay";
+    private const string EnableKey = "Enable";
+
+    // Every section the file is meant to have; one that is missing is written back with defaults.
+    public static readonly string[] Sections = { General, Hardware, OverlaySection, SpinnerSection };
     private const string SpinnerSection = "Spinner";
 
     // Milliseconds in a second: the file speaks seconds, the timers milliseconds.
@@ -29,14 +33,13 @@ internal static class ConfFormat
     public static AppConfig Read(string text)
     {
         ConfFile file = ConfFile.Parse(text);
-        var cfg = new AppConfig();
+        var cfg = new AppConfig { MissingSections = Sections.Where(s => !file.HasSection(s)).ToList() };
 
         cfg.Language = file.Choice<Language>(General, nameof(cfg.Language)) ?? cfg.Language;
 
         if (file.Number(General, "UpdateInterval") is double seconds)
             cfg.UpdateIntervalMs = (int)(seconds * Second);
 
-        cfg.ShowOverlayInGames = file.Flag(General, nameof(cfg.ShowOverlayInGames)) ?? cfg.ShowOverlayInGames;
         cfg.SpinOnDesktop = file.Flag(General, nameof(cfg.SpinOnDesktop)) ?? cfg.SpinOnDesktop;
 
         // A missing switch differs from one set to false: the rule "log the first run in full,
@@ -102,18 +105,21 @@ internal static class ConfFormat
         n.GpuUsage = file.Percent(Hardware, "WarnGpuUsage") ?? n.GpuUsage;
 
         AppearanceConfig a = cfg.Appearance;
-        a.FontFamily = file.Text(AppearanceSection, nameof(a.FontFamily)) ?? a.FontFamily;
-        a.FontScalePercent = file.Number(AppearanceSection, nameof(a.FontScalePercent)) ?? a.FontScalePercent;
-        a.UnitSizePercent = file.Number(AppearanceSection, nameof(a.UnitSizePercent)) ?? a.UnitSizePercent;
-        a.Margin = file.Number(AppearanceSection, nameof(a.Margin)) ?? a.Margin;
-        a.TextColor = file.Text(AppearanceSection, nameof(a.TextColor)) ?? a.TextColor;
-        a.TextOpacity = file.Number(AppearanceSection, nameof(a.TextOpacity)) ?? a.TextOpacity;
-        a.ShowPanel = file.Flag(AppearanceSection, nameof(a.ShowPanel)) ?? a.ShowPanel;
-        a.PanelColor = file.Text(AppearanceSection, nameof(a.PanelColor)) ?? a.PanelColor;
-        a.PanelOpacity = file.Number(AppearanceSection, nameof(a.PanelOpacity)) ?? a.PanelOpacity;
-        a.ShadowBlur = file.Number(AppearanceSection, nameof(a.ShadowBlur)) ?? a.ShadowBlur;
-        a.ShadowOpacity = file.Number(AppearanceSection, nameof(a.ShadowOpacity)) ?? a.ShadowOpacity;
+        cfg.ShowOverlayInGames = file.Flag(OverlaySection, EnableKey) ?? cfg.ShowOverlayInGames;
+
+        a.FontFamily = file.Text(OverlaySection, nameof(a.FontFamily)) ?? a.FontFamily;
+        a.FontScalePercent = file.Number(OverlaySection, nameof(a.FontScalePercent)) ?? a.FontScalePercent;
+        a.UnitSizePercent = file.Number(OverlaySection, nameof(a.UnitSizePercent)) ?? a.UnitSizePercent;
+        a.Margin = file.Number(OverlaySection, nameof(a.Margin)) ?? a.Margin;
+        a.TextColor = file.Text(OverlaySection, nameof(a.TextColor)) ?? a.TextColor;
+        a.TextOpacity = file.Number(OverlaySection, nameof(a.TextOpacity)) ?? a.TextOpacity;
+        a.ShowPanel = file.Flag(OverlaySection, nameof(a.ShowPanel)) ?? a.ShowPanel;
+        a.PanelColor = file.Text(OverlaySection, nameof(a.PanelColor)) ?? a.PanelColor;
+        a.PanelOpacity = file.Number(OverlaySection, nameof(a.PanelOpacity)) ?? a.PanelOpacity;
+        a.ShadowBlur = file.Number(OverlaySection, nameof(a.ShadowBlur)) ?? a.ShadowBlur;
+        a.ShadowOpacity = file.Number(OverlaySection, nameof(a.ShadowOpacity)) ?? a.ShadowOpacity;
         a.Rows = Rows(file) ?? a.Rows;
+        a.BlackListApplications = file.List(OverlaySection, nameof(a.BlackListApplications)) ?? a.BlackListApplications;
 
         SpinnerConfig sp = cfg.Spinner;
         sp.Style = file.Text(SpinnerSection, nameof(sp.Style)) ?? sp.Style;
@@ -134,7 +140,7 @@ internal static class ConfFormat
         for (int index = 1; index <= MaxRows; index++)
         {
             string key = RowKey + index;
-            if (file.Text(AppearanceSection, key) is not string line) continue;
+            if (file.Text(OverlaySection, key) is not string line) continue;
 
             rows ??= new List<OverlayRow>();
 
@@ -144,7 +150,7 @@ internal static class ConfFormat
             }
             else if (problem is not null)
             {
-                Log.Warn($"[{AppearanceSection}] {key}: {problem}");
+                Log.Warn($"[{OverlaySection}] {key}: {problem}");
                 spoilt = true;
             }
         }
@@ -153,7 +159,7 @@ internal static class ConfFormat
         // a line in the log than nothing at all over the game.
         if (spoilt && rows is { Count: 0 })
         {
-            Log.Warn($"[{AppearanceSection}]: no row was understood — the standard ones are used");
+            Log.Warn($"[{OverlaySection}]: no row was understood — the standard ones are used");
             return null;
         }
 
@@ -175,9 +181,6 @@ internal static class ConfFormat
 
         w.Note("Poll interval, seconds (1). Less than one is refused.")
          .Value("UpdateInterval", cfg.UpdateIntervalMs / Second).Blank();
-
-        w.Note("Show the panel over full-screen applications (true).")
-         .Value(nameof(cfg.ShowOverlayInGames), cfg.ShowOverlayInGames).Blank();
 
         w.Note("Spin the tray icon while no full-screen application is running (true).")
          .Value(nameof(cfg.SpinOnDesktop), cfg.SpinOnDesktop).Blank();
@@ -277,10 +280,13 @@ internal static class ConfFormat
          .Value("WarnGpuUsage", n.GpuUsage, "%");
 
         AppearanceConfig a = cfg.Appearance;
-        w.Section(AppearanceSection);
+        w.Section(OverlaySection);
 
         w.Note("The panel over a game; the tray icon and the status window follow the system theme.")
          .Blank();
+
+        w.Note("Show the panel over full-screen applications (true).")
+         .Value(EnableKey, cfg.ShowOverlayInGames).Blank();
 
         w.Note("Panel font — the first of these names present in the system.")
          .Value(nameof(a.FontFamily), a.FontFamily).Blank();
@@ -312,7 +318,15 @@ internal static class ConfFormat
                "  " + string.Join(", ", Enum.GetNames<OverlayMetric>().Take(8)),
                "  " + string.Join(", ", Enum.GetNames<OverlayMetric>().Skip(8)),
                "ExtraFans is one cell per name in ExtraFan above.")
-         .Values(RowKey, cfg.Appearance.Rows.Select(r => r.ToString()));
+         .Values(RowKey, cfg.Appearance.Rows.Select(r => r.ToString())).Blank();
+
+        w.Note("Full-screen applications the panel is not shown over: the names of their exe",
+               "files, separated by commas. * stands for any run of characters, ? for one;",
+               "case does not matter, and the .exe may be left off. A name with a backslash",
+               "is held against the whole path, as in C:\\Program Files\\VideoLAN\\*. An empty",
+               "list keeps nothing away. The name of every full-screen application the app",
+               "meets is written into the log — look there for what to put here.")
+         .Value(nameof(a.BlackListApplications), a.BlackListApplications);
 
         SpinnerConfig sp = cfg.Spinner;
         w.Section(SpinnerSection);

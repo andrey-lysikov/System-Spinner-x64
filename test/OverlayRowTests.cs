@@ -81,7 +81,7 @@ public class OverlayRowTests
     public void Ряды_читаются_из_конфига_по_порядку()
     {
         AppConfig cfg = ConfFormat.Read(
-            "[AppearanceFullScreen]\n" +
+            "[FullScreenOverlay]\n" +
             "Row1 = FPS: Fps, FrameTime\n" +
             "Row2 = CPU: CpuLoad\n");
 
@@ -91,7 +91,7 @@ public class OverlayRowTests
     [Fact]
     public void Без_параметров_ряды_остаются_по_умолчанию()
     {
-        AppConfig cfg = ConfFormat.Read("[AppearanceFullScreen]\nMargin = 4\n");
+        AppConfig cfg = ConfFormat.Read("[FullScreenOverlay]\nMargin = 4\n");
 
         Assert.Equal(new[] { "CPU", "GPU", "FPS" }, cfg.Appearance.Rows.Select(r => r.Title));
     }
@@ -100,7 +100,7 @@ public class OverlayRowTests
     public void Пустой_параметр_убирает_ряд()
     {
         AppConfig cfg = ConfFormat.Read(
-            "[AppearanceFullScreen]\n" +
+            "[FullScreenOverlay]\n" +
             "Row1 = CPU: CpuLoad\n" +
             "Row2 =\n");
 
@@ -156,7 +156,7 @@ public class OverlayRowTests
         // A mistake in the looks of a panel must not keep the app from starting: the row is
         // dropped, the reason goes to the log, the rest stands.
         AppConfig cfg = ConfFormat.Read(
-            "[AppearanceFullScreen]\n" +
+            "[FullScreenOverlay]\n" +
             "Row1 = CPU: CpuLoad\n" +
             "Row2 = GPU: Погода\n" +
             "Row3 = FPS: Fps\n");

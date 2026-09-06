@@ -2,6 +2,12 @@
 
 
 
+## 1.1
+
+* Rename the [AppearanceFullScreen] section to [FullScreenOverlay]
+* Add BlackListApplications to exclude from FullscreenOverlay
+
+
 ## 1.0.0
 
 * Now we have installs

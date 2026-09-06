@@ -116,13 +116,13 @@ internal static class Win32
     };
 
     // Whether the foreground window covers its whole monitor — how the overlay tells a game from
-    // the desktop.
-    public static bool TryFullscreenArea(out RECT work, out double scale)
+    // the desktop. The window itself is handed out too: the panel is kept away from some of them.
+    public static bool TryFullscreenArea(out RECT work, out double scale, out IntPtr hwnd)
     {
         work = default;
         scale = 1;
 
-        IntPtr hwnd = GetForegroundWindow();
+        hwnd = GetForegroundWindow();
         if (hwnd == IntPtr.Zero) return false;
 
         // The desktop and the taskbar formally cover the screen but are not games.
@@ -150,6 +150,40 @@ internal static class Win32
         work = info.rcWork;
         scale = ScaleOf(monitor);
         return true;
+    }
+
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, uint dwProcessId);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryFullProcessImageName(IntPtr hProcess, uint dwFlags, StringBuilder lpExeName, ref uint lpdwSize);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
+    // The full path of the exe behind a window, or null when the system keeps it back.
+    // Limited rights are enough here, so a protected process still names its file.
+    public static string? ProcessPathOf(IntPtr hWnd)
+    {
+        if (GetWindowThreadProcessId(hWnd, out uint pid) == 0 || pid == 0) return null;
+
+        IntPtr process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (process == IntPtr.Zero) return null;
+
+        try
+        {
+            var path = new StringBuilder(1024);
+            uint size = (uint)path.Capacity;
+            return QueryFullProcessImageName(process, 0, path, ref size) && size > 0 ? path.ToString() : null;
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
     }
 
     // The scale of one monitor: 1.5 at 150 per cent.

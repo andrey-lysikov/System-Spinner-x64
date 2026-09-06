@@ -24,6 +24,7 @@ This is the Windows version. If you are looking for macOS, go to [System Spinner
 - Spinner overlay effects
 - Customisable game overlay in full-screen mode
 - Localisation (English, Arabic, Chinese, French, German, Italian, Japanese, Russian)
+- Black list for some apllication in FullScreen mode
 
 *WARNING: the application is not officially signed, so Windows will ask you to allow it to run.*
 

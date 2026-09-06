@@ -15,6 +15,8 @@ public class UpdateCheckerTests
     [InlineData("1.0.0", "0.9.9")]
     [InlineData("0.5.1", "0.5.0")]
     [InlineData("0.10.0", "0.9.0")]   // as text "0.10.0" sorts before "0.9.0"
+    [InlineData("1.1", "1.0.0")]      // the older tags carry three numbers
+    [InlineData("1.2", "1.1")]
     public void Более_новая_версия_распознаётся(string latest, string current) =>
         Assert.True(UpdateChecker.IsNewer(latest, current));
 
@@ -22,6 +24,8 @@ public class UpdateCheckerTests
     [InlineData("0.5.0", "0.5.0")]    // the same one
     [InlineData("0.4.0", "0.5.0")]    // older on the server than here
     [InlineData("0.9.0", "0.10.0")]
+    [InlineData("1.1.0", "1.1")]      // a number left off is a zero, not an older version
+    [InlineData("1.1", "1.1.0")]
     public void Не_более_новая_версия_не_считается_обновлением(string latest, string current) =>
         Assert.False(UpdateChecker.IsNewer(latest, current));
 
@@ -34,11 +38,11 @@ public class UpdateCheckerTests
         Assert.False(UpdateChecker.IsNewer(latest, current));
 
     [Fact]
-    public void Своя_версия_состоит_из_трёх_чисел()
+    public void Своя_версия_состоит_из_двух_чисел()
     {
-        // The tags, the changelog and this check all speak in three numbers.
+        // The tags, the changelog and this check all speak in two numbers.
         string version = SystemSpinnerX64.AppParameters.Identity.Version;
 
-        Assert.Equal(3, version.Split('.').Length);
+        Assert.Equal(2, version.Split('.').Length);
     }
 }
