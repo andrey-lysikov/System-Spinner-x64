@@ -11,6 +11,7 @@ obj/
 *.suo
 
 # Files the app itself creates while it runs, next to the exe or in the project root.
+.DS_Store
 config.conf
 System-Spinner.log
 System-Spinner.log.old

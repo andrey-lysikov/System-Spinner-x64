@@ -1,0 +1,22 @@
+{
+  "dotnet.defaultSolution": "SystemSpinnerX64.sln",
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "installer/obj": true
+  },
+  "files.watcherExclude": {
+    "**/bin/**": true,
+    "**/obj/**": true,
+    "build/**": true
+  },
+  "search.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "build": true
+  },
+  "[csharp]": {
+    "editor.formatOnSave": true
+  },
+  "powershell.scriptAnalysis.enable": true
+}

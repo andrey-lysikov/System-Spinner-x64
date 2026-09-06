@@ -1,0 +1,74 @@
+{
+  // Every task runs plain dotnet: the same commands build.ps1 and build.sh use.
+  // The default build task is "publish" — it leaves build/System-Spinner.exe for Windows 11 x64.
+  "version": "2.0.0",
+  "options": {
+    "cwd": "${workspaceFolder}"
+  },
+  "presentation": {
+    "reveal": "always",
+    "panel": "shared",
+    "clear": true
+  },
+  "tasks": [
+    {
+      "label": "restore",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["restore", "SystemSpinnerX64.sln"],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build (Debug)",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "build", "src/SystemSpinnerX64.csproj",
+        "-c", "Debug",
+        "--nologo",
+        "-consoleLoggerParameters:NoSummary"
+      ],
+      "group": "build",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish (Release, win-x64)",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "publish", "src/SystemSpinnerX64.csproj",
+        "-c", "Release",
+        "-o", "build",
+        "--nologo",
+        "-consoleLoggerParameters:NoSummary"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "test (Windows only)",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["test", "test/SystemSpinnerX64.Tests.csproj", "-c", "Release", "--nologo"],
+      "group": "test",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "clean",
+      "type": "shell",
+      "command": "rm",
+      "args": ["-rf", "src/bin", "src/obj", "test/bin", "test/obj", "build/System-Spinner.exe"],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile", "-Command",
+          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/bin, src/obj, test/bin, test/obj, build/System-Spinner.exe"
+        ]
+      },
+      "problemMatcher": []
+    }
+  ]
+}

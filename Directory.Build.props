@@ -1,0 +1,9 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- On macOS and Linux the SDK refuses a Windows TFM without this switch; on Windows
+         it is not needed and stays unset, so the builds there do not change. -->
+    <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+</Project>
