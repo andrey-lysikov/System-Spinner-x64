@@ -170,8 +170,6 @@ internal static class ConfFormat
     {
         var w = new ConfFile.Writer();
 
-        w.Note(AppParameters.Identity.Name + " settings. Read once, at startup — restart after editing.");
-
         OsdConfig o = cfg.Osd;
         StatsConfig st = cfg.Stats;
         w.Section(General);
@@ -182,41 +180,29 @@ internal static class ConfFormat
         w.Note("Poll interval, seconds (1). Less than one is refused.")
          .Value("UpdateInterval", cfg.UpdateIntervalMs / Second).Blank();
 
-        w.Note("Spin the tray icon while no full-screen application is running (true).")
+        w.Note("Spin the tray icon while no full-screen application is running.")
          .Value(nameof(cfg.SpinOnDesktop), cfg.SpinOnDesktop).Blank();
 
-        w.Note("Log the whole course of work, not just problems (false).",
-               "The first run — the one that creates this file — is always logged in full.")
+        w.Note("Log the whole course of work, not just problems.")
          .Value(nameof(cfg.Debug), cfg.Debug ?? false).Blank();
 
-        w.Note("Take the volume and brightness keys even when no monitor answers over DDC (false).",
-               "Off, those keys are left to Windows whenever there is nothing to drive over DDC:",
-               "it changes the volume or the brightness itself and shows its own panel, and a",
-               "second panel of ours would only repeat it. On, the app takes the keys in every",
-               "case and shows its own panel for them — the Windows one is then kept out of sight.")
+        w.Note("Take the volume and brightness keys and show own OSD.")
          .Value(nameof(o.AlwaysUseCustomOsd), o.AlwaysUseCustomOsd).Blank();
 
-        w.Note("Steps from zero to full for volume and brightness (16).")
+        w.Note("Steps from zero to full for volume and brightness.")
          .Value("AdjustmentStepsOsd", o.AdjustmentSteps).Blank();
 
-        w.Note("Drive an external monitor over DDC/CI: its brightness, and its own speakers",
-               "(both on). The monitor's volume is kept in step with the Windows mixer — both",
-               "carry the same number, so one press is one step whichever of the two the sound",
-               "is listened through.")
+        w.Note("Drive an external monitor over DDC/CI: its brightness, and its own speakers.")
          .Value(nameof(o.ControlExternalBrightness), o.ControlExternalBrightness)
          .Value(nameof(o.ControlExternalVolume), o.ControlExternalVolume).Blank();
 
-        w.Note("Keys standing in for the brightness keys a keyboard has not got (Ctrl+F1/F2),",
-               "dimmer first. Ctrl, Alt, Shift and Win can be combined, F1 to F24; \"none\" turns",
-               "them off. A modifier is required — a bare key would be taken from every other",
-               "application. As soon as the keyboard's own brightness keys are pressed, \"native\"",
-               "is written here and nothing is registered any more.")
+        w.Note("Keys standing in for the brightness keys a keyboard has not got (Ctrl+F1/F2).")
          .Value(nameof(o.BrightnessKeys), o.BrightnessKeys).Blank();
 
-        w.Note("Look up the external address through checkip.dyndns.org (true).")
+        w.Note("Look up the external address through checkip.dyndns.org.")
          .Value(nameof(st.ShowExternalAddress), st.ShowExternalAddress).Blank();
 
-        w.Note("Chart points and process rows in the status window (500 and 12).")
+        w.Note("Chart points and process rows in the status window.")
          .Value("DetailHistoryPoints", st.HistoryPoints)
          .Value("DetailTopProcesses", st.TopProcesses);
 
@@ -224,10 +210,6 @@ internal static class ConfFormat
         FanConfig f = cfg.Fans;
         WarnConfig n = cfg.Warn;
         w.Section(Hardware);
-
-        w.Note("Sensor names the readings come from; the Intel and the AMD ones stand together.",
-               "Change a name when its value shows a dash: what your machine reports is written",
-               "into the log (Debug = true).").Blank();
 
         w.Note("Which GPU when there are several (0). The discrete one comes first.")
          .Value(nameof(cfg.GpuIndex), cfg.GpuIndex).Blank();
@@ -282,10 +264,7 @@ internal static class ConfFormat
         AppearanceConfig a = cfg.Appearance;
         w.Section(OverlaySection);
 
-        w.Note("The panel over a game; the tray icon and the status window follow the system theme.")
-         .Blank();
-
-        w.Note("Show the panel over full-screen applications (true).")
+        w.Note("The panel over a game.")
          .Value(EnableKey, cfg.ShowOverlayInGames).Blank();
 
         w.Note("Panel font — the first of these names present in the system.")
@@ -320,28 +299,15 @@ internal static class ConfFormat
                "ExtraFans is one cell per name in ExtraFan above.")
          .Values(RowKey, cfg.Appearance.Rows.Select(r => r.ToString())).Blank();
 
-        w.Note("Full-screen applications the panel is not shown over: the names of their exe",
-               "files, separated by commas. * stands for any run of characters, ? for one;",
-               "case does not matter, and the .exe may be left off. A name with a backslash",
-               "is held against the whole path, as in C:\\Program Files\\VideoLAN\\*. An empty",
-               "list keeps nothing away. The name of every full-screen application the app",
-               "meets is written into the log — look there for what to put here.")
+        w.Note("Full-screen applications the panel is not shown over.")
          .Value(nameof(a.BlackListApplications), a.BlackListApplications);
 
+        // The spinner keys speak for themselves; the sets and the effects are listed in the menu.
         SpinnerConfig sp = cfg.Spinner;
         w.Section(SpinnerSection);
 
-        w.Note("The tray icon outside full-screen applications; its speed follows the busier of",
-               "the processor and the card.",
-               "A set of one frame — App Icon, say — simply stands still.",
-               "  " + string.Join(", ", SpinnerCatalog.All.Select(x => x.Name)))
-         .Value(nameof(sp.Style), sp.Style).Blank();
-
-        w.Note("Colouring: Original, White, Black or Auto (Original). Sets that live by their own",
-               "colours ignore it.")
-         .Value(nameof(sp.Effect), sp.Effect.ToString()).Blank();
-
-        w.Note("Spin the frames backwards (false).")
+        w.Value(nameof(sp.Style), sp.Style)
+         .Value(nameof(sp.Effect), sp.Effect.ToString())
          .Value(nameof(sp.InvertRotation), sp.InvertRotation);
 
         return w.ToString();
