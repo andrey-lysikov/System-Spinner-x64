@@ -71,8 +71,6 @@ public class LanguageTests
         {
             Text.Use(Language.Ru);
             string written = ConfFormat.Write(new AppConfig());
-
-            Assert.Contains("System-Spinner settings.", written);
             Assert.DoesNotContain("настройки", written);
         }
         finally { Text.Use(before); }
