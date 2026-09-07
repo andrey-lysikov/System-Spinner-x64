@@ -71,9 +71,20 @@ public sealed class DisplayManager : IDisposable
             }
         }
 
-        Log.Info($"displays: {_displays.Count} found, brightness control " +
-                 $"{(HasBrightnessControl ? "available" : "unavailable")}");
+        // The screens are re-polled every hour and on every change of the sound device, so the
+        // same line would repeat all day. What is worth keeping without Debug is the moment it
+        // reads differently: a monitor plugged in, unplugged, or gone quiet over DDC/CI.
+        string summary = $"displays: {_displays.Count} found ({string.Join(", ", DisplayNames.Select(d => d.Name))}), " +
+                         $"brightness control {(HasBrightnessControl ? "available" : "unavailable")}";
+
+        if (summary == _lastSummary) Log.Info(summary);
+        else Log.Event(_lastSummary is null ? summary : summary + " — this is a change");
+
+        _lastSummary = summary;
     }
+
+    // What Refresh() reported last time, to tell a change from the hourly look.
+    private string? _lastSummary;
 
     private double Step => 100.0 / Math.Clamp(_cfg.AdjustmentSteps,
                                               AppParameters.Limits.MinAdjustmentSteps,
@@ -96,20 +107,13 @@ public sealed class DisplayManager : IDisposable
             return MediaKeyResult.PassThrough;
 
         DisplayDevice? screen = BrightnessTarget();
-
-        // HDR is asked about the screen being looked at, not about the one that can be driven: in
-        // HDR a monitor may stop answering the brightness command, and then there is no such screen.
-        DisplayDevice? looked = InFront();
-        bool hdr = looked is not null && HdrControl.IsOn(looked.GdiName);
-
         MediaKeyResult result = MediaKeyRules.Brightness(DrivesBrightnessOverDdc, _cfg.AlwaysUseCustomOsd,
-                                                         screen is not null, hdr);
+                                                         screen is not null);
 
         // Only with the full record: a line per press, and it is what says which way the decision
         // went when the keys do something other than what was expected.
         Log.Info($"brightness key: ddc={Yes(DrivesBrightnessOverDdc)} always={Yes(_cfg.AlwaysUseCustomOsd)} " +
-                 $"target=\"{screen?.GdiName ?? "none"}\" screen=\"{looked?.GdiName ?? "none"}\" " +
-                 $"hdr={Yes(hdr)} -> {result}");
+                 $"target=\"{screen?.GdiName ?? "none"}\" -> {result}");
 
         if (result != MediaKeyResult.Consumed || screen is null) return result;
 
@@ -117,14 +121,6 @@ public sealed class DisplayManager : IDisposable
         screen.SetBrightness(shown);
 
         return result;
-    }
-
-    // The screen being looked at, driveable or not: the one the pointer is on.
-    private DisplayDevice? InFront()
-    {
-        IntPtr active = Win32.MonitorUnderPointer();
-
-        return _displays.FirstOrDefault(d => d.Monitor == active) ?? _displays.FirstOrDefault();
     }
 
     // The screen under the pointer where it can be driven, otherwise the first that can.

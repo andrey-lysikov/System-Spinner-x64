@@ -4,7 +4,6 @@
 using System;
 using System.IO;
 using SystemSpinnerX64.Configuration;
-using SystemSpinnerX64.Diagnostics;
 using Xunit;
 
 namespace SystemSpinnerX64.Tests;

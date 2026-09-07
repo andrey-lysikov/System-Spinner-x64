@@ -89,8 +89,6 @@ public sealed class MetricsService : IDisposable
 
     public void Stop() => _timer.Stop();
 
-    public bool IsRunning => _timer.IsEnabled;
-
     // Changes the poll period on the fly — from the tray menu.
     public void SetInterval(int milliseconds)
     {

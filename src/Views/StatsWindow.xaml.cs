@@ -296,7 +296,7 @@ public partial class StatsWindow : Window
 
     private void ShowDetail(DetailKind kind)
     {
-        _detail ??= new DetailWindow(_cfg) { Owner = this };
+        _detail ??= new DetailWindow { Owner = this };
 
         // Clicking the same icon again closes it: this is a toggle, not a button, and there is no
         // other way to close it without moving the mouse away.

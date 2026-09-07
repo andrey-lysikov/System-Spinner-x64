@@ -7,7 +7,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Forms;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using SystemSpinnerX64.Configuration;
@@ -111,7 +110,7 @@ public sealed class ModeSupervisor : IDisposable
         _displayTimer.Interval = AppParameters.Displays.AudioCheckPeriod;
         _displayTimer.Tick += (_, _) => WatchDisplays();
 
-        // A screen that has just changed mode — woken up, come out of HDR — answers nothing over
+        // A screen that has just changed mode — woken up, switched resolution — answers nothing over
         // DDC for a few seconds, and one asked too early is written off as unable until the hourly
         // look. So it is asked again after a pause, and again while it stays silent.
         _wakeTimer.Interval = AppParameters.Displays.ResumeDelay;
@@ -170,19 +169,16 @@ public sealed class ModeSupervisor : IDisposable
         // The first check right away rather than in a second: the app may have been started from a game.
         UpdateMode();
 
-        Log.Info("started");
+        Log.Event("started");
     }
 
     // --- Switching faces ---
 
     private void UpdateMode()
     {
-        Win32.RECT screen = default;
-        double scale = 1;
-
         // Full screen is decided on its own, without asking whether the panel is wanted: the tray
         // icon is hidden behind a game either way, and an animation nobody can see is pure waste.
-        bool inGame = Win32.TryFullscreenArea(out screen, out scale, out IntPtr window);
+        bool inGame = Win32.TryFullscreenArea(out Win32.RECT screen, out double scale, out IntPtr window);
 
         if (inGame == _inGame)
         {
@@ -216,7 +212,7 @@ public sealed class ModeSupervisor : IDisposable
         // What actually happened, not what usually happens: with a second monitor the tray icon
         // stays in sight and the animation with it, and a line claiming otherwise sends the next
         // reader hunting for a fault that is not there.
-        Log.Info(inGame
+        Log.Event(inGame
             ? "a full-screen application is active — spinner " +
               (TrayHidden ? "stopped: the tray icon is covered"
                           : $"still running: the tray icon is in sight on {_screenCount} screens")
@@ -238,13 +234,13 @@ public sealed class ModeSupervisor : IDisposable
         string? path = Win32.ProcessPathOf(window);
         if (path is null)
         {
-            Log.Info("the full-screen application would not tell its name");
+            Log.Event("the full-screen application would not tell its name");
             return false;
         }
 
         ProcessPattern? hit = ProcessPattern.Find(_excludedApps, path);
 
-        Log.Info(hit is null
+        Log.Event(hit is null
             ? $"full-screen application: {path}"
             : $"full-screen application: {path} — on the black list as \"{hit.Text}\", no panel over it");
 
@@ -291,19 +287,23 @@ public sealed class ModeSupervisor : IDisposable
         // the panel leaves it unclear whether it failed or was never asked for.
         if (!_cfg.ShowOverlayInGames)
         {
-            Log.Info("the panel is off in the config — nothing is shown over the game");
+            Log.Event("the panel is off in the config — nothing is shown over the game");
             return;
         }
 
         if (_overlayExcluded)
         {
-            Log.Info("the application is on the black list — nothing is shown over it");
+            Log.Event("the application is on the black list — nothing is shown over it");
             return;
         }
 
         _overlay.ApplyLayout();
         _overlay.Visibility = Visibility.Visible;
         _overlay.KeepOnTop();
+
+        // The other half of the pair above: a log that says the panel was not shown, and never
+        // says when it was, answers only one of the two questions ever asked about it.
+        Log.Event("the panel is up over the game");
 
         _fps.Start();
         if (_fps.Status is { Length: > 0 } status)
@@ -361,7 +361,7 @@ public sealed class ModeSupervisor : IDisposable
     {
         _overlayModel.ApplyFps(_fps.Average(), _fps.FrameTimeMs());
 
-        if (_fps.Api != _fpsApi) Log.Info($"frame source: {_fpsApi = _fps.Api}");
+        if (_fps.Api != _fpsApi) Log.Event($"frame source: {_fpsApi = _fps.Api}");
     }
 
     // Writes to the log what the panel shows — for checking against Task Manager or HWiNFO.
@@ -477,7 +477,7 @@ public sealed class ModeSupervisor : IDisposable
 
         if (wanted.Trim().Equals(OsdConfig.NativeKeys, StringComparison.OrdinalIgnoreCase))
         {
-            Log.Info("brightness keys: the keyboard's own");
+            Log.Event("brightness keys: the keyboard's own");
             return;
         }
 
@@ -491,14 +491,14 @@ public sealed class ModeSupervisor : IDisposable
 
         if (spec is null)
         {
-            Log.Info("brightness keys: turned off");
+            Log.Event("brightness keys: turned off");
             return;
         }
 
         _keys.NativeKeysSeen = OnNativeBrightnessKeys;
 
         if (_keys.StartBrightnessKeys(spec.Value))
-            Log.Info($"brightness keys: {spec.Value.Describe}, until the keyboard's own are pressed");
+            Log.Event($"brightness keys: {spec.Value.Describe}, until the keyboard's own are pressed");
     }
 
     // The keyboard has the real keys after all. The combination is already given back; what is
@@ -508,7 +508,7 @@ public sealed class ModeSupervisor : IDisposable
         _keys.NativeKeysSeen = null;
         _cfg.Osd.BrightnessKeys = OsdConfig.NativeKeys;
 
-        Log.Info("the keyboard has brightness keys of its own: the stand-in keys are released");
+        Log.Event("the keyboard has brightness keys of its own: the stand-in keys are released");
 
         if (_cfg.SaveSomewhere() is null)
             Log.Warn("could not write the config — the stand-in keys will be registered again next time");
@@ -543,8 +543,7 @@ public sealed class ModeSupervisor : IDisposable
                 return MediaKeyResult.PassThrough;
         }
 
-        // Nothing to drive: the key goes to the system, which shows its own panel. Silent means it
-        // is ours but there is nothing true to show — a monitor in HDR ignores brightness commands.
+        // Nothing to drive: the key goes to the system, which shows its own panel.
         if (result == MediaKeyResult.Consumed) _osd.Show(value, kind);
 
         return result;
@@ -583,7 +582,6 @@ public sealed class ModeSupervisor : IDisposable
         {
             _tray.Rebuild();
             _tray.ShowDisplays(_displays.DisplayNames);
-            _tray.ShowHdr();
         };
 
         _tray.ExitRequested += () => System.Windows.Application.Current.Shutdown();
@@ -632,10 +630,6 @@ public sealed class ModeSupervisor : IDisposable
 
         _displays.Refresh();
         _tray.ShowDisplays(_displays.DisplayNames);
-
-        // HDR is switched elsewhere too — in the display settings, by a game, by the screen being
-        // swapped — so the ticks are read anew along with the screens rather than remembered.
-        _tray.ShowHdr();
 
         Log.Info($"displays rescanned: {why}");
     }
@@ -708,7 +702,7 @@ public sealed class ModeSupervisor : IDisposable
 
             RescanDisplays("the screen configuration changed");
 
-            // The mode may still be settling — coming out of HDR a monitor goes quiet over DDC for
+            // The mode may still be settling — a monitor just switched goes quiet over DDC for
             // a few seconds — so the screens are asked again in a while.
             Settle("the screen configuration settled");
         });

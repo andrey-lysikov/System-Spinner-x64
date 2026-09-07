@@ -7,8 +7,6 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using SystemSpinnerX64.Configuration;
-using SystemSpinnerX64.Diagnostics;
 using SystemSpinnerX64.Platform;
 using SystemSpinnerX64.Views;
 
@@ -18,16 +16,13 @@ namespace SystemSpinnerX64.Osd;
 // from Windows 11 rather than from Liquid Glass.
 public partial class OsdWindow : Window
 {
-    private readonly AppConfig _cfg;
-
     private IntPtr _handle;
     private bool _acrylic;
     private bool _dark;
 
-    public OsdWindow(AppConfig cfg)
+    public OsdWindow()
     {
         InitializeComponent();
-        _cfg = cfg;
         Opacity = 0;
     }
 

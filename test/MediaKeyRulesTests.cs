@@ -23,7 +23,7 @@ public class MediaKeyRulesTests
     {
         Assert.Equal(MediaKeyResult.PassThrough,
                      MediaKeyRules.Brightness(drivesOverDdc: false, alwaysCustomOsd: false,
-                                              targetFound: true, screenInHdr: false));
+                                              targetFound: true));
     }
 
     [Fact]
@@ -31,33 +31,7 @@ public class MediaKeyRulesTests
     {
         Assert.Equal(MediaKeyResult.Consumed,
                      MediaKeyRules.Brightness(drivesOverDdc: true, alwaysCustomOsd: false,
-                                              targetFound: true, screenInHdr: false));
-    }
-
-    [Fact]
-    public void Яркость_в_HDR_молчит()
-    {
-        Assert.Equal(MediaKeyResult.Silent,
-                     MediaKeyRules.Brightness(drivesOverDdc: true, alwaysCustomOsd: false,
-                                              targetFound: true, screenInHdr: true));
-    }
-
-    [Fact]
-    public void Яркость_в_HDR_молчит_и_когда_монитор_перестал_отвечать()
-    {
-        // In HDR the monitor may stop answering the brightness command, and then there is no
-        // screen to drive at all — the silence has to win over "show it anyway".
-        Assert.Equal(MediaKeyResult.Silent,
-                     MediaKeyRules.Brightness(drivesOverDdc: false, alwaysCustomOsd: true,
-                                              targetFound: false, screenInHdr: true));
-    }
-
-    [Fact]
-    public void Яркость_в_HDR_молчит_и_при_включенном_своем_OSD()
-    {
-        Assert.Equal(MediaKeyResult.Silent,
-                     MediaKeyRules.Brightness(drivesOverDdc: true, alwaysCustomOsd: true,
-                                              targetFound: true, screenInHdr: true));
+                                              targetFound: true));
     }
 
     [Fact]
@@ -66,11 +40,11 @@ public class MediaKeyRulesTests
         // Nothing found to move: the key goes back unless the custom OSD was demanded.
         Assert.Equal(MediaKeyResult.PassThrough,
                      MediaKeyRules.Brightness(drivesOverDdc: true, alwaysCustomOsd: false,
-                                              targetFound: false, screenInHdr: false));
+                                              targetFound: false));
 
         Assert.Equal(MediaKeyResult.Consumed,
                      MediaKeyRules.Brightness(drivesOverDdc: true, alwaysCustomOsd: true,
-                                              targetFound: false, screenInHdr: false));
+                                              targetFound: false));
     }
 
     [Theory]

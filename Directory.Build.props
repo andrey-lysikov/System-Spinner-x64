@@ -6,4 +6,25 @@
     <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
   </PropertyGroup>
 
+  <!-- Everything the compiler leaves behind goes under build\, next to the finished exe, instead
+       of beside the sources. The two build scripts then have one pair of folders to sweep up
+       rather than four, and a build started from an IDE leaves src\ and test\ untouched.
+
+       This has to live here rather than in the csproj: NuGet works out where to put
+       project.assets.json from BaseIntermediateOutputPath while Microsoft.Common.props is being
+       read, which is before any csproj gets a say. Set there, it would be too late and restore
+       would carry on writing into obj\ beside the project.
+
+       Forward slashes on purpose: the exe is also published from macOS through build.sh, and a
+       backslash is an ordinary character in a path there — "build\obj" would become one folder
+       with a backslash in its name. $(MSBuildThisFileDirectory) already ends in the separator
+       of whichever system is building.
+
+       The project name in the path keeps the app and the tests apart; without it the two would
+       write over each other. -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)build/obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)build/bin/$(MSBuildProjectName)/</BaseOutputPath>
+  </PropertyGroup>
+
 </Project>

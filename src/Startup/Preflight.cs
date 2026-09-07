@@ -23,18 +23,18 @@ internal static class Preflight
         if (PlatformGuard.DescribeOs() is { Length: > 0 } osProblem)
             return PreflightResult.Stop(osProblem);
 
-        Log.Info($"Windows {Environment.OSVersion.Version}");
+        Log.Event($"Windows {Environment.OSVersion.Version}");
 
         // A remote desktop explains at a glance half of what the log shows afterwards: one screen
-        // instead of the monitors on the card, no brightness, no HDR. Without this line all of it
+        // instead of the monitors on the card, no brightness. Without this line all of it
         // reads as a failure.
         if (Win32.IsRemoteSession)
-            Log.Info("remote session: the desktop is on the virtual display of the remote adapter — " +
-                     "the monitors on the graphics card are out of reach, and with them DDC/CI and HDR");
+            Log.Event("remote session: the desktop is on the virtual display of the remote adapter — " +
+                     "the monitors on the graphics card are out of reach, and with them DDC/CI");
 
         // 2. The config.
         var cfg = AppConfig.Load();
-        Log.Info(cfg.LoadedFromFile ? $"config loaded: {cfg.Path}" : "no config, using defaults");
+        Log.Event(cfg.LoadedFromFile ? $"config loaded: {cfg.Path}" : "no config, using defaults");
 
         // The interface language right after reading the file: the tray menu is built later.
         Text.Use(cfg.Language);
@@ -43,7 +43,7 @@ internal static class Preflight
         // mean edits in it simply have no effect.
         if (!AppConfig.PortableAllowed)
         {
-            Log.Info($"the exe is in a system folder — config and log go to {AppConfig.FallbackDirectory}");
+            Log.Event($"the exe is in a system folder — config and log go to {AppConfig.FallbackDirectory}");
 
             if (System.IO.File.Exists(AppConfig.PortablePath))
                 Log.Warn($"the file {AppConfig.PortablePath} is no longer used: settings do " +
@@ -68,7 +68,7 @@ internal static class Preflight
         // A section the file has not got — a new version brought it — is written in with defaults.
         bool sectionsMissing = cfg.MissingSections.Count > 0;
         if (sectionsMissing)
-            Log.Info("no [" + string.Join("], [", cfg.MissingSections) + "] in the config: " +
+            Log.Event("no [" + string.Join("], [", cfg.MissingSections) + "] in the config: " +
                      "written in with the standard settings");
 
         if (cfg.LoadError is { Length: > 0 } configError)
@@ -84,7 +84,7 @@ internal static class Preflight
         try
         {
             hw.Open();
-            Log.Info($"sensors opened: CPU \"{hw.CpuName}\", GPU \"{hw.GpuName}\"");
+            Log.Event($"sensors opened: CPU \"{hw.CpuName}\", GPU \"{hw.GpuName}\"");
 
             // Before the icon appears: the sensor list is needed exactly when something will not start.
             if (Environment.GetCommandLineArgs()
@@ -145,7 +145,7 @@ internal static class Preflight
             return;
         }
 
-        Log.Info($"config file {(existed ? "updated" : "created")}: {path}");
+        Log.Event($"config file {(existed ? "updated" : "created")}: {path}");
         Log.Info($"if the fan layout is wrong, fix it in the same file; reference: {ConfigDoc}");
     }
 

@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using SystemSpinnerX64.Diagnostics;
 using SystemSpinnerX64.Localization;
 
 namespace SystemSpinnerX64.Configuration;

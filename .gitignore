@@ -1,5 +1,6 @@
-# The finished exe, and what the compiler leaves next to the sources — build.ps1 clears the
-# latter after every run, so these are here for builds started from an IDE.
+# The finished exe and everything the compiler leaves behind: both live under build/ now, see
+# Directory.Build.props. The two bare names below are a safety net for a tool that ignores those
+# settings and writes beside the sources after all.
 build/
 bin/
 obj/
@@ -14,5 +15,5 @@ obj/
 .DS_Store
 config.conf
 System-Spinner.log
-System-Spinner.log.old
+System-Spinner.log.*
 sensors-found.txt

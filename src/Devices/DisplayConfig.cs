@@ -9,8 +9,7 @@ using SystemSpinnerX64.Diagnostics;
 namespace SystemSpinnerX64.Devices;
 
 // The Windows display configuration: the paths from a graphics adapter to a screen. This is where
-// the names shown in the display settings live — "XV320QU LV" rather than "Generic PnP Monitor" —
-// and where the HDR switch is kept.
+// the names shown in the display settings live — "XV320QU LV" rather than "Generic PnP Monitor".
 internal static class DisplayConfig
 {
     [StructLayout(LayoutKind.Sequential)]
@@ -203,39 +202,6 @@ internal static class DisplayConfig
     // interface that never left the drawing board, and a monitor on a dock was being told it had
     // no speakers because of it.
     private const uint UsbTunnel = 18;
-
-    // Whether nothing physical hangs on this path: a display driven by an indirect driver rather
-    // than by an output of the graphics card — the virtual screen of a remote session, a
-    // screen-sharing tool, a tablet used as a second monitor. Such a target answers the display
-    // configuration like any other and may even claim advanced colour, but nothing it claims
-    // reaches a panel, and every switch thrown at it fails.
-    public static bool IsVirtual(uint technology) => technology switch
-    {
-        IndirectWired or IndirectVirtual or Miracast or Other => true,
-        _ => false
-    };
-
-    private const uint Miracast = 15;
-    private const uint IndirectWired = 16;
-    private const uint IndirectVirtual = 17;
-    private const uint Other = 0xFFFFFFFF;
-
-    // For the log: the kind of connection, in the words the display settings use.
-    public static string TechnologyName(uint technology) => technology switch
-    {
-        Hdmi => "HDMI",
-        DisplayPortExternal => "DisplayPort",
-        DisplayPortEmbedded => "embedded DisplayPort",
-        UsbTunnel => "USB-C",
-        Miracast => "Miracast",
-        IndirectWired => "indirect",
-        IndirectVirtual => "virtual",
-        Other => "other",
-        Internal => "internal",
-        _ => $"technology {technology}"
-    };
-
-    private const uint Internal = 0x80000000;
 
     // The name the rest of Windows knows the screen by: "\\.\DISPLAY1".
     public static string SourceName(Luid adapter, uint source)

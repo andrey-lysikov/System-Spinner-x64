@@ -30,7 +30,7 @@ public sealed class OsdController : IDisposable
     {
         // The window is built on first use: the app may run all day without anyone touching the
         // volume, and parsing the markup up front would be paid for nothing.
-        _window ??= new OsdWindow(_cfg);
+        _window ??= new OsdWindow();
 
         _window.Show(percent, kind, _cfg.Osd.AdjustmentSteps);
 

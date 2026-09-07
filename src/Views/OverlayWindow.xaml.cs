@@ -10,7 +10,6 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
-using SystemSpinnerX64.Monitoring;
 using SystemSpinnerX64.Platform;
 using SystemSpinnerX64.ViewModels;
 

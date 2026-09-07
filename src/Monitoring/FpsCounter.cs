@@ -8,7 +8,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Platform;

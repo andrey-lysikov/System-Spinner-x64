@@ -55,9 +55,14 @@ internal static class UpdateChecker
             if (latest.Length == 0) return null;
 
             string current = AppParameters.Identity.Version;
-            Log.Info($"update check: running {current}, latest {latest}");
+            bool newer = IsNewer(latest, current);
 
-            return new Result(current, latest, IsNewer(latest, current));
+            // A release worth acting on is kept whatever Debug says — the daily check is the only
+            // place it is ever said. "Nothing new" is part of the course of work and goes with it.
+            if (newer) Log.Event($"update available: running {current}, latest {latest}");
+            else Log.Info($"update check: running {current}, latest {latest}");
+
+            return new Result(current, latest, newer);
         }
         catch (Exception ex)
         {

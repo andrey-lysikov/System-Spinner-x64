@@ -2,6 +2,13 @@
 
 
 
+## 1.2
+
+* Fix the installer if it found older version
+* Update log events
+* Optimisation
+
+
 ## 1.1
 
 * Rename the [AppearanceFullScreen] section to [FullScreenOverlay]

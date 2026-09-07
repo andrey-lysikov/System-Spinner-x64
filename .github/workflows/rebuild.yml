@@ -17,7 +17,14 @@ permissions:
   contents: write
 
 jobs:
+  # Started by hand, so nothing else has tested this commit: tests.yml answers pushes, and a
+  # manual run of this workflow is not one. Hence the tests here, ahead of the build, from the
+  # same file the other workflows use.
+  test:
+    uses: ./.github/workflows/tests.yml
+
   rebuild:
+    needs: test
     runs-on: windows-latest
 
     steps:
@@ -45,19 +52,23 @@ jobs:
 
           # The installer carries a version of its own, and it has to be the one on the release
           # page rather than whatever the branch has moved on to.
+          #
+          # Two numbers or three: the tags up to 1.0.0 carried three, everything from 1.1 on
+          # carries two — the csproj is what the tag is made from, and the app names itself in
+          # two everywhere. Demanding three here made the newest release impossible to rebuild.
           $version = $tag -replace '^v', ''
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "The tag $tag is not a version." }
+          if ($version -notmatch '^\d+\.\d+(\.\d+)?$') { throw "The tag $tag is not a version." }
 
           "tag=$tag"         >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Build
         shell: pwsh
-        # The same script a developer runs: tests first, then the exe, then the installer around
-        # it. The version is the one of the release being rebuilt rather than of the branch: the
-        # tag stays as it is, and an installer announcing another number would contradict the
-        # page it hangs on.
-        run: ./build.ps1 -Installer -Version ${{ steps.target.outputs.version }}
+        # The same script a developer runs: the exe, then the installer around it. The tests are
+        # left out because the job above has already run them. The version is the one of the
+        # release being rebuilt rather than of the branch: the tag stays as it is, and an
+        # installer announcing another number would contradict the page it hangs on.
+        run: ./build.ps1 -Installer -SkipTests -Version ${{ steps.target.outputs.version }}
 
       - name: Replace the installer
         shell: pwsh

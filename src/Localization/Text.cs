@@ -108,28 +108,6 @@ internal static class Text
         "Superposition plein écran", "Vollbild-Overlay", "Overlay a schermo intero",
         "全画面オーバーレイ");
 
-    // HDR is written the same way everywhere — the submenu title only says what it belongs to.
-    public static string MenuHdr => S(
-        "HDR", "HDR", "‏HDR", "HDR",
-        "HDR", "HDR", "HDR", "HDR");
-
-    // Stands in the HDR submenu when not a single screen carries it: an empty greyed-out submenu
-    // would read as a broken menu item.
-    public static string HdrUnavailable => S(
-        "Not supported", "Не поддерживается", "غير مدعوم", "不支持",
-        "Non pris en charge", "Nicht unterstützt", "Non supportato", "非対応");
-
-    // Windows refused the switch: a duplicated desktop or a mode that does not carry HDR.
-    public static string HdrFailed(string display) => S(
-        $"Windows did not switch HDR on \"{display}\"",
-        $"Windows не переключила HDR на «{display}»",
-        $"لم يبدّل Windows‏ HDR على «{display}»",
-        $"Windows 未能切换“{display}”的 HDR",
-        $"Windows n'a pas basculé le HDR sur « {display} »",
-        $"Windows hat HDR auf „{display}“ nicht umgeschaltet",
-        $"Windows non ha commutato l'HDR su «{display}»",
-        $"Windows は「{display}」の HDR を切り替えませんでした");
-
     public static string MenuOpenConfig => S(
         "Open config.conf", "Открыть config.conf", "فتح config.conf", "打开 config.conf",
         "Ouvrir config.conf", "config.conf öffnen", "Apri config.conf", "config.conf を開く");

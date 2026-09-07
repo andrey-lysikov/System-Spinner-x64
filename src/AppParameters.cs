@@ -269,11 +269,21 @@ internal static class AppParameters
     // The log file.
     internal static class Logging
     {
-        // Past this the log is rotated: one previous file is kept, the rest is dropped.
-        public const long MaxBytes = 1_000_000;
+        // Past this the log is rotated to <name>.log.1, pushing the older numbers up.
+        public const long MaxBytes = 1024 * 1024;
 
-        // How often the size is checked, in lines written.
-        public const int SizeCheckEvery = 100;
+        // Kept as .log.1 through .log.<this>; whatever would become the next number is deleted
+        // instead. A week of runs is enough to look back over, and no more than that piles up.
+        public const int MaxRotations = 7;
+
+        // How often the size is checked, in lines written — not on every write.
+        public const int CheckEveryLines = 100;
+
+        // Continuation lines are indented to the width of "timestamp + tag ".
+        public const int ContinuationIndent = 30;
+
+        // How long a repeating complaint is kept quiet after it has been made once.
+        public static readonly TimeSpan RepeatAfter = TimeSpan.FromSeconds(30);
     }
 
     // What the config is allowed to ask for.

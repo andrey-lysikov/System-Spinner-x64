@@ -183,7 +183,7 @@ internal static class ConfFormat
         w.Note("Spin the tray icon while no full-screen application is running.")
          .Value(nameof(cfg.SpinOnDesktop), cfg.SpinOnDesktop).Blank();
 
-        w.Note("Log the whole course of work, not just problems.")
+        w.Note("Log the whole course of work, not only events, warnings and errors.")
          .Value(nameof(cfg.Debug), cfg.Debug ?? false).Blank();
 
         w.Note("Take the volume and brightness keys and show own OSD.")

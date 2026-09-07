@@ -1,0 +1,17 @@
+# Line endings, fixed here rather than left to whatever core.autocrlf each machine happens to
+# carry. The exe is built on Windows and on macOS, and build.sh is the half that runs there: with
+# CRLF in it the shell reads the shebang as "/usr/bin/env bash\r" and answers "bad interpreter".
+* text=auto
+
+*.sh    text eol=lf
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+
+# Left alone byte for byte: the icon and the frames of the tray animation are read as resources,
+# and the licence the installer shows is RTF.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.ico   binary
+*.rtf   binary

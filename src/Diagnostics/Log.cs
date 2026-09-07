@@ -2,20 +2,27 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
 
 namespace SystemSpinnerX64.Diagnostics;
 
-// A log file next to config.conf.
+// A log file next to config.conf. The only diagnostic channel this application has: there is no
+// window to print to, so somebody reporting a problem sends this file, and it has to answer the
+// question on its own — including from a run where Debug was never switched on.
 public static class Log
 {
     private static readonly object Gate = new();
 
     private static string? _path;
-    private static LogLevel _level = LogLevel.Info;
-    private static int _writes;
+
+    // Until the config says otherwise everything is written: the config is read after the log is
+    // opened, and the lines from before it would be the ones missing.
+    private static bool _verbose = true;
+
+    private static int _linesSinceSizeCheck;
 
     public static string? Path
     {
@@ -37,7 +44,7 @@ public static class Log
                     System.IO.Directory.CreateDirectory(dir);
                     string path = System.IO.Path.Combine(dir, AppParameters.Identity.LogFile);
 
-                    RotateIfBig(path);
+                    Rotate(path);
 
                     // The first line is written here rather than through Write(): that one swallows
                     // errors, and a folder without write access would look like a log that opened
@@ -56,21 +63,28 @@ public static class Log
         }
     }
 
-    // Everything is written until this is called. Debug keeps it that way; without it only what
-    // got in the way is written — warnings and errors.
+    // Everything is written until this is called. Debug keeps it that way; without it the course
+    // of work and the key presses drop out, and what happened to the machine stays.
     public static void SetVerbose(bool verbose)
     {
-        LogLevel level = verbose ? LogLevel.Info : LogLevel.Warn;
-
         lock (Gate)
         {
-            if (_level == level) return;
-            _level = level;
-            if (_path is not null) Write(verbose ? "debug logging on" : "debug logging off");
+            if (_verbose == verbose) return;
+            _verbose = verbose;
         }
+
+        Event(verbose
+            ? "debug logging on: the whole course of work goes into this file"
+            : "debug logging off: events, warnings and errors are still kept — " +
+              "set Debug = true in [General] for the rest");
     }
 
+    // The course of work. Kept only while Debug is on.
     public static void Info(string message) => Add(LogLevel.Info, message);
+
+    // Something that happened to the machine rather than inside this application: a screen found
+    // or lost, autostart changed, the app started or stopped. Kept whatever Debug says.
+    public static void Event(string message) => Add(LogLevel.Event, message);
 
     public static void Warn(string message) => Add(LogLevel.Warn, message);
 
@@ -96,32 +110,57 @@ public static class Log
             }
         }
 
-        Add(LogLevel.Error, text.ToString());
+        Add(LogLevel.Crash, text.ToString());
     }
 
     // A key seen by the hook or read from the raw input. Part of the full record, and only written
     // with it — but under a tag of its own: a line per press would drown the rest otherwise.
-    public static void Key(string message) => Add(LogLevel.Info, message, "KEY  ");
+    public static void Key(string message) => Add(LogLevel.Key, message);
 
-    private static void Add(LogLevel level, string message, string? tag = null)
+    private static readonly Dictionary<string, DateTime> LastSaid = new();
+
+    // A warning from somewhere that runs many times a second — a poll, a redraw, a device that
+    // answers nothing. Said once, then held for a while however often it recurs; subject is what
+    // counts as "the same complaint".
+    public static void WarnOccasionally(string subject, string message)
     {
         lock (Gate)
         {
-            if (_path is null || level > _level) return;
+            DateTime now = DateTime.UtcNow;
+            if (LastSaid.TryGetValue(subject, out DateTime last) &&
+                now - last < AppParameters.Logging.RepeatAfter) return;
+
+            LastSaid[subject] = now;
+        }
+
+        Add(LogLevel.Warn, message);
+    }
+
+    private static void Add(LogLevel level, string message)
+    {
+        lock (Gate)
+        {
+            if (_path is null) return;
+            if (!_verbose && level is LogLevel.Info or LogLevel.Key) return;
 
             string stamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
 
             // Multi-line explanations are indented to the margin, or the log is unreadable by eye.
+            string indent = new(' ', AppParameters.Logging.ContinuationIndent);
             string[] lines = message.Replace("\r\n", "\n").Split('\n');
-            Write($"{stamp} {tag ?? Tag(level)} {lines[0]}");
-            for (int i = 1; i < lines.Length; i++) Write($"{new string(' ', 30)}{lines[i]}");
+
+            Write($"{stamp} {Tag(level)} {lines[0]}");
+            for (int i = 1; i < lines.Length; i++) Write($"{indent}{lines[i]}");
         }
     }
 
     private static string Tag(LogLevel level) => level switch
     {
-        LogLevel.Error => "ERROR",
+        LogLevel.Event => "EVENT",
         LogLevel.Warn => "WARN ",
+        LogLevel.Error => "ERROR",
+        LogLevel.Crash => "CRASH",
+        LogLevel.Key => "KEY  ",
         _ => "INFO "
     };
 
@@ -130,9 +169,15 @@ public static class Log
     {
         try
         {
-            if (++_writes % AppParameters.Logging.SizeCheckEvery == 0) RotateIfBig(_path!);
+            if (++_linesSinceSizeCheck >= AppParameters.Logging.CheckEveryLines)
+            {
+                _linesSinceSizeCheck = 0;
+                Rotate(_path!);
+            }
 
-            // The BOM appears only for a new file — StreamWriter writes the preamble at position zero.
+            // Opened and closed per line: the process can be killed at any moment, and a buffered
+            // log is an empty log. The BOM appears only for a new file — StreamWriter writes the
+            // preamble at position zero.
             using var writer = new StreamWriter(_path!, append: true, new UTF8Encoding(true));
             writer.WriteLine(line);
         }
@@ -142,16 +187,25 @@ public static class Log
         }
     }
 
-    private static void RotateIfBig(string path)
+    // Numbered generations, .log.1 the newest: each is pushed up one number, and whatever falls
+    // past MaxRotations is gone rather than kept forever. Failures here are swallowed on purpose —
+    // a log that cannot be rotated is still worth writing to.
+    private static void Rotate(string path)
     {
         try
         {
             var file = new FileInfo(path);
             if (!file.Exists || file.Length < AppParameters.Logging.MaxBytes) return;
 
-            string old = path + ".old";
-            File.Delete(old);
-            File.Move(path, old);
+            File.Delete($"{path}.{AppParameters.Logging.MaxRotations}");
+
+            for (int number = AppParameters.Logging.MaxRotations - 1; number >= 1; number--)
+            {
+                string from = $"{path}.{number}";
+                if (File.Exists(from)) File.Move(from, $"{path}.{number + 1}", overwrite: true);
+            }
+
+            File.Move(path, $"{path}.1", overwrite: true);
         }
         catch (Exception ex)
         {
@@ -160,6 +214,5 @@ public static class Log
     }
 
     // Closing line — it shows the exit was orderly rather than a crash.
-    public static void Finish(string reason) => Add(LogLevel.Info, $"--- shutdown: {reason} ---");
-
+    public static void Finish(string reason) => Add(LogLevel.Event, $"--- shutdown: {reason} ---");
 }

@@ -20,7 +20,6 @@ internal static class Win32
     public const uint SWP_NOMOVE = 0x0002;
     public const uint SWP_NOZORDER = 0x0004;
     public const uint SWP_NOACTIVATE = 0x0010;
-    public const uint SWP_SHOWWINDOW = 0x0040;
 
     public static readonly IntPtr HWND_TOPMOST = new(-1);
 
@@ -209,8 +208,8 @@ internal static class Win32
 
     // Whether the desktop of this session is being drawn by a remote client — RDP. Then the
     // session hangs on the virtual display of the remote adapter, and the monitors on the graphics
-    // card belong to nobody: no handle from EnumDisplayMonitors leads to them, DDC/CI has no wire
-    // to travel down, and the HDR switch has nothing to switch.
+    // card belong to nobody: no handle from EnumDisplayMonitors leads to them, and DDC/CI has no
+    // wire to travel down.
     public static bool IsRemoteSession => GetSystemMetrics(SM_REMOTESESSION) != 0;
 
     private const int SM_REMOTESESSION = 0x1000;

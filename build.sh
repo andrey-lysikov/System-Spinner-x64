@@ -7,7 +7,9 @@
 #     ./build.sh
 #
 # What stays on Windows: the tests (they load WPF, which the Mac runtime does not have) and the
-# msi. Both run in GitHub Actions on every release, see .github/workflows/release.yml.
+# msi. Every commit is still tested in GitHub Actions — see .github/workflows/tests.yml, which
+# the release and rebuild workflows call as a job of their own; the msi is packaged on every
+# release, see .github/workflows/release.yml.
 
 set -euo pipefail
 
@@ -19,10 +21,11 @@ exe="$output/System-Spinner.exe"
 step() { printf '\n\033[36m=== %s\033[0m\n' "$1"; }
 ok()   { printf '\033[32m  + %s\033[0m\n' "$1"; }
 
-# MSBuild leaves these next to the sources; the folder with the exe is left alone, the app
-# keeps its settings and log there.
+# What MSBuild leaves behind. It writes under build/ — see Directory.Build.props — so these two
+# folders are all of it; the exe beside them stays, along with the settings and log the app keeps
+# in the same place.
 cleanup() {
-    rm -rf "$repo/src/bin" "$repo/src/obj" "$repo/test/bin" "$repo/test/obj"
+    rm -rf "$output/obj" "$output/bin"
 }
 trap cleanup EXIT
 

@@ -60,12 +60,12 @@
       "label": "clean",
       "type": "shell",
       "command": "rm",
-      "args": ["-rf", "src/bin", "src/obj", "test/bin", "test/obj", "build/System-Spinner.exe"],
+      "args": ["-rf", "build/obj", "build/bin", "build/System-Spinner.exe"],
       "windows": {
         "command": "powershell",
         "args": [
           "-NoProfile", "-Command",
-          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/bin, src/obj, test/bin, test/obj, build/System-Spinner.exe"
+          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue build/obj, build/bin, build/System-Spinner.exe"
         ]
       },
       "problemMatcher": []

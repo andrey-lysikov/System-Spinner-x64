@@ -9,11 +9,13 @@
 
         ./build.ps1 -Installer
 
-    The msi carries the PawnIO installer inside and runs it when the driver is missing: without
-    it there are no temperatures, no power and no fan speeds, and the app refuses to start.
-    Building it needs the WiX toolset, installed here when it is missing, and that PawnIO
-    installer, fetched from the author's releases at build time — a driver is not ours to keep
-    a copy of.
+    Building the msi needs the WiX toolset, installed here when it is missing. Nothing else is
+    fetched: the msi carries the exe and installer/Prerequisites.ps1, and that script is what runs
+    when the install is over — it takes out copies of the app that came from another installer,
+    fetches the .NET Desktop Runtime when the machine has none, and fetches the PawnIO driver,
+    without which there are no temperatures, no power and no fan speeds and the app refuses to
+    start. A driver is not ours to keep a copy of, and one carried inside the msi would be as old
+    as the build.
 #>
 
 param(
@@ -22,7 +24,12 @@ param(
 
     # The version the installer announces. Taken from the csproj when not given, so it cannot
     # drift from the app; the workflow passes the one on the release page.
-    [string] $Version = ''
+    [string] $Version = '',
+
+    # For CI only. Both workflows run tests.yml as a job of their own and only reach the build
+    # once it has passed, so running the same tests here again would be paying twice for one
+    # answer. Left alone locally: a build that skipped the tests is not one to hand to anybody.
+    [switch] $SkipTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,18 +45,17 @@ $exe     = Join-Path $output 'System-Spinner.exe'
 
 $wixDir  = Join-Path $repo 'installer'
 $msi     = Join-Path $output 'System-Spinner.msi'
-$wixWork = Join-Path $wixDir 'obj'
+$wixWork = Join-Path $output 'obj\wix'
 
 $wixVersion = '6.0.2'
-$pawnIoApi  = 'https://api.github.com/repos/namazso/PawnIO.Setup/releases/latest'
 
-# What MSBuild leaves next to the sources, and what WiX leaves beside the packages. Removed when
-# the script ends, whether it succeeded or not: the release build happens in a GitHub Action, and
-# a local run should leave only what was asked for.
+# What MSBuild and WiX leave behind. Both now write under build\ — see Directory.Build.props —
+# so it is these two folders and nothing else. Removed when the script ends, whether it succeeded
+# or not: the release build happens in a GitHub Action, and a local run should leave only what was
+# asked for. The exe, the msi and the config and log the app keeps beside itself are all directly
+# in build\ and are not touched.
 $leftovers = @(
-    (Join-Path $source 'bin'), (Join-Path $source 'obj'),
-    (Join-Path $tests  'bin'), (Join-Path $tests  'obj'),
-    $wixWork,
+    (Join-Path $output 'obj'), (Join-Path $output 'bin'),
     [IO.Path]::ChangeExtension($msi, '.wixpdb')
 )
 
@@ -76,9 +82,14 @@ try {
     & dotnet restore $project
     if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed. Check the connection and access to nuget.org.' }
 
-    Write-Step 'Running tests'
-    & dotnet test $testProj -c Release --nologo
-    if ($LASTEXITCODE -ne 0) { throw 'Tests failed. Nothing is built: those come first.' }
+    if ($SkipTests) {
+        Write-Step 'Tests skipped: they passed in a job of their own'
+    }
+    else {
+        Write-Step 'Running tests'
+        & dotnet test $testProj -c Release --nologo
+        if ($LASTEXITCODE -ne 0) { throw 'Tests failed. Nothing is built: those come first.' }
+    }
 
     Write-Step 'Building the exe'
 
@@ -109,6 +120,21 @@ try {
     $manufacturer = "$($properties.Company | Where-Object { $_ })".Trim()
     if (-not $manufacturer) { throw "No <Company> in $project" }
 
+    # The script the msi carries names the UpgradeCode of this package: it tells the copies
+    # Windows Installer replaces by itself from the ones it has to take out with their own
+    # uninstaller. One number in two files, so they are held against each other here rather than
+    # found to disagree on somebody's machine.
+    $packageWxs    = Join-Path $wixDir 'Package.wxs'
+    $prerequisites = Join-Path $wixDir 'Prerequisites.ps1'
+
+    $upgradeCode = [regex]::Match((Get-Content $packageWxs -Raw),
+                                  'UpgradeCode="\{?([0-9A-Fa-f-]{36})\}?"').Groups[1].Value
+    if (-not $upgradeCode) { throw "No UpgradeCode in $packageWxs" }
+
+    if ((Get-Content $prerequisites -Raw) -notmatch [regex]::Escape($upgradeCode)) {
+        throw "Prerequisites.ps1 names an UpgradeCode other than the {$upgradeCode} in $packageWxs"
+    }
+
     New-Item -ItemType Directory -Force -Path $wixWork | Out-Null
 
     $env:PATH = "$env:PATH;$env:USERPROFILE\.dotnet\tools"
@@ -125,16 +151,6 @@ try {
         & wix extension add -g "$extension/$wixVersion" | Out-Null
     }
 
-    Write-Step 'Fetching the PawnIO installer'
-
-    $release = Invoke-RestMethod -Uri $pawnIoApi -Headers @{ 'User-Agent' = 'System-Spinner-build' }
-    $asset = $release.assets | Where-Object { $_.name -eq 'PawnIO_setup.exe' } | Select-Object -First 1
-    if (-not $asset) { throw "PawnIO_setup.exe is not among the assets of $($release.tag_name)." }
-
-    $pawnIoExe = Join-Path $wixWork 'PawnIO_setup.exe'
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $pawnIoExe
-    Write-Ok "PawnIO $($release.tag_name) ($(Show-Size $pawnIoExe))"
-
     Write-Step "Building the msi for $Version, published by $manufacturer"
 
     & wix build -arch x64 `
@@ -143,7 +159,7 @@ try {
         -d "Exe=$exe" `
         -d "Icon=$(Join-Path $repo 'icon.ico')" `
         -d "License=$(Join-Path $wixDir 'License.rtf')" `
-        -d "PawnIo=$pawnIoExe" `
+        -d "Prerequisites=$prerequisites" `
         -ext WixToolset.UI.wixext `
         -ext WixToolset.Util.wixext `
         (Join-Path $wixDir 'Package.wxs') (Join-Path $wixDir 'ShortcutsDlg.wxs') `

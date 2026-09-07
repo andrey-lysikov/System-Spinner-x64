@@ -10,7 +10,6 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Monitoring;
 using SystemSpinnerX64.Platform;
@@ -28,20 +27,17 @@ public enum DetailKind
 // the macOS version.
 public partial class DetailWindow : Window
 {
-    private readonly AppConfig _cfg;
-
     // Process icons are converted to WPF brushes once each: the conversion copies the bitmap, and
     // doing that every second for a dozen rows is noticeable work for nothing.
     private readonly Dictionary<int, ImageSource?> _icons = new();
 
-    public DetailWindow(AppConfig cfg)
+    public DetailWindow()
     {
         InitializeComponent();
 
         // Arabic reads right to left: the whole window is mirrored rather than each label,
         // or the numbers would end up on the wrong side of their captions.
         FlowDirection = Text.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
-        _cfg = cfg;
 
         ApplyTheme();
 

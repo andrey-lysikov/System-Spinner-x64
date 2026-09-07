@@ -166,7 +166,7 @@ internal static class AudioEndpoint
             // The device answered when it was opened and stopped answering a moment later: the
             // screen carrying the sound went to sleep, the dock was unplugged. Nothing here can
             // be done about it, and throwing would take the key hook down with it.
-            Log.Warn($"the audio device stopped answering: {ex.Message.Trim()}");
+            Log.WarnOccasionally("audio device", $"the audio device stopped answering: {ex.Message.Trim()}");
             return whenUnavailable;
         }
         finally

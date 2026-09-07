@@ -2,8 +2,7 @@
   "dotnet.defaultSolution": "SystemSpinnerX64.sln",
   "files.exclude": {
     "**/bin": true,
-    "**/obj": true,
-    "installer/obj": true
+    "**/obj": true
   },
   "files.watcherExclude": {
     "**/bin/**": true,
@@ -18,5 +17,6 @@
   "[csharp]": {
     "editor.formatOnSave": true
   },
-  "powershell.scriptAnalysis.enable": true
+  "powershell.scriptAnalysis.enable": true,
+  "chat.disableAIFeatures": true
 }

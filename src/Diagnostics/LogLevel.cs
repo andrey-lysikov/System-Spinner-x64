@@ -3,17 +3,27 @@
 
 namespace SystemSpinnerX64.Diagnostics;
 
-// The kind of a log line. The order matters: a line is written when its level is not above the
-// one in force, so the values run from terse to verbose. The config has no level of its own —
-// only the Debug switch, which chooses between Info and Warn.
+// The kind of a log line. It is the kind, not a threshold: what is written without Debug is
+// decided by the level itself rather than by counting up or down from one.
 internal enum LogLevel
 {
-    // Only what got in the way: sensors did not open, the ETW session did not start.
-    Error = 0,
+    // The whole course of work. Written only while Debug is on, or before the config has been read.
+    Info,
 
-    // Plus what is worth noticing: a sensor was not found, the config was not written.
-    Warn = 1,
+    // The few things that happen to the machine rather than inside this application — the app
+    // started or stopped, a screen was found or lost, autostart was changed.
+    // Always written, Debug or not: without them a log of a quiet run says nothing at all.
+    Event,
 
-    // Plus the course of work: startup checks, the chosen frame source.
-    Info = 2
+    // What is worth noticing: a sensor was not found, the config was not written.
+    Warn,
+
+    // What got in the way: sensors did not open, the ETW session did not start.
+    Error,
+
+    // What nobody caught. Writes the stack of every inner exception as well.
+    Crash,
+
+    // Key presses. They have a tag of their own or a line per press drowns the rest of the file.
+    Key
 }

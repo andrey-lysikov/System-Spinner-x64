@@ -38,9 +38,17 @@
                  Property="LAUNCHAFTERINSTALL" CheckBoxValue="1"
                  Text="Start the app when the installer finishes" />
 
-        <Control Id="Note" Type="Text" X="20" Y="150" Width="330" Height="40" Transparent="yes"
+        <!-- The one thing on this page that is not about shortcuts, and the only place it can be
+             asked: an older copy that came from another installer is invisible to this package,
+             and replacing it means running the uninstaller it left behind. Ticked to begin with —
+             two copies of the app on one machine is not something anybody chooses on purpose. -->
+        <Control Id="PreviousCheckBox" Type="CheckBox" X="20" Y="145" Width="330" Height="17"
+                 Property="UPGRADEPREVIOUS" CheckBoxValue="1"
+                 Text="Replace copies installed some other way" />
+
+        <Control Id="Note" Type="Text" X="20" Y="170" Width="330" Height="50" Transparent="yes"
                  NoPrefix="yes"
-                 Text="The app lives in the notification area: it has no window of its own, and a shortcut is what starts it the first time." />
+                 Text="The app lives in the notification area: it has no window of its own, and a shortcut is what starts it the first time. A copy installed by this same installer is replaced in any case; the box above is about the ones that came from somewhere else." />
 
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
 

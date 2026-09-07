@@ -2,7 +2,6 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 using System;
-using System.Linq;
 using System.Management;
 using SystemSpinnerX64.Diagnostics;
 
@@ -81,7 +80,4 @@ internal static class InternalBrightness
             return false;
         }
     }
-
-    // Whether there is a built-in panel that can be driven at all.
-    public static bool IsAvailable => Get() is not null;
 }

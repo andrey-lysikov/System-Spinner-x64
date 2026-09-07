@@ -6,8 +6,9 @@
   "Program Files" for everyone.
 
   Administrator rights are asked for once either way, by Windows, when the questions are over and
-  the install begins. They are not a formality: the sensors are read through a driver, the driver
-  is installed here, and nothing machine-wide can be done without them.
+  the install begins: the package is machine-wide whichever folder was chosen. The sensor driver
+  is no longer among what goes in from here — Prerequisites.ps1 fetches and installs it once this
+  install is over.
 
   Built by build.ps1, which takes the version and the publisher from the csproj so that the
   installer cannot say one thing while the exe says another:
@@ -53,6 +54,7 @@
 
     <StandardDirectory Id="ProgramMenuFolder" />
     <StandardDirectory Id="DesktopFolder" />
+    <StandardDirectory Id="TempFolder" />
 
     <!-- "Just me" would otherwise land in AppData\Local\Apps\System-Spinner. The app keeps its
          config and log in AppData\Local\System-Spinner, and having the exe one folder deeper than
@@ -70,23 +72,55 @@
                  After="WixSetDefaultPerMachineFolder"
                  Sequence="both" />
 
+    <!-- Which of those two is offered first. Without this line it is always Program Files, no
+         matter what WixAppFolder above says: the stock actions of WixUI_Advanced pick the folder
+         from ALLUSERS rather than from WixAppFolder, and
+
+             WixSetPerUserFolder     ... AND (ALLUSERS="" OR (ALLUSERS=2 AND NOT Privileged))
+             WixSetPerMachineFolder  ... AND (ALLUSERS=1  OR (ALLUSERS=2 AND Privileged))
+
+         with a perMachine package ALLUSERS is 1, so the second one always wins and the first
+         never runs. The install has to stay machine-wide — the package is perMachine, and the
+         shortcuts it makes are common ones — so the folder is decided here instead.
+
+         Both of those actions are conditioned on APPLICATIONFOLDER being empty, which is what
+         makes this work: setting it while it still is skips them both. The scope page is not
+         affected — it writes APPLICATIONFOLDER itself, later and in the UI, so choosing "for
+         everyone" there still moves the install to Program Files.
+
+         Only on a fresh install: during a repair or a change the folder is the one already in
+         use, and overwriting it with the default would move the app out from under itself. -->
+    <SetProperty Id="APPLICATIONFOLDER"
+                 Value="[WixPerUserFolder]"
+                 After="SetWixPerMachineFolder"
+                 Sequence="both"
+                 Condition="NOT Installed AND APPLICATIONFOLDER = &quot;&quot;" />
+
     <!-- Both shortcuts are named after the exe rather than after the project: the file is
          System-Spinner.exe, and a menu entry calling itself something else is one more thing to
          match up when looking for what is running. -->
     <?define ShortcutName = "System-Spinner" ?>
     <?define ShortcutNote = "System monitoring in the tray and over full-screen applications" ?>
 
-    <!-- The app is a single self-contained exe. Beside it goes the PawnIO setup: it has to be a
-         file on disk with a name of its own, not a stream inside the package, because it is
-         sometimes started by hand — and because a driver setup asks for administrator rights, and
-         what asks for them has to be something Windows can show a prompt for. -->
+    <!-- The app is a single self-contained exe, and it is the whole of what this package carries.
+         The PawnIO setup used to sit beside it, as old as the build that made the msi; it is
+         fetched by Prerequisites.ps1 now, so what goes in is the release its author has out on the
+         day of the install. -->
     <ComponentGroup Id="AppFiles" Directory="APPLICATIONFOLDER">
       <Component Id="MainExe" Guid="0F8D272E-1348-400B-A2CF-93B2527E70DF">
         <File Id="SystemSpinnerExe" Source="$(Exe)" Name="System-Spinner.exe" KeyPath="yes" />
       </Component>
+    </ComponentGroup>
 
-      <Component Id="PawnIoSetupFile" Guid="6B1F3A7C-2E14-4B0D-95C6-2A0B7F3D9E58">
-        <File Id="PawnIoSetupExe" Source="$(PawnIo)" Name="PawnIO_setup.exe" KeyPath="yes" />
+    <!-- The script that runs when this install is over: it takes out copies of the app that came
+         from some other installer, fetches the .NET Desktop Runtime, and installs the PawnIO
+         driver. All three are things an msi cannot do from inside itself — see Prerequisites.ps1.
+
+         In the temporary folder rather than beside the exe: it is of use once, and it deletes
+         itself when it has run. -->
+    <ComponentGroup Id="PrerequisiteFiles" Directory="TempFolder">
+      <Component Id="PrerequisiteScript" Guid="5A4E7C21-9D3B-4F86-A0E7-1C8B5D2F63A9">
+        <File Id="PrerequisitesPs1" Source="$(Prerequisites)" Name="Prerequisites.ps1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
@@ -139,6 +173,11 @@
     <Property Id="INSTALLSTARTMENUSHORTCUT" Value="1" />
     <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" />
 
+    <!-- The third checkbox on that page, and the one thing on it that is not about shortcuts: an
+         older copy of the app that this package cannot see is taken out with its own uninstaller.
+         Secure, so that a silent install can turn it off: msiexec /i ... UPGRADEPREVIOUS=0 -->
+    <Property Id="UPGRADEPREVIOUS" Value="1" Secure="yes" />
+
     <Feature Id="Main"
              Title="System Spinner x64"
              Description="The application itself."
@@ -146,6 +185,7 @@
              AllowAbsent="no"
              ConfigurableDirectory="APPLICATIONFOLDER">
       <ComponentGroupRef Id="AppFiles" />
+      <ComponentGroupRef Id="PrerequisiteFiles" />
 
       <Feature Id="StartMenu" Title="Start menu shortcut"
                Description="A shortcut in the Start menu." Level="1">
@@ -160,36 +200,49 @@
       </Feature>
     </Feature>
 
-    <!-- PawnIO is what LibreHardwareMonitor reads the sensors through: without it there are no
-         temperatures, no power and no fan speeds, and the app refuses to start. It is left in
-         place when the app is removed: other applications use the same driver, and taking it away
-         with us would break them.
+    <!-- Everything an msi cannot do from inside itself, done once this install is over: an older
+         copy that came from another installer is taken out, the .NET Desktop Runtime is fetched
+         when it is missing or behind, and the PawnIO driver is put in when it is missing or behind
+         as well.
 
-         The same key the app itself looks at, in the 64-bit view of the registry. -->
-    <Property Id="PAWNIOINSTALLED">
-      <RegistrySearch Id="PawnIoSearch"
-                      Root="HKLM"
-                      Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO"
-                      Name="DisplayName"
-                      Type="raw"
-                      Bitness="always64" />
-    </Property>
+         That driver is what LibreHardwareMonitor reads the sensors through: without it there are
+         no temperatures, no power and no fan speeds, and the app refuses to start. Nothing about
+         it is done from inside this package any more — the script looks at what is on the machine
+         and fetches the release its author has out today. It is left in place when the app is
+         removed: other applications use the same driver, and taking it away with us would break
+         them.
 
-    <!-- A driver is machine-wide, and installing one takes administrator rights. This package is
-         machine-wide too, whichever folder was chosen, so those rights are asked for once — by
-         Windows, when the install itself begins, after every question has been answered — and the
-         driver goes in silently in the installer's own elevated service.
+         After InstallFinalize and not inside the install: everything it reaches for is somebody
+         else's package, and an msi cannot start another msi while it holds the installer to
+         itself.
 
-         The first attempt at this had the package installing for one person and no rights at all,
-         and the log said so plainly: error 1721, the setup "could not be run". An action of the
-         installer cannot raise a prompt of its own; either the whole install has the rights or
-         nothing here does. -->
-    <CustomAction Id="InstallPawnIo"
-                  FileRef="PawnIoSetupExe"
-                  ExeCommand="-install -silent"
-                  Execute="deferred"
-                  Impersonate="no"
+         Immediate and impersonated, so it runs as whoever started the installer and can raise the
+         prompt for administrator rights itself; it asks for them once, and only when it has found
+         something to do. Its outcome is ignored: the app is installed by the time it runs.
+
+         [#SystemSpinnerExe] is where the exe has just landed, and the shortcuts and the autostart
+         task are pointed back at it if the older copy's uninstaller takes them along. -->
+    <CustomAction Id="InstallPrerequisites"
+                  Directory="TempFolder"
+                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[TempFolder]Prerequisites.ps1&quot; -Exe &quot;[#SystemSpinnerExe]&quot; -Product &quot;[ProductCode]&quot; [PREVIOUSSWITCH]"
                   Return="ignore" />
+
+    <!-- The checkbox travels to the script as its one switch: look for older copies only while it
+         is still ticked. -->
+    <SetProperty Id="PREVIOUSSWITCH" Value="-NoPrevious" Before="InstallPrerequisites"
+                 Sequence="execute" Condition="UPGRADEPREVIOUS &lt;&gt; 1" />
+
+    <!-- A running copy holds its own exe, which an upgrade has to overwrite — left alone, Windows
+         would ask for a restart to finish what it could not do. The app has no ordinary window a
+         close message can reach and it runs elevated, so it is asked from the elevated side and
+         then ended. -->
+    <util:CloseApplication Id="CloseRunningApp"
+                           Target="System-Spinner.exe"
+                           CloseMessage="yes"
+                           ElevatedCloseMessage="yes"
+                           TerminateProcess="0"
+                           RebootPrompt="no"
+                           Timeout="10" />
 
     <!-- The autostart entry is a scheduled task the app makes for itself, so the app is what the
          installer knows nothing about — it is removed here, and a failure is not worth stopping
@@ -202,9 +255,16 @@
                   Return="ignore" />
 
     <InstallExecuteSequence>
-      <Custom Action="InstallPawnIo" After="InstallFiles"
-              Condition="NOT Installed AND NOT PAWNIOINSTALLED" />
-      <Custom Action="RemoveAutostartTask" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+      <!-- On an install and on an upgrade, which is where a driver that has moved on since the
+           last one is noticed; never on the way out. -->
+      <Custom Action="InstallPrerequisites" After="InstallFinalize" Condition="NOT Installed" />
+
+      <!-- Only when the app is really being removed. An upgrade removes the older version the
+           same way, with REMOVE=ALL, and deleting the task there would quietly turn autostart
+           off for someone who had asked for it — UPGRADINGPRODUCTCODE is set on exactly that
+           half of an upgrade and on nothing else. -->
+      <Custom Action="RemoveAutostartTask" Before="RemoveFiles"
+              Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
     </InstallExecuteSequence>
 
     <!-- The advanced set is the one that asks whom the install is for, and brings the folder page
@@ -241,9 +301,9 @@
       <!-- After the choice of whom it is for, the stock set goes to the folder page when the
            install is for everyone and skips to the feature tree otherwise. That other half is
            claimed here, so both ways reach the folder and the shortcuts behind it. -->
-      <!-- The install is machine-wide whichever folder was chosen, so the driver can be put in
-           without asking anyone anything. The stock page clears that flag for "just me" — this
-           puts it back, later in the order and therefore last. -->
+      <!-- The install is machine-wide whichever folder was chosen: the package is perMachine and
+           the shortcuts it makes are common ones. The stock page clears that flag for "just me" —
+           this puts it back, later in the order and therefore last. -->
       <Publish Dialog="InstallScopeDlg" Control="Next" Property="ALLUSERS" Value="1" Order="8" />
 
       <Publish Dialog="InstallScopeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg"

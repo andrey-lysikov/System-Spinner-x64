@@ -18,8 +18,5 @@ public enum MediaKey
 public enum MediaKeyResult
 {
     PassThrough,
-    Consumed,
-
-    // Taken, with nothing to show for it: a monitor in HDR ignores the brightness command.
-    Silent
+    Consumed
 }

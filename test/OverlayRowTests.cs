@@ -1,7 +1,6 @@
 //  Copyright © AndreyLysikov
 //  SPDX-License-Identifier: Apache-2.0
 
-using System;
 using System.Linq;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.ViewModels;

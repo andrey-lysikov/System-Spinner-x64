@@ -13,7 +13,15 @@ permissions:
   contents: write
 
 jobs:
+  # The tests, from the one file that describes them. They run on every push to main, release or
+  # no release: main has to be known good either way. tests.yml does not answer pushes to main
+  # itself, so this is the only run — and build.ps1 is given -SkipTests below rather than doing
+  # the same work a second time.
+  test:
+    uses: ./.github/workflows/tests.yml
+
   release:
+    needs: test
     runs-on: windows-latest
 
     steps:
@@ -80,8 +88,10 @@ jobs:
       - name: Build
         if: steps.check.outputs.release == 'true'
         shell: pwsh
-        # The same script a developer runs: tests first, then the exe, then the installer around it.
-        run: ./build.ps1 -Installer -Version ${{ steps.check.outputs.version }}
+        # The same script a developer runs: the exe, then the installer around it. Only the tests
+        # are left out — the job above has already run them, and this step is not reached unless
+        # they passed.
+        run: ./build.ps1 -Installer -SkipTests -Version ${{ steps.check.outputs.version }}
 
       - name: Publish the release
         if: steps.check.outputs.release == 'true'

@@ -7,7 +7,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Interop;
 using SystemSpinnerX64.Diagnostics;
-using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Devices;
 
@@ -99,7 +98,7 @@ internal sealed class MediaKeyMonitor : IDisposable
             return false;
         }
 
-        Log.Info("volume keys hooked");
+        Log.Event("volume keys hooked");
         return true;
     }
 

@@ -35,7 +35,7 @@ public partial class App : Application
         // not hit it while this one is still closing.
         if (!Elevation.IsElevated)
         {
-            Log.Info("no administrator rights — restarting elevated");
+            Log.Event("no administrator rights — restarting elevated");
 
             if (Elevation.TryRelaunchElevated(out string? elevationProblem))
             {

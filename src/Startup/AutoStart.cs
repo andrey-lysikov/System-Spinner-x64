@@ -28,7 +28,7 @@ internal static class AutoStart
 
         if (code == 0)
         {
-            Log.Info($"autostart enabled: task \"{AppParameters.Identity.TaskName}\" → {exe}");
+            Log.Event($"autostart enabled: task \"{AppParameters.Identity.TaskName}\" → {exe}");
             return null;
         }
 
@@ -43,7 +43,7 @@ internal static class AutoStart
 
         if (code == 0)
         {
-            Log.Info("autostart disabled: task removed");
+            Log.Event("autostart disabled: task removed");
             return null;
         }
 

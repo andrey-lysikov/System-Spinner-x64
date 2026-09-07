@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Threading;
-using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
 using SystemSpinnerX64.Platform;
 

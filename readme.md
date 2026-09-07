@@ -28,7 +28,7 @@ This is the Windows version. If you are looking for macOS, go to [System Spinner
 
 *WARNING: the application is not officially signed, so Windows will ask you to allow it to run.*
 
-This application uses **PawnIO** — [pawnio.eu](https://pawnio.eu) — for low-level access to the hardware. If you do not have it, please install it.
+This application uses **PawnIO** — [pawnio.eu](https://pawnio.eu) — for low-level access to the hardware. The installer fetches and installs it for you when it is missing or out of date; if you run the exe on its own, install it yourself.
 
 ## Screenshots
 
