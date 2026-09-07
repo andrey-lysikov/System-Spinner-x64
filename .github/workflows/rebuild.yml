@@ -1,10 +1,5 @@
 name: Rebuild
 
-# Replaces the installer attached to a release with one built from the current state of the branch.
-# Started by hand only: the version, the tag and the description of the release stay as they are —
-# the only thing that changes is the file itself, and the link to the list of commits, which is
-# pointed at what was actually built.
-
 on:
   workflow_dispatch:
     inputs:
@@ -17,9 +12,6 @@ permissions:
   contents: write
 
 jobs:
-  # Started by hand, so nothing else has tested this commit: tests.yml answers pushes, and a
-  # manual run of this workflow is not one. Hence the tests here, ahead of the build, from the
-  # same file the other workflows use.
   test:
     uses: ./.github/workflows/tests.yml
 
@@ -30,8 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # The whole history: the description of the release links to the commits, and that link
-          # is rewritten below.
           fetch-depth: 0
 
       - uses: actions/setup-dotnet@v6
@@ -50,12 +40,6 @@ jobs:
 
           Write-Host "Rebuilding the installer of $tag from $($env:GITHUB_SHA)"
 
-          # The installer carries a version of its own, and it has to be the one on the release
-          # page rather than whatever the branch has moved on to.
-          #
-          # Two numbers or three: the tags up to 1.0.0 carried three, everything from 1.1 on
-          # carries two — the csproj is what the tag is made from, and the app names itself in
-          # two everywhere. Demanding three here made the newest release impossible to rebuild.
           $version = $tag -replace '^v', ''
           if ($version -notmatch '^\d+\.\d+(\.\d+)?$') { throw "The tag $tag is not a version." }
 
@@ -64,10 +48,6 @@ jobs:
 
       - name: Build
         shell: pwsh
-        # The same script a developer runs: the exe, then the installer around it. The tests are
-        # left out because the job above has already run them. The version is the one of the
-        # release being rebuilt rather than of the branch: the tag stays as it is, and an
-        # installer announcing another number would contradict the page it hangs on.
         run: ./build.ps1 -Installer -SkipTests -Version ${{ steps.target.outputs.version }}
 
       - name: Replace the installer
@@ -86,10 +66,6 @@ jobs:
           $tag = '${{ steps.target.outputs.tag }}'
           $sha = '${{ github.sha }}'
 
-          # Only the one line with the link is touched. Everything the release says about the
-          # version itself was written by hand and is left alone.
-          # gh hands the description back line by line, so it is joined and split once more:
-          # the lines then carry no stray carriage returns.
           $body = (gh release view $tag --json body --jq '.body') -join "`n"
           $lines = $body -split "`r?`n"
           $changed = $false

@@ -1,20 +1,9 @@
 name: Tests
 
-# The one place the tests run. They load WPF, so they need a Windows runner — build.sh skips them
-# for that reason, and once the work moves to VS Code on a Mac this is where they happen. Nothing
-# is built or published here.
-#
-# release.yml and rebuild.yml call this workflow as a job of their own and wait for it, so the
-# tests guard a release without being run twice; build.ps1 is then given -SkipTests.
-
 on:
-  # Every branch except main. There the release workflow calls this one as its first job, and
-  # answering the push here as well would test the same commit twice. Tags are not covered by
-  # branches at all, so the ones the release pushes raise nothing.
   push:
     branches-ignore: [main]
   pull_request:
-  # How release.yml and rebuild.yml reach these tests.
   workflow_call:
   workflow_dispatch:
 

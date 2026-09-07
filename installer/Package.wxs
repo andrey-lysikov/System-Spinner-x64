@@ -201,9 +201,31 @@
     </Feature>
 
     <!-- Everything an msi cannot do from inside itself, done once this install is over: an older
-         copy that came from another installer is taken out, the .NET Desktop Runtime is fetched
+         copy that came from another installer is cleared away, the .NET Desktop Runtime is fetched
          when it is missing or behind, and the PawnIO driver is put in when it is missing or behind
          as well.
+
+         Clearing away, and not uninstalling: the script never calls the older copy's uninstaller.
+         Several of them take the whole folder they were installed into with them, and an older copy
+         of this same app is as likely as not to be sitting in the very folder the msi has just
+         filled — the app would go minutes after it arrived. What stood where ours now stands is
+         ours. Everything else of it goes: the folder it was installed into, the exe and the
+         uninstaller in it, its entry in the list of installed programs, its shortcuts in the Start
+         menu and on the desktop, and whatever started it with Windows. A folder is emptied rather
+         than deleted outright when settings or a log are in it — those are the same files the new
+         copy will read.
+
+         [APPLICATIONFOLDER] is how the script knows which folder is not to be touched, and it
+         cannot work that out for itself: it does its work elevated, under an account whose own
+         AppData is not where an install "just for me" went. What belongs to the person installing
+         rather than to the machine — their own Start menu, their own Run key — is cleared by the
+         first, unelevated run for the same reason.
+
+         The dot after [APPLICATIONFOLDER] is not a slip: an msi directory property ends in a
+         backslash, and a backslash in front of the closing quote is read as an escaped quote by
+         the parser that splits a command line into arguments — the folder and everything after it
+         would arrive as one string. A dot is a folder that means "this one", and the script takes
+         it off again.
 
          That driver is what LibreHardwareMonitor reads the sensors through: without it there are
          no temperatures, no power and no fan speeds, and the app refuses to start. Nothing about
@@ -217,14 +239,22 @@
          itself.
 
          Immediate and impersonated, so it runs as whoever started the installer and can raise the
-         prompt for administrator rights itself; it asks for them once, and only when it has found
-         something to do. Its outcome is ignored: the app is installed by the time it runs.
+         prompt for administrator rights itself. It asks for them at once, before it has looked at
+         anything: what it does is machine-wide to the last line, and the run that has the rights
+         should not have to work out, as another account, what this one would have decided. Its
+         outcome is ignored either way: the app is installed by the time it runs.
+
+         The console it opens is minimised — the questions have all been answered by this point,
+         and what happens in it belongs in its log rather than in front of anybody. The one thing
+         that cannot wait for somebody to open the log, that the app will not start at all, the
+         script puts in a message box of its own. [UILevel] is what tells it whether there is
+         anybody to put it in front of: below 4 the install was asked to be quiet, and it stays so.
 
          [#SystemSpinnerExe] is where the exe has just landed, and the shortcuts and the autostart
          task are pointed back at it if the older copy's uninstaller takes them along. -->
     <CustomAction Id="InstallPrerequisites"
                   Directory="TempFolder"
-                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[TempFolder]Prerequisites.ps1&quot; -Exe &quot;[#SystemSpinnerExe]&quot; -Product &quot;[ProductCode]&quot; [PREVIOUSSWITCH]"
+                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -WindowStyle Minimized -ExecutionPolicy Bypass -File &quot;[TempFolder]Prerequisites.ps1&quot; -Folder &quot;[APPLICATIONFOLDER].&quot; -Exe &quot;[#SystemSpinnerExe]&quot; -Product &quot;[ProductCode]&quot; -UiLevel &quot;[UILevel]&quot; [PREVIOUSSWITCH]"
                   Return="ignore" />
 
     <!-- The checkbox travels to the script as its one switch: look for older copies only while it
