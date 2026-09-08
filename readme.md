@@ -1,4 +1,4 @@
-<img src="icon.ico" width="128" alt="icon">
+<img src="pictures/icon.ico" width="128" alt="icon">
 
 # System Spinner x64 (for Windows)
 
@@ -28,7 +28,7 @@ This is the Windows version. If you are looking for macOS, go to [System Spinner
 
 *WARNING: the application is not officially signed, so Windows will ask you to allow it to run.*
 
-This application uses **PawnIO** — [pawnio.eu](https://pawnio.eu) — for low-level access to the hardware. The installer fetches and installs it for you when it is missing or out of date; if you run the exe on its own, install it yourself.
+This application uses **PawnIO** — [pawnio.eu](https://pawnio.eu) — for low-level access to the hardware. The installer carries it and puts it in silently, so a fresh install always ends on the newest release there was when that installer was built; if you run the exe on its own, install it yourself.
 
 ## Screenshots
 

@@ -7,10 +7,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Where the popup windows land. Everything here is in pixels of the one grid the screens share:
-/// a second monitor can sit to the left of the main one, and then its coordinates are negative.
-/// </summary>
+/// <summary>Where the popup windows land, in pixels of the one grid the screens share: a second
+/// monitor can sit left of the main one, and then its coordinates are negative.</summary>
 public class ScreenPlacementTests
 {
     // A screen at 1920×1080 with the taskbar along its bottom edge, forty pixels of it.

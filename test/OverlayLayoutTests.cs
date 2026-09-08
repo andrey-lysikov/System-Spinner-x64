@@ -8,10 +8,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Column layout. The requirement is strict: the CPU, GPU and FPS numbers line up exactly, and
-/// a column takes its width from the longest value in that column, not across the whole panel.
-/// </summary>
+/// <summary>Column layout: the CPU, GPU and FPS numbers line up exactly, and a column takes its
+/// width from the longest value in that column, not across the whole panel.</summary>
 public class OverlayLayoutTests
 {
     /// <summary>A fake measurement: a digit is 10 wide, a label letter 5. That keeps the test

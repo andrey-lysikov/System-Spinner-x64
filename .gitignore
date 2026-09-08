@@ -5,6 +5,9 @@ build/
 bin/
 obj/
 
+# What WiX leaves beside the msi; installer/installer.ps1 clears it after each run.
+*.wixpdb
+
 # Visual Studio and Rider leave their own state next to the sources.
 .vs/
 .idea/

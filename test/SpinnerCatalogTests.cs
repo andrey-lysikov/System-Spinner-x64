@@ -7,11 +7,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// The animation catalogue is built from the assembly resource names. A table that drifted from
-/// what the assembly actually holds would mean an empty tray icon, so there is no table — but
-/// the name parsing still has to be checked.
-/// </summary>
+/// <summary>The catalogue is built from the assembly resource names rather than a table that
+/// could drift from them, but the name parsing still has to be checked.</summary>
 public class SpinnerCatalogTests
 {
     [Fact]

@@ -2,6 +2,14 @@
 
 
 
+## 1.3
+
+* Carry the PawnIO driver in the installer instead of fetching it on the machine
+* Fix install
+* Update icon location
+* Redesign code classes
+
+
 ## 1.2
 
 * Fix the installer if it found older version

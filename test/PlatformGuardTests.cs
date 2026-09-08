@@ -7,10 +7,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Hardware requirements. A refusal here is expensive — the app simply will not start — so both
-/// what gets filtered out and what has to pass are checked.
-/// </summary>
+/// <summary>Hardware requirements. A refusal here is expensive, the app simply will not start,
+/// so both what gets filtered out and what has to pass are checked.</summary>
 public class PlatformGuardTests
 {
     [Theory]

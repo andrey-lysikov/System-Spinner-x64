@@ -18,26 +18,21 @@
     <Authors>Andrey.Lysikov and Claude</Authors>
     <Copyright>© Andrey Lysikov, Apache 2.0 licence.</Copyright>
     <Description>System monitoring: an overlay over games and an animated tray icon outside them.</Description>
-    <Version>1.2</Version>
+    <Version>1.3</Version>
   </PropertyGroup>
 
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- One icon file for everything: the exe, the tray and the readme. It lives in the project
-         root as a multi-size .ico — the format Windows wants — rather than as a picture the build
-         has to convert every time. -->
-    <IconFile>$(MSBuildThisFileDirectory)..\icon.ico</IconFile>
+    <!-- One icon file for everything: the exe, the tray, the msi and the readme. A multi-size
+         .ico, the format Windows wants, rather than a picture the build has to convert. -->
+    <IconFile>$(MSBuildThisFileDirectory)..\pictures\icon.ico</IconFile>
     <ApplicationIcon>$(IconFile)</ApplicationIcon>
-    <!-- The minimum of Windows 11 (build 22000) is checked at run time, in PlatformGuard.cs.
-         It cannot be declared through SupportedOSPlatformVersion: that property needs a versioned
-         TFM (net10.0-windows10.0.22000.0), which drags in the Windows SDK projections and adds
-         tens of megabytes to the exe. -->
+    <!-- The minimum of Windows 11 (build 22000) is checked in PlatformGuard.cs: declaring it
+         through SupportedOSPlatformVersion needs a versioned TFM and the whole Windows SDK. -->
   </PropertyGroup>
 
-  <!-- One exe, but without .NET inside: the machine needs .NET Desktop Runtime 10 or newer.
-       When it is missing, the window with the download link is shown by the apphost itself —
-       before the first line of C#, so this cannot be checked in code. The installer fetches it
-       instead, at the end of the install: installer/Prerequisites.ps1. -->
+  <!-- One exe, but without .NET inside: the machine needs .NET Desktop Runtime 10 or newer. The
+       apphost shows the download link itself, before the first line of C# could check for it. -->
   <PropertyGroup>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
@@ -52,9 +47,8 @@
     <!-- So that no .pdb appears next to the exe -->
     <DebugType>none</DebugType>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <!-- WFO0003: the WinForms analyser suggests setting DPI through ApplicationHighDpiMode instead
-         of the manifest. That is wrong advice here: the app is WPF, WinForms is only there for the
-         tray icon, and WPF reads its DPI awareness from the manifest before the first line of code. -->
+    <!-- WFO0003 is wrong advice here: the app is WPF, WinForms is only there for the tray icon,
+         and WPF reads its DPI awareness from the manifest before the first line of code. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
 
@@ -64,10 +58,8 @@
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <!-- The ETW session for counting frames: replaces an external PresentMon.exe -->
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.5" />
-    <!-- WMI: brightness of the built-in laptop panel. DDC/CI does not reach it and Windows offers
-         no other path — this is the same call the notification-centre slider uses. The package
-         already comes with LibreHardwareMonitor, but it is used directly here, so it is declared
-         explicitly; the version has to match the one the library pulls. -->
+    <!-- WMI: brightness of the built-in laptop panel, which DDC/CI does not reach. Declared even
+         though LibreHardwareMonitor brings it, so the version must match the one it pulls. -->
     <PackageReference Include="System.Management" Version="10.0.2" />
   </ItemGroup>
 
@@ -76,10 +68,8 @@
          not sit next to the exe as a separate file — one exe was promised. -->
     <EmbeddedResource Include="$(IconFile)" LogicalName="System-Spinner.icon.ico" />
 
-    <!-- Tray animation frames: one folder per set directly in Assets, frame numbers from zero
-         inside. The resource name is built from the path ("Spinners/Blue Ball/3.png"), with the
-         separator normalised to a forward slash: MSBuild gives %(RecursiveDir) with a backslash,
-         which would read as an escape sequence in the first regular expression that saw it. -->
+    <!-- Tray animation frames: one folder per set in Assets, frames numbered from zero. The
+         separator is normalised to a slash; %(RecursiveDir) gives a backslash. -->
     <EmbeddedResource Include="Assets\*\*.png"
                       LogicalName="Spinners/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
   </ItemGroup>

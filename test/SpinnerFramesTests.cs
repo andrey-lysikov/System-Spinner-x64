@@ -9,11 +9,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Fitting a set into the tray icon. The sets are exported with transparent margins: those are
-/// cut off by one rectangle shared by the whole set, and what is left is reduced by one and the
-/// same amount.
-/// </summary>
+/// <summary>Fitting a set into the tray icon: the transparent margins are cut off by one
+/// rectangle shared by the whole set, and what is left is reduced by the same amount.</summary>
 public class SpinnerFramesTests
 {
     private static Bitmap Frame(int size, Rectangle drawn)

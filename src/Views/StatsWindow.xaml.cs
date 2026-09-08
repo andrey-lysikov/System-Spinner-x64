@@ -8,14 +8,12 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Monitoring;
-using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Views;
 
@@ -26,9 +24,8 @@ public partial class StatsWindow : Window
 
     private MetricsSnapshot _latest = MetricsSnapshot.Empty;
 
-    // Where the pointer was when the window was opened — that is where the tray icon is. Kept
-    // because the window is placed again on every height change, and by then the pointer is
-    // elsewhere: the page file arrives a poll later than the rest and adds a row.
+    // Where the pointer was when the window opened, which is where the tray icon is. Kept because
+    // the window is placed again on every height change, by which time the pointer has moved.
     private System.Drawing.Point _anchor;
     private DetailWindow? _detail;
     private bool _prepared;
@@ -48,9 +45,8 @@ public partial class StatsWindow : Window
         ApplyTheme();
         ApplyLabels();
 
-        // A click elsewhere closes the window, like the macOS popover. The check is deferred: at
-        // the moment of the event the chart window has not become active yet, and without the
-        // delay a click on it would close both.
+        // A click elsewhere closes the window. The check is deferred: at the moment of the event
+        // the chart window is not active yet, and a click on it would otherwise close both.
         Deactivated += (_, _) => Dispatcher.BeginInvoke(
             DispatcherPriority.ApplicationIdle,
             new Action(() =>
@@ -63,20 +59,16 @@ public partial class StatsWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        Dwm.ApplyAcrylic(new WindowInteropHelper(this).Handle, Theme.AreWindowsDark());
+        WindowTheme.ApplyBackdrop(this);
     }
 
     // Re-reads the theme and repaints the window.
     public void ApplyTheme()
     {
-        bool dark = Theme.AreWindowsDark();
+        bool dark = WindowTheme.ApplyBackdrop(this);
 
-        // The dark flag of the backdrop is part of the theme too: without repeating this call the
-        // acrylic would keep its old tint and the window would look dirty on a light theme.
-        Dwm.ApplyAcrylic(new WindowInteropHelper(this).Handle, dark);
-
-        Color foreground = dark ? Colors.White : Color.FromRgb(0x11, 0x11, 0x11);
-        Color background = dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xF7, 0xF7, 0xF7);
+        Color foreground = WindowTheme.Foreground(dark);
+        Color background = WindowTheme.Background(dark);
 
         Shell.Background = new SolidColorBrush(background) { Opacity = 0.88 };
         Shell.BorderBrush = new SolidColorBrush(foreground) { Opacity = 0.12 };
@@ -109,9 +101,8 @@ public partial class StatsWindow : Window
 
     private void ApplyLabels()
     {
-        // The same thresholds as the in-game panel: no reason to keep a second set of numbers
-        // for the same hardware. Temperatures are converted to a share of the scale, which runs
-        // to a hundred degrees; the memory ones are already percentages.
+        // The same thresholds as the in-game panel. Temperatures become a share of the scale,
+        // which runs to a hundred degrees; the memory ones are already percentages.
         CpuTempLevel.CriticalLevel = _cfg.Warn.CpuTemp > 0 ? _cfg.Warn.CpuTemp / AppParameters.Layout.TemperatureScale * 100 : 0;
         GpuTempLevel.CriticalLevel = _cfg.Warn.GpuTemp > 0 ? _cfg.Warn.GpuTemp / AppParameters.Layout.TemperatureScale * 100 : 0;
 
@@ -179,17 +170,15 @@ public partial class StatsWindow : Window
         CpuLevel.Value = r.CpuLoad ?? 0;
         Note(CpuNote, Join(Unit(r.CpuClockMhz, "MHz"), Unit(r.CpuPowerW, "W")));
 
-        // Fan speeds get a line of their own with tags: there can be three or four of them, and
-        // without a tag there is no telling the cooler from the pump. The card fan stays with the
-        // card: there is only one there, and nothing to tag.
+        // Fan speeds get a tagged line of their own: with three or four there is no telling the
+        // cooler from the pump. The card fan stays with the card, there being only one.
         Note(FanNote, Fans(r));
 
         GpuTitle.Text = Headline(Text.StatsGpu, r.GpuLoad, "%");
         GpuLevel.Value = r.GpuLoad ?? 0;
 
-        // Integrated graphics have nothing of their own to put under the bar: the clock that does
-        // arrive belongs to the processor package and would read as the card own. Power or a fan
-        // means a card of its own even when the memory sensor stays silent.
+        // Integrated graphics have nothing of their own for the bar: the clock belongs to the
+        // package. Power or a fan means a card of its own even when the memory sensor is silent.
         bool ownCard = r.GpuHasOwnMemory || r.GpuPowerW is not null || r.GpuFanRpm is not null;
 
         Note(GpuNote, ownCard
@@ -206,9 +195,8 @@ public partial class StatsWindow : Window
         Row(GpuMemTitle, GpuMemLevel, Text.StatsGpuMemory,
             r.GpuHasOwnMemory ? r.GpuMemLoadPercent : null, "%", r.GpuMemLoadPercent ?? 0);
 
-        // The page file is read a poll later than everything else, and a machine can have none at
-        // all. The row stays either way, at zero until a figure arrives: a scale that comes and
-        // goes changes the height of the window, and the window jumps as it is opening.
+        // The page file is read a poll later, and a machine can have none. The row stays either
+        // way, at zero until a figure arrives, or the window would change height as it opens.
         double swap = r.SwapLoadPercent ?? 0;
         SwapTitle.Text = Headline(Text.StatsSwap, swap, "%");
         SwapLevel.Value = swap;

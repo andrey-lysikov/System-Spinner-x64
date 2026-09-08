@@ -42,9 +42,7 @@ public partial class OverlayWindow : Window
     {
         base.OnSourceInitialized(e);
 
-        _handle = new WindowInteropHelper(this).Handle;
-        Win32.SetClickThrough(_handle, true);
-        Win32.ForceTopmost(_handle);
+        _handle = OverlayChrome.MakeClickThrough(this);
 
         // The screen scale is only known once the window exists, so the layout is set here.
         ApplyLayout();
@@ -155,9 +153,8 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        // Placed in pixels rather than by Left/Top: those are read in the units of the screen the
-        // window is on now, and with two monitors at different scales that is the screen it is
-        // leaving. The move brings a scale change of its own, and the layout is redone then.
+        // Placed in pixels, not by Left/Top: those are in the units of the screen it is leaving
+        // when two monitors differ in scale. The move brings its own scale change and redraw.
         int inset = (int)Math.Round(margin * _screenScale);
 
         Win32.SetWindowPos(_handle, IntPtr.Zero, work.Left + inset, work.Top + inset, 0, 0,

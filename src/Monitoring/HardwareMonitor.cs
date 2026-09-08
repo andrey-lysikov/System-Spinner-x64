@@ -12,6 +12,83 @@ using LibreHardwareMonitor.Hardware;
 
 namespace SystemSpinnerX64.Monitoring;
 
+// What a fan is for. Detected sensors are sorted into the panel slots by this.
+public enum FanRole
+{
+    // A graphics card fan: the sensor belongs to the card itself.
+    Gpu,
+
+    // An AIO pump or its radiator fans: Pump, AIO, Water, Kraken and the like.
+    Aio,
+
+    // The CPU cooler: the sensor name contains CPU.
+    Cpu,
+
+    // Everything else — case fans, the PSU fan, unidentified headers.
+    Case
+}
+
+// One detected fan sensor: what it is, where it sits and what it read while scanning.
+public sealed record FanSensor(string Name, string HardwareName, FanRole Role, double? Rpm)
+{
+    // Line for the scan report in the log.
+    public string Describe =>
+        $"[{Role}] {HardwareName} / {Name} = {(Rpm is null ? "—" : Rpm.Value.ToString("0"))} rpm";
+}
+
+// Works out whose fan this is from the sensor name and the hardware it was found on.
+internal static class FanClassifier
+{
+    // Words that give an AIO away, in the sensor name and in the controller name.
+    private static readonly string[] AioMarkers =
+    {
+        "pump", "aio", "water", "liquid", "насос", "kraken", "capellix", "commander",
+        "quadro", "octo", "d5", "ddc", "h100", "h115", "h150", "h170", "galahad"
+    };
+
+    public static FanRole Classify(string sensorName, IHardware owner, bool underGpu) =>
+        Classify(sensorName, owner.Name, owner.HardwareType, underGpu || IsGpu(owner));
+
+    // The same on plain values instead of a hardware object, so it can be tested: a stub for
+    // IHardware would be longer than the logic under test.
+    public static FanRole Classify(string sensorName, string hardwareName, HardwareType hardwareType, bool onGpu)
+    {
+        if (onGpu) return FanRole.Gpu;
+
+        string name = sensorName.ToLowerInvariant();
+        string hardware = hardwareName.ToLowerInvariant();
+
+        // A pump is named in many ways but almost always with one of these words; fans hanging off
+        // an AIO controller count as AIO too — they sit on its radiator.
+        if (AioMarkers.Any(m => name.Contains(m, StringComparison.Ordinal))) return FanRole.Aio;
+
+        if (hardwareType is HardwareType.Cooler &&
+            AioMarkers.Any(m => hardware.Contains(m, StringComparison.Ordinal))) return FanRole.Aio;
+
+        if (name.Contains("cpu", StringComparison.Ordinal)) return FanRole.Cpu;
+
+        return FanRole.Case;
+    }
+
+    public static bool IsGpu(IHardware hw) =>
+        hw.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel;
+}
+
+// Walks the hardware tree and refreshes the sensor values.
+internal sealed class UpdateVisitor : IVisitor
+{
+    public void VisitComputer(IComputer computer) => computer.Traverse(this);
+
+    public void VisitHardware(IHardware hardware)
+    {
+        hardware.Update();
+        foreach (IHardware sub in hardware.SubHardware) sub.Accept(this);
+    }
+
+    public void VisitSensor(ISensor sensor) { }
+    public void VisitParameter(IParameter parameter) { }
+}
+
 // Polling the hardware through LibreHardwareMonitor: keeps the sensor tree open, refreshes the
 // values each cycle and picks out the ones the panel shows.
 public sealed class HardwareMonitor : IDisposable
@@ -56,9 +133,8 @@ public sealed class HardwareMonitor : IDisposable
         _cpu = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
         _memory = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Memory);
 
-        // Discrete cards first: on a Core Ultra or a Ryzen with graphics, GpuIndex = 0 would
-        // otherwise be the integrated one. Intel graphics go last — on an Intel machine the
-        // discrete card is somebody else's, and an Arc is picked with GpuIndex.
+        // Discrete cards first, or GpuIndex = 0 would be the integrated one on a Core Ultra or a
+        // Ryzen with graphics. Intel goes last; an Arc is picked with GpuIndex.
         var gpus = _computer.Hardware.Where(FanClassifier.IsGpu)
                                      .OrderBy(h => h.HardwareType == HardwareType.GpuIntel)
                                      .ThenByDescending(h => h.HardwareType == HardwareType.GpuNvidia)
@@ -133,10 +209,8 @@ public sealed class HardwareMonitor : IDisposable
 
     private bool _memoryStallLogged;
 
-    // Video memory reading full is the shape the fault takes: the card is idle, nothing holds the
-    // memory, and the number stays where the last heavy application left it. Whether it is the
-    // sensor or the memory is answered by the other sensors, and only at that moment — so they are
-    // written down the first time it happens, and not again.
+    // Video memory reading full while the card is idle is the shape the fault takes. Only the
+    // other sensors, read at that moment, say whether it is the sensor: written down once.
     private void LogMemoryStall(Readings r)
     {
         if (_memoryStallLogged) return;
@@ -152,10 +226,8 @@ public sealed class HardwareMonitor : IDisposable
 
     private bool _sensorChoiceLogged;
 
-    // Once per run: which sensor each configurable reading actually came from, and what it said.
-    // A number that looks wrong is nearly always the wrong sensor behind it — video memory shown
-    // full while the card is idle means "used" and "total" landed on sensors that do not belong
-    // together — and no amount of staring at the percentage tells you which.
+    // Once per run: which sensor each configurable reading came from, and what it said. A number
+    // that looks wrong is nearly always the wrong sensor, and the percentage never says which.
     private void LogSensorChoice(SensorNamesConfig names)
     {
         if (_sensorChoiceLogged) return;
@@ -214,8 +286,7 @@ public sealed class HardwareMonitor : IDisposable
         FindSensor(hw, type, names)?.Value;
 
     // An exact match across the whole list first, then a substring. The sensor is returned rather
-    // than its value: which name a reading came from is the first thing to know when the number
-    // looks wrong, and only the sensor carries that.
+    // than its value: only it carries the name a reading came from.
     private static ISensor? FindSensor(IHardware? hw, SensorType type, IReadOnlyList<string> names)
     {
         if (hw is null) return null;

@@ -1,19 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!--
-  The installer. It asks where the app should go: into the profile of the person installing —
-  what it offers first — beside the config and log the app already keeps there, or into
-  "Program Files" for everyone.
-
-  Administrator rights are asked for once either way, by Windows, when the questions are over and
-  the install begins: the package is machine-wide whichever folder was chosen. The sensor driver
-  is no longer among what goes in from here — Prerequisites.ps1 fetches and installs it once this
-  install is over.
-
-  Built by build.ps1, which takes the version and the publisher from the csproj so that the
-  installer cannot say one thing while the exe says another:
-      wix build -arch x64 -d Version=0.7.0 -d Manufacturer=lysnet.ru -d Exe=...
--->
+<!-- The installer: where the app goes (the installer's profile, offered first, or Program Files),
+     which shortcuts to make, whether to start it. Built by installer/installer.ps1. -->
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
@@ -26,25 +14,35 @@
            Scope="perMachine"
            Compressed="yes">
 
-    <!-- One file in one cab inside the msi: there is nothing to stream separately. -->
-    <MediaTemplate EmbedCab="yes" />
+    <!-- One cab inside the msi. Compressed hard: most of what goes in is the PawnIO setup. -->
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-    <!-- An older version is replaced rather than added beside: two tray icons of the same app
-         would poll the same sensors twice. The same version counts as an upgrade too — without
-         that, installing a rebuild of the number already there leaves both, and during a run of
-         testing that happens more often than a version change does. -->
+    <!-- This is the whole of "is it already here?": a copy under this upgrade code makes the run
+         an update. Same version too, or a rebuild of that number would leave both installed. -->
     <MajorUpgrade AllowSameVersionUpgrades="yes"
                   DowngradeErrorMessage="A newer version of System Spinner x64 is already installed." />
+
+    <!-- The floor the app stands on, the same one PlatformGuard.cs checks at run time. From the
+         registry: WindowsBuild and VersionNT lie to an msi (9600 and 603 on build 28000). -->
+    <Property Id="WINDOWSBUILDNUMBER">
+      <RegistrySearch Id="WindowsBuildSearch"
+                      Root="HKLM"
+                      Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentBuildNumber"
+                      Type="raw"
+                      Bitness="always64" />
+    </Property>
+
+    <Launch Condition="VersionNT64 AND WINDOWSBUILDNUMBER &gt;= 22000"
+            Message="System Spinner x64 needs 64-bit Windows 11 or newer. This machine does not meet that, and nothing has been installed." />
 
     <Icon Id="AppIcon.ico" SourceFile="$(Icon)" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/andrey-lysikov/System-Spinner-x64" />
     <Property Id="ARPNOREPAIR" Value="1" />
 
-    <!-- Where to put it: the dialog that asks stands on these two. The folder name is the same
-         either way — only the place it hangs from changes, and the profile of the person
-         installing is what it offers first. Both are machine-wide installs; the choice is the
-         folder, not who may run the app. -->
+    <!-- What the folder dialog stands on. Both choices are machine-wide installs; only the folder
+         changes, and the profile of the person installing is offered first. -->
     <Property Id="ApplicationFolderName" Value="System-Spinner" />
     <Property Id="WixAppFolder" Value="WixPerUserFolder" />
 
@@ -56,78 +54,71 @@
     <StandardDirectory Id="DesktopFolder" />
     <StandardDirectory Id="TempFolder" />
 
-    <!-- "Just me" would otherwise land in AppData\Local\Apps\System-Spinner. The app keeps its
-         config and log in AppData\Local\System-Spinner, and having the exe one folder deeper than
-         its own settings is a puzzle for whoever goes looking for either. -->
+    <!-- Machine-wide even under /qn, where no dialog runs to put the flag back. ALLUSERS is
+         public, so msiexec ALLUSERS="" would otherwise beat the Property table. -->
+    <SetProperty Id="ALLUSERS" Value="1" Before="FindRelatedProducts" Sequence="both" />
+
+    <!-- "Just me" would land in AppData\Local\Apps\System-Spinner, one folder deeper than the
+         config and log the app keeps in AppData\Local\System-Spinner. -->
     <SetProperty Id="WixPerUserFolder"
                  Value="[LocalAppDataFolder]System-Spinner"
                  After="WixSetDefaultPerUserFolder"
                  Sequence="both" />
 
-    <!-- And "for everyone" would otherwise land in Program Files (x86): the folder the dialog
-         suggests comes from ProgramFilesFolder, which means the 32-bit one even in a 64-bit
-         package. This app is x64 and belongs in Program Files proper. -->
+    <!-- And "for everyone" would land in Program Files (x86): ProgramFilesFolder means the
+         32-bit one even in a 64-bit package. This app is x64. -->
     <SetProperty Id="WixPerMachineFolder"
                  Value="[ProgramFiles64Folder]System-Spinner"
                  After="WixSetDefaultPerMachineFolder"
                  Sequence="both" />
 
-    <!-- Which of those two is offered first. Without this line it is always Program Files, no
-         matter what WixAppFolder above says: the stock actions of WixUI_Advanced pick the folder
-         from ALLUSERS rather than from WixAppFolder, and
+    <!-- Where the copy being updated is. Windows Installer says a related product exists but
+         never where it put itself, so its own record of the component is what is asked. -->
+    <Property Id="INSTALLEDFOLDER" Secure="yes">
+      <ComponentSearch Id="InstalledAppSearch"
+                       Guid="0F8D272E-1348-400B-A2CF-93B2527E70DF" Type="directory" />
+    </Property>
 
-             WixSetPerUserFolder     ... AND (ALLUSERS="" OR (ALLUSERS=2 AND NOT Privileged))
-             WixSetPerMachineFolder  ... AND (ALLUSERS=1  OR (ALLUSERS=2 AND Privileged))
-
-         with a perMachine package ALLUSERS is 1, so the second one always wins and the first
-         never runs. The install has to stay machine-wide — the package is perMachine, and the
-         shortcuts it makes are common ones — so the folder is decided here instead.
-
-         Both of those actions are conditioned on APPLICATIONFOLDER being empty, which is what
-         makes this work: setting it while it still is skips them both. The scope page is not
-         affected — it writes APPLICATIONFOLDER itself, later and in the UI, so choosing "for
-         everyone" there still moves the install to Program Files.
-
-         Only on a fresh install: during a repair or a change the folder is the one already in
-         use, and overwriting it with the default would move the app out from under itself. -->
+    <!-- An update stays where it already is rather than moving out from under its own shortcuts.
+         Naming the folder also stands the stock actions at 998 and 999 down. -->
     <SetProperty Id="APPLICATIONFOLDER"
+                 Value="[INSTALLEDFOLDER]"
+                 After="AppSearch"
+                 Sequence="both"
+                 Condition="NOT Installed AND WIX_UPGRADE_DETECTED AND INSTALLEDFOLDER" />
+
+    <!-- Without this a first install always goes to Program Files: the stock actions read
+         ALLUSERS, which is 1 in a perMachine package, and never WixAppFolder. -->
+    <SetProperty Id="APPLICATIONFOLDER"
+                 Action="SetDefaultApplicationFolder"
                  Value="[WixPerUserFolder]"
                  After="SetWixPerMachineFolder"
                  Sequence="both"
                  Condition="NOT Installed AND APPLICATIONFOLDER = &quot;&quot;" />
 
-    <!-- Both shortcuts are named after the exe rather than after the project: the file is
-         System-Spinner.exe, and a menu entry calling itself something else is one more thing to
-         match up when looking for what is running. -->
+    <!-- Named after the exe rather than the project: a menu entry calling itself something else
+         is one more thing to match up when looking for what is running. -->
     <?define ShortcutName = "System-Spinner" ?>
     <?define ShortcutNote = "System monitoring in the tray and over full-screen applications" ?>
 
-    <!-- The app is a single self-contained exe, and it is the whole of what this package carries.
-         The PawnIO setup used to sit beside it, as old as the build that made the msi; it is
-         fetched by Prerequisites.ps1 now, so what goes in is the release its author has out on the
-         day of the install. -->
     <ComponentGroup Id="AppFiles" Directory="APPLICATIONFOLDER">
       <Component Id="MainExe" Guid="0F8D272E-1348-400B-A2CF-93B2527E70DF">
         <File Id="SystemSpinnerExe" Source="$(Exe)" Name="System-Spinner.exe" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
-    <!-- The script that runs when this install is over: it takes out copies of the app that came
-         from some other installer, fetches the .NET Desktop Runtime, and installs the PawnIO
-         driver. All three are things an msi cannot do from inside itself — see Prerequisites.ps1.
-
-         In the temporary folder rather than beside the exe: it is of use once, and it deletes
-         itself when it has run. -->
-    <ComponentGroup Id="PrerequisiteFiles" Directory="TempFolder">
-      <Component Id="PrerequisiteScript" Guid="5A4E7C21-9D3B-4F86-A0E7-1C8B5D2F63A9">
-        <File Id="PrerequisitesPs1" Source="$(Prerequisites)" Name="Prerequisites.ps1" KeyPath="yes" />
+    <!-- PawnIO, carried rather than fetched: the app will not start without it. In the temporary
+         folder, since it is of use once and the app folder is no place to keep it for ever. -->
+    <ComponentGroup Id="DriverFiles" Directory="TempFolder">
+      <!-- A new GUID, not the one of the program that used to sit here: a component keeps its
+           key path for as long as its GUID lives, and this one holds a different file. -->
+      <Component Id="PawnIoSetup" Guid="60735EC3-FDCF-4933-B90F-95A1AD28DB3C">
+        <File Id="PawnIoSetupExe" Source="$(PawnIO)" Name="PawnIO_setup.exe" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
-    <!-- The shortcut sits directly in the menu rather than in a folder of its own: one entry does
-         not deserve a folder to be opened first. Not advertised — an advertised shortcut shows no
-         icon unless one is named in the msi, and it drags the repair machinery in behind it for
-         a single file that either exists or does not. -->
+    <!-- Directly in the menu: one entry deserves no folder. Not advertised, which would show no
+         icon unless one is named in the msi and drag the repair machinery in behind it. -->
     <ComponentGroup Id="StartMenuShortcutFiles" Directory="ProgramMenuFolder">
       <Component Id="StartMenuShortcut" Guid="C0D8CE73-8C33-4E5C-9A24-7C5A03FFB1CE">
         <Shortcut Id="StartMenuShortcutEntry"
@@ -166,17 +157,10 @@
       </Component>
     </ComponentGroup>
 
-    <!-- The two checkboxes, on by default. Each drives a feature of its own rather than a
-         condition on the component: a feature left out at install is remembered as left out, and
-         a component switched off by a condition would go looking for that condition again when
-         the time comes to remove it. -->
+    <!-- On by default, and a feature each rather than a condition on the component: a feature
+         left out is remembered as left out, a condition would be asked again at removal. -->
     <Property Id="INSTALLSTARTMENUSHORTCUT" Value="1" />
     <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" />
-
-    <!-- The third checkbox on that page, and the one thing on it that is not about shortcuts: an
-         older copy of the app that this package cannot see is taken out with its own uninstaller.
-         Secure, so that a silent install can turn it off: msiexec /i ... UPGRADEPREVIOUS=0 -->
-    <Property Id="UPGRADEPREVIOUS" Value="1" Secure="yes" />
 
     <Feature Id="Main"
              Title="System Spinner x64"
@@ -185,7 +169,7 @@
              AllowAbsent="no"
              ConfigurableDirectory="APPLICATIONFOLDER">
       <ComponentGroupRef Id="AppFiles" />
-      <ComponentGroupRef Id="PrerequisiteFiles" />
+      <ComponentGroupRef Id="DriverFiles" />
 
       <Feature Id="StartMenu" Title="Start menu shortcut"
                Description="A shortcut in the Start menu." Level="1">
@@ -200,72 +184,21 @@
       </Feature>
     </Feature>
 
-    <!-- Everything an msi cannot do from inside itself, done once this install is over: an older
-         copy that came from another installer is cleared away, the .NET Desktop Runtime is fetched
-         when it is missing or behind, and the PawnIO driver is put in when it is missing or behind
-         as well.
+    <!-- A way out for a deployment that manages the driver itself: msiexec /i ... INSTALLPAWNIO=0
+         The app will say what is missing at its first start. -->
+    <Property Id="INSTALLPAWNIO" Value="1" Secure="yes" />
 
-         Clearing away, and not uninstalling: the script never calls the older copy's uninstaller.
-         Several of them take the whole folder they were installed into with them, and an older copy
-         of this same app is as likely as not to be sitting in the very folder the msi has just
-         filled — the app would go minutes after it arrived. What stood where ours now stands is
-         ours. Everything else of it goes: the folder it was installed into, the exe and the
-         uninstaller in it, its entry in the list of installed programs, its shortcuts in the Start
-         menu and on the desktop, and whatever started it with Windows. A folder is emptied rather
-         than deleted outright when settings or a log are in it — those are the same files the new
-         copy will read.
-
-         [APPLICATIONFOLDER] is how the script knows which folder is not to be touched, and it
-         cannot work that out for itself: it does its work elevated, under an account whose own
-         AppData is not where an install "just for me" went. What belongs to the person installing
-         rather than to the machine — their own Start menu, their own Run key — is cleared by the
-         first, unelevated run for the same reason.
-
-         The dot after [APPLICATIONFOLDER] is not a slip: an msi directory property ends in a
-         backslash, and a backslash in front of the closing quote is read as an escaped quote by
-         the parser that splits a command line into arguments — the folder and everything after it
-         would arrive as one string. A dot is a folder that means "this one", and the script takes
-         it off again.
-
-         That driver is what LibreHardwareMonitor reads the sensors through: without it there are
-         no temperatures, no power and no fan speeds, and the app refuses to start. Nothing about
-         it is done from inside this package any more — the script looks at what is on the machine
-         and fetches the release its author has out today. It is left in place when the app is
-         removed: other applications use the same driver, and taking it away with us would break
-         them.
-
-         After InstallFinalize and not inside the install: everything it reaches for is somebody
-         else's package, and an msi cannot start another msi while it holds the installer to
-         itself.
-
-         Immediate and impersonated, so it runs as whoever started the installer and can raise the
-         prompt for administrator rights itself. It asks for them at once, before it has looked at
-         anything: what it does is machine-wide to the last line, and the run that has the rights
-         should not have to work out, as another account, what this one would have decided. Its
-         outcome is ignored either way: the app is installed by the time it runs.
-
-         The console it opens is minimised — the questions have all been answered by this point,
-         and what happens in it belongs in its log rather than in front of anybody. The one thing
-         that cannot wait for somebody to open the log, that the app will not start at all, the
-         script puts in a message box of its own. [UILevel] is what tells it whether there is
-         anybody to put it in front of: below 4 the install was asked to be quiet, and it stays so.
-
-         [#SystemSpinnerExe] is where the exe has just landed, and the shortcuts and the autostart
-         task are pointed back at it if the older copy's uninstaller takes them along. -->
-    <CustomAction Id="InstallPrerequisites"
-                  Directory="TempFolder"
-                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -WindowStyle Minimized -ExecutionPolicy Bypass -File &quot;[TempFolder]Prerequisites.ps1&quot; -Folder &quot;[APPLICATIONFOLDER].&quot; -Exe &quot;[#SystemSpinnerExe]&quot; -Product &quot;[ProductCode]&quot; -UiLevel &quot;[UILevel]&quot; [PREVIOUSSWITCH]"
+    <!-- Deferred, so it runs elevated with no second prompt, and silent. FileRef because a
+         deferred action reads no properties and [TempFolder] would arrive empty. -->
+    <CustomAction Id="InstallPawnIo"
+                  FileRef="PawnIoSetupExe"
+                  ExeCommand="-install -silent"
+                  Execute="deferred"
+                  Impersonate="no"
                   Return="ignore" />
 
-    <!-- The checkbox travels to the script as its one switch: look for older copies only while it
-         is still ticked. -->
-    <SetProperty Id="PREVIOUSSWITCH" Value="-NoPrevious" Before="InstallPrerequisites"
-                 Sequence="execute" Condition="UPGRADEPREVIOUS &lt;&gt; 1" />
-
-    <!-- A running copy holds its own exe, which an upgrade has to overwrite — left alone, Windows
-         would ask for a restart to finish what it could not do. The app has no ordinary window a
-         close message can reach and it runs elevated, so it is asked from the elevated side and
-         then ended. -->
+    <!-- A running copy holds the exe an upgrade must overwrite. It has no ordinary window and
+         runs elevated, so it is asked from the elevated side and then ended. -->
     <util:CloseApplication Id="CloseRunningApp"
                            Target="System-Spinner.exe"
                            CloseMessage="yes"
@@ -274,9 +207,8 @@
                            RebootPrompt="no"
                            Timeout="10" />
 
-    <!-- The autostart entry is a scheduled task the app makes for itself, so the app is what the
-         installer knows nothing about — it is removed here, and a failure is not worth stopping
-         an uninstall over. -->
+    <!-- Autostart is a scheduled task the app makes for itself, so the installer knows nothing
+         about it: removed here, and a failure is not worth stopping an uninstall over. -->
     <CustomAction Id="RemoveAutostartTask"
                   Directory="APPLICATIONFOLDER"
                   ExeCommand="[System64Folder]schtasks.exe /delete /tn &quot;System-Spinner&quot; /f"
@@ -285,73 +217,58 @@
                   Return="ignore" />
 
     <InstallExecuteSequence>
-      <!-- On an install and on an upgrade, which is where a driver that has moved on since the
-           last one is noticed; never on the way out. -->
-      <Custom Action="InstallPrerequisites" After="InstallFinalize" Condition="NOT Installed" />
+      <!-- After the files are on disk, since the setup being run is one of them. Every time:
+           what to do with a copy it finds is PawnIO's own setup to decide. -->
+      <Custom Action="InstallPawnIo" After="InstallFiles"
+              Condition="NOT Installed AND INSTALLPAWNIO = 1" />
 
-      <!-- Only when the app is really being removed. An upgrade removes the older version the
-           same way, with REMOVE=ALL, and deleting the task there would quietly turn autostart
-           off for someone who had asked for it — UPGRADINGPRODUCTCODE is set on exactly that
-           half of an upgrade and on nothing else. -->
+      <!-- Only on a real uninstall. An upgrade removes the old version with REMOVE=ALL as well,
+           and UPGRADINGPRODUCTCODE is set on exactly that half and on nothing else. -->
       <Custom Action="RemoveAutostartTask" Before="RemoveFiles"
               Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
     </InstallExecuteSequence>
 
-    <!-- The advanced set is the one that asks whom the install is for, and brings the folder page
-         with it: for everyone or for me, and where it goes. -->
+    <!-- The advanced set: the one that asks whom the install is for and brings the folder page. -->
     <ui:WixUI Id="WixUI_Advanced" />
     <WixVariable Id="WixUILicenseRtf" Value="$(License)" />
 
-    <!-- The app is started when the installer closes, unless the checkbox on the shortcuts page
-         says otherwise. There is nothing to see after an install otherwise: the app has no window,
-         only an icon in the notification area, and someone who has just installed it wants to look
-         at it now rather than hunt for the shortcut.
-
-         Through the shell rather than started directly: the app demands administrator rights, and
-         a program started by the installer itself never gets the prompt for them — it simply
-         fails, which is what error 1631 in the log was. The shell shows the prompt.
-
-         The last page belongs to the part of the installer that runs as the person installing,
-         not to the elevated half, so the app comes up as them and reads their config. -->
+    <!-- Through the shell, not started directly: the app demands administrator rights, and a
+         program started by the installer never gets the prompt for them (error 1631). -->
     <Property Id="LAUNCHAFTERINSTALL" Value="1" />
 
     <CustomAction Id="SetAppTarget" Property="WixShellExecTarget" Value="[#SystemSpinnerExe]" />
     <CustomAction Id="LaunchApplication" DllEntry="WixShellExec" BinaryRef="Wix4UtilCA_X64" Impersonate="yes" />
 
-    <!-- Our page of shortcuts, put between the folder page and the last one.
-
-         Where a button already carries a jump of the stock set, ours has to come after it: several
-         events on one button run in order of Ordering, and of two that both name a next dialog the
-         later one decides. Hence the tens — the set uses one to seven.
-
-         The first page is left alone: "Install" installs there and then, with everything at its
-         default — for the person installing, into their profile, with both shortcuts — and
-         "Advanced" opens the questions below. -->
+    <!-- Our shortcuts page, between the folder page and the last one. The tens in Ordering put
+         ours after the stock jumps (one to seven); the later of two next-dialogs decides. -->
     <UI>
-      <!-- After the choice of whom it is for, the stock set goes to the folder page when the
-           install is for everyone and skips to the feature tree otherwise. That other half is
-           claimed here, so both ways reach the folder and the shortcuts behind it. -->
-      <!-- The install is machine-wide whichever folder was chosen: the package is perMachine and
-           the shortcuts it makes are common ones. The stock page clears that flag for "just me" —
-           this puts it back, later in the order and therefore last. -->
+      <!-- The stock page clears ALLUSERS for "just me". This puts it back, later in the order
+           and therefore last: the package is perMachine whichever folder was chosen. -->
       <Publish Dialog="InstallScopeDlg" Control="Next" Property="ALLUSERS" Value="1" Order="8" />
 
+      <!-- The stock set skips the folder page for a per-user install; that half is claimed here. -->
       <Publish Dialog="InstallScopeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg"
                Condition="WixAppFolder = &quot;WixPerUserFolder&quot;" Order="10" />
 
       <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ShortcutsDlg" Order="10" />
       <Publish Dialog="ShortcutsDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" />
+
+      <!-- On an update neither the scope nor the folder is a question, so "Advanced" passes both
+           pages. The stock jumps out of the first page are ordered one to three. -->
+      <Publish Dialog="AdvancedWelcomeEulaDlg" Control="Advanced" Event="NewDialog"
+               Value="ShortcutsDlg" Condition="WIX_UPGRADE_DETECTED" Order="20" />
+
+      <Publish Dialog="ShortcutsDlg" Control="Back" Event="NewDialog"
+               Value="AdvancedWelcomeEulaDlg" Condition="WIX_UPGRADE_DETECTED" Order="10" />
       <Publish Dialog="ShortcutsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
-      <!-- The way back is only claimed while installing. During maintenance the last page is
-           reached from the repair-or-remove page and has to return there, and a page about
-           shortcuts to be created has nothing to say then. -->
+      <!-- Claimed only while installing: during maintenance the last page returns to the
+           repair-or-remove page, and a page about shortcuts has nothing to say then. -->
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ShortcutsDlg"
                Condition="NOT Installed" Order="10" />
 
-      <!-- Only after a fresh install: the same page ends a repair and an uninstall too, and
-           starting the app at the end of its own removal would be a poor joke. The stock event
-           that closes the page sits at 999, so both of these run before it. -->
+      <!-- Only after a fresh install: the same page ends a repair and an uninstall too. The stock
+           event that closes it sits at 999, so both of these run before it. -->
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="SetAppTarget"
                Condition="LAUNCHAFTERINSTALL = 1 AND NOT Installed" Order="1" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"

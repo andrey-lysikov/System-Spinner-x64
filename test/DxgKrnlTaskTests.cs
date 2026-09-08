@@ -6,10 +6,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Picking the graphics kernel event by the preference list from the config. The list is kept by
-/// hand, so it matters that a name matches case-insensitively and a number only exactly.
-/// </summary>
+/// <summary>Picking the graphics kernel event by the preference list, which is kept by hand: a
+/// name matches case-insensitively, a number only exactly.</summary>
 public class DxgKrnlTaskTests
 {
     private static readonly string[] Tasks =

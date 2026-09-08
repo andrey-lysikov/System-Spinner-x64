@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!--
-  One dialog of our own, wedged into the stock advanced set between the folder page and the last
-  one: where the shortcuts go. The stock sets have no page for that — they offer a tree of
-  features instead, which names the same two things in the language of an installer rather than
-  in the language of someone installing.
-
-  The geometry follows the stock dialogs exactly (370 x 270, the banner at the top, the buttons at
-  the bottom), or this page would jump when it comes up between two of theirs.
--->
+<!-- Our one page, between the stock folder page and the last one: where the shortcuts go. The
+     geometry (370 x 270, banner, buttons) follows the stock dialogs so the page does not jump. -->
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>
@@ -31,24 +24,15 @@
                  Property="INSTALLDESKTOPSHORTCUT" CheckBoxValue="1"
                  Text="Add a shortcut to the desktop" />
 
-        <!-- The same question the stock last page can ask, asked here instead: there the checkbox
-             is drawn by a control of the set over the white of that page and comes out in a grey
-             box of its own. Here it sits on the same ground as the two above it. -->
+        <!-- The same question the stock last page can ask, asked here instead: there it comes
+             out in a grey box of its own, here it sits on the same ground as the two above. -->
         <Control Id="LaunchCheckBox" Type="CheckBox" X="20" Y="120" Width="330" Height="17"
                  Property="LAUNCHAFTERINSTALL" CheckBoxValue="1"
                  Text="Start the app when the installer finishes" />
 
-        <!-- The one thing on this page that is not about shortcuts, and the only place it can be
-             asked: an older copy that came from another installer is invisible to this package,
-             and replacing it means running the uninstaller it left behind. Ticked to begin with —
-             two copies of the app on one machine is not something anybody chooses on purpose. -->
-        <Control Id="PreviousCheckBox" Type="CheckBox" X="20" Y="145" Width="330" Height="17"
-                 Property="UPGRADEPREVIOUS" CheckBoxValue="1"
-                 Text="Replace copies installed some other way" />
-
-        <Control Id="Note" Type="Text" X="20" Y="170" Width="330" Height="50" Transparent="yes"
+        <Control Id="Note" Type="Text" X="20" Y="150" Width="330" Height="70" Transparent="yes"
                  NoPrefix="yes"
-                 Text="The app lives in the notification area: it has no window of its own, and a shortcut is what starts it the first time. A copy installed by this same installer is replaced in any case; the box above is about the ones that came from somewhere else." />
+                 Text="The app lives in the notification area: it has no window of its own, and a shortcut is what starts it the first time. Its tray menu can make it start with Windows from then on.&#10;&#10;The PawnIO driver, which the app reads the sensors through, is carried in this installer and put in silently while this install runs. It is the newest release there was on the day this installer was built, and it is left in place when the app is removed: other programs read their sensors through it too." />
 
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
 

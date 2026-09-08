@@ -6,10 +6,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// The frame window: counting FPS and the leeway for a delayed ETW batch. Three bugs were caught
-/// here, which showed the panel either tens of thousands of frames or a flickering dash.
-/// </summary>
+/// <summary>The frame window: counting FPS and the leeway for a delayed ETW batch. Three bugs
+/// were caught here, showing either tens of thousands of frames or a flickering dash.</summary>
 public class FrameWindowTests
 {
     private const double Window = 1.0;
@@ -60,9 +58,8 @@ public class FrameWindowTests
     [Fact]
     public void Пачка_событий_не_завышает_fps()
     {
-        // Exactly the bug that sent the FPS into the tens of thousands: an ETW batch is parsed in
-        // microseconds, and had the frames been stamped at parse time the intervals would collapse.
-        // The stamps follow the trace clock, so the arrival of a batch does not affect the count.
+        // The bug that sent FPS into the tens of thousands: a batch is parsed in microseconds, so
+        // stamping at parse time would collapse the intervals. The stamps follow the trace clock.
         var w = new FrameWindow(Window, Stale);
         for (int i = 0; i < 60; i++) w.Add(i / 60.0, wallNow: 100.0 + i * 0.000_001);
 

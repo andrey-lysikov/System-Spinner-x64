@@ -8,10 +8,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Sorting detected fans into the panel slots. The decisions fixed here are easy to "simplify"
-/// back: an empty AIO slot, and case fans as fallbacks for the processor.
-/// </summary>
+/// <summary>Sorting detected fans into the panel slots. The decisions fixed here are easy to
+/// "simplify" back: an empty AIO slot, and case fans as fallbacks for the processor.</summary>
 public class FanConfigTests
 {
     private static FanSensor Fan(string name, FanRole role, double? rpm) =>

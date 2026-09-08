@@ -7,10 +7,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// The exclusion list: which full-screen applications a name from the config stands for.
-/// A wrong match here means the panel disappears over a game or stays over the Snipping Tool.
-/// </summary>
+/// <summary>The exclusion list: which full-screen applications a config name stands for. A wrong
+/// match means the panel disappears over a game or stays over the Snipping Tool.</summary>
 public class ProcessPatternTests
 {
     private const string HandBrake = @"C:\Program Files\HandBrake\HandBrake.exe";

@@ -10,11 +10,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// The log file: which lines survive without Debug, and how the numbered generations are kept.
-/// The whole class shares one static Log, so the tests here run one after another — xunit keeps
-/// the tests of a class in the same collection.
-/// </summary>
+/// <summary>The log file: which lines survive without Debug, and how the numbered generations
+/// are kept. The class shares one static Log, so xunit runs these one after another.</summary>
 public class LogTests : IDisposable
 {
     private readonly List<string> _folders = new();

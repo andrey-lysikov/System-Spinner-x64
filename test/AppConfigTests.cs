@@ -6,10 +6,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Where the settings live. The file format itself is checked in <see cref="ConfFormatTests"/> —
-/// this is only about the choice of place.
-/// </summary>
+/// <summary>Where the settings live; the file format itself is checked in
+/// <see cref="ConfFormatTests"/>.</summary>
 public class AppConfigTests
 {
     [Fact]

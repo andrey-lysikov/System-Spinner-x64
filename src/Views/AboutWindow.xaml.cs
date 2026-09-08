@@ -5,7 +5,6 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using SystemSpinnerX64.Diagnostics;
@@ -33,17 +32,15 @@ public partial class AboutWindow : Window
 
         ApplyTheme();
 
-        // A click elsewhere closes the window, like every other window here. Closing itself
-        // deactivates it, so without the guard the handler would call Close() on an already
-        // closed window — and that throws.
+        // A click elsewhere closes the window. Closing deactivates it too, so without the guard
+        // the handler would call Close() on an already closed window, and that throws.
         Deactivated += (_, _) => CloseOnce();
     }
 
     private bool _closing;
 
-    // The flag is raised here rather than in CloseOnce: Close() raises Closing synchronously,
-    // so every way of closing the window — the button, Esc, the system — passes through this
-    // and is covered.
+    // The flag is raised here rather than in CloseOnce: Close() raises Closing synchronously, so
+    // every way of closing the window — the button, Esc, the system — passes through it.
     protected override void OnClosing(CancelEventArgs e)
     {
         _closing = true;
@@ -59,15 +56,17 @@ public partial class AboutWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        Dwm.ApplyAcrylic(new WindowInteropHelper(this).Handle, Theme.AreWindowsDark());
+        WindowTheme.ApplyBackdrop(this);
     }
 
     private void ApplyTheme()
     {
+        // The backdrop is not re-applied here: this window is built once and never outlives a
+        // theme switch, unlike the two that stay behind the tray icon.
         bool dark = Theme.AreWindowsDark();
 
-        Color foreground = dark ? Colors.White : Color.FromRgb(0x11, 0x11, 0x11);
-        Color background = dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xF7, 0xF7, 0xF7);
+        Color foreground = WindowTheme.Foreground(dark);
+        Color background = WindowTheme.Background(dark);
 
         Shell.Background = new SolidColorBrush(background) { Opacity = 0.92 };
         Shell.BorderBrush = new SolidColorBrush(foreground) { Opacity = 0.12 };

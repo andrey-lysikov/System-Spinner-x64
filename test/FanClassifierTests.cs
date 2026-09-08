@@ -7,11 +7,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Sorting fans into roles. Worth testing because it is the only guess in the project: every
-/// board names its headers differently, and a mistake here is not a failure but a quietly wrong
-/// reading — a case fan passed off as a pump.
-/// </summary>
+/// <summary>Sorting fans into roles, the only guess in the project: a mistake here is not a
+/// failure but a quietly wrong reading, a case fan passed off as a pump.</summary>
 public class FanClassifierTests
 {
     [Theory]

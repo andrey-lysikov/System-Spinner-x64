@@ -46,9 +46,18 @@ jobs:
           "tag=$tag"         >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - name: Build
+      - name: Build the exe
         shell: pwsh
-        run: ./build.ps1 -Installer -SkipTests -Version ${{ steps.target.outputs.version }}
+        run: ./build.ps1
+
+      # The msi, out of the exe the step above produced. The tests are the job this one needs.
+      - name: Build the installer
+        shell: pwsh
+        # The installer fetches the newest PawnIO release and packages it. The token is only there
+        # so the call to the GitHub API is not rate limited by the address of the runner.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./installer/installer.ps1 -Version ${{ steps.target.outputs.version }}
 
       - name: Replace the installer
         shell: pwsh

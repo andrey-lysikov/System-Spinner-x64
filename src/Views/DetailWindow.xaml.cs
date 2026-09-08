@@ -12,7 +12,6 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Monitoring;
-using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Views;
 
@@ -67,19 +66,15 @@ public partial class DetailWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        Dwm.ApplyAcrylic(new WindowInteropHelper(this).Handle, Theme.AreWindowsDark());
+        WindowTheme.ApplyBackdrop(this);
     }
 
     public void ApplyTheme()
     {
-        bool dark = Theme.AreWindowsDark();
+        bool dark = WindowTheme.ApplyBackdrop(this);
 
-        // The dark flag of the backdrop is part of the theme too: without repeating this call the
-        // acrylic would keep its old tint.
-        Dwm.ApplyAcrylic(new WindowInteropHelper(this).Handle, dark);
-
-        Color foreground = dark ? Colors.White : Color.FromRgb(0x11, 0x11, 0x11);
-        Color background = dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xF7, 0xF7, 0xF7);
+        Color foreground = WindowTheme.Foreground(dark);
+        Color background = WindowTheme.Background(dark);
 
         Shell.Background = new SolidColorBrush(background) { Opacity = 0.90 };
         Shell.BorderBrush = new SolidColorBrush(foreground) { Opacity = 0.12 };

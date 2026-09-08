@@ -6,10 +6,8 @@ using Xunit;
 
 namespace SystemSpinnerX64.Tests;
 
-/// <summary>
-/// Reading the stand-in brightness keys out of the config. A wrong line there must leave the keys
-/// unregistered and say why, never throw.
-/// </summary>
+/// <summary>Reading the stand-in brightness keys out of the config: a wrong line must leave them
+/// unregistered and say why, never throw.</summary>
 public class HotKeySpecTests
 {
     [Fact]

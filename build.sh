@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +11,21 @@ step() { printf '\n\033[36m=== %s\033[0m\n' "$1"; }
 ok()   { printf '\033[32m  + %s\033[0m\n' "$1"; }
 
 cleanup() {
-    rm -rf "$output/obj" "$output/bin"
+    local kept=""
+
+    for path in "$output/obj" "$output/bin" \
+                "$repo/src/bin" "$repo/src/obj" \
+                "$repo/test/bin" "$repo/test/obj" \
+                "$repo/installer/bin" "$repo/installer/obj"; do
+        if [[ -e "$path" ]]; then
+            rm -rf "$path" 2>/dev/null || true
+            if [[ -e "$path" ]]; then kept="$kept $path"; fi
+        fi
+    done
+
+    if [[ -n "$kept" ]]; then
+        printf '\033[33m  ! could not be removed:%s\033[0m\n' "$kept" >&2
+    fi
 }
 trap cleanup EXIT
 
