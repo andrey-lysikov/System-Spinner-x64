@@ -54,7 +54,6 @@ public class LogTests : IDisposable
         Log.SetVerbose(false);
 
         Log.Info("course of work");
-        Log.Key("a key press");
         Log.Event("the machine changed");
         Log.Warn("worth noticing");
         Log.Error("got in the way");
@@ -62,7 +61,6 @@ public class LogTests : IDisposable
         string written = File.ReadAllText(path);
 
         Assert.DoesNotContain("course of work", written);
-        Assert.DoesNotContain("a key press", written);
         Assert.Contains("EVENT the machine changed", written);
         Assert.Contains("WARN  worth noticing", written);
         Assert.Contains("ERROR got in the way", written);
@@ -77,12 +75,10 @@ public class LogTests : IDisposable
         Log.SetVerbose(true);
 
         Log.Info("course of work");
-        Log.Key("a key press");
 
         string written = File.ReadAllText(path);
 
         Assert.Contains("INFO  course of work", written);
-        Assert.Contains("KEY   a key press", written);
     }
 
     [Fact]

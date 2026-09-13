@@ -444,9 +444,6 @@ public sealed class ModeSupervisor : IDisposable
     private void StartMediaKeys()
     {
         _keys.Handler = OnMediaKey;
-        // Every key into the log goes with the full record: it is a line per press, and someone
-        // who asked for the whole course of work asked for this too.
-        _keys.Trace = _cfg.Debug ?? false;
         _keys.StartVolumeKeys();
 
         // Windows makes no virtual key of the brightness keys and acts on them nowhere, so they
@@ -458,11 +455,6 @@ public sealed class ModeSupervisor : IDisposable
         // The panel Windows draws for the same keys. It is only ever touched right after a press
         // we have already answered with our own panel.
         ShellFlyout.Watch();
-
-        // Said out loud: someone reading a log full of KEY lines has to know where they come from
-        // and how to stop them.
-        if (_keys.Trace)
-            Log.Info("every key press goes into the log as a KEY line while Debug is on");
     }
 
     // A keyboard without brightness keys leaves the screen with no way to be dimmed from it at
@@ -744,7 +736,5 @@ public sealed class ModeSupervisor : IDisposable
         _metrics.Dispose();
         _fps.Dispose();
         _hardware.Dispose();
-
-        Log.Finish("exit from the tray menu");
     }
 }

@@ -20,6 +20,9 @@ public partial class App : Application
     private Mutex? _instanceLock;
     private ModeSupervisor? _supervisor;
 
+    // Set once the closing line is in the log: every way out writes it, and only once.
+    private bool _finished;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -107,16 +110,38 @@ public partial class App : Application
     // notice is what the user is told in the action centre; without it the app just closes.
     private void Stop(string reason, string? notice = null)
     {
-        Log.Finish(reason);
+        Finish(reason);
 
         if (notice is not null) StartupNotice.Show(notice);
         else Shutdown();
     }
 
+    // Logoff and shutdown do not wait for the sensors and the ETW session to close: the line goes
+    // in now, or the process is gone before OnExit gets to it.
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        Finish(e.ReasonSessionEnding == ReasonSessionEnding.Shutdown
+            ? "Windows is shutting down"
+            : "the user is logging off");
+
+        base.OnSessionEnding(e);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
+        // Before disposing, not after: a device that hangs on closing would take the line with it.
+        Finish("exit from the tray menu");
+
         _supervisor?.Dispose();
         _instanceLock?.Dispose();
         base.OnExit(e);
+    }
+
+    private void Finish(string reason)
+    {
+        if (_finished) return;
+        _finished = true;
+
+        Log.Finish(reason);
     }
 }

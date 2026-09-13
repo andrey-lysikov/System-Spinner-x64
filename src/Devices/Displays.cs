@@ -309,7 +309,8 @@ internal sealed class DisplayDevice : IDisposable
 
         // The handle was given out and the monitor still answered nothing worth having: on most
         // panels a switch in their own menu, off from the factory, that nothing here can turn on.
-        if (!isInternal && physical.Length > 0 && brightness is null && volume is null)
+        // Once per monitor: screens are rescanned many times a day, and the answer does not change.
+        if (!isInternal && physical.Length > 0 && brightness is null && volume is null && FirstAdvice(name))
             Log.Info($"\"{name}\" is on a wire that carries DDC/CI but answers none of it: look " +
                      "for DDC/CI (HP calls it \"DDC/CI\", LG \"DDC/CI\" or \"Auto\", Dell \"DDC/CI\") " +
                      "in the monitor's own menu and turn it on. A dock, a KVM or a DP/HDMI adapter " +
@@ -318,6 +319,14 @@ internal sealed class DisplayDevice : IDisposable
         return device;
 
         static string Show(double? value) => value is null ? "no" : $"{value.Value:0} %";
+    }
+
+    private static readonly HashSet<string> Advised = new(StringComparer.Ordinal);
+
+    // Whether the DDC/CI advice for this monitor has not been written yet; marks it as written.
+    private static bool FirstAdvice(string name)
+    {
+        lock (Advised) return Advised.Add(name);
     }
 
     // Asks the monitor what it stands at: the numbers held here are only what the app last set,

@@ -27,10 +27,7 @@ internal enum LogLevel
     Error,
 
     // What nobody caught. Writes the stack of every inner exception as well.
-    Crash,
-
-    // Key presses. They have a tag of their own or a line per press drowns the rest of the file.
-    Key
+    Crash
 }
 
 // A log file next to config.conf, and the only diagnostic channel this application has: it has
@@ -135,10 +132,6 @@ public static class Log
         Add(LogLevel.Crash, text.ToString());
     }
 
-    // A key seen by the hook or read from the raw input. Part of the full record, and only written
-    // with it — but under a tag of its own: a line per press would drown the rest otherwise.
-    public static void Key(string message) => Add(LogLevel.Key, message);
-
     private static readonly Dictionary<string, DateTime> LastSaid = new();
 
     // A warning from somewhere that runs many times a second. Said once, then held for a while
@@ -162,7 +155,7 @@ public static class Log
         lock (Gate)
         {
             if (_path is null) return;
-            if (!_verbose && level is LogLevel.Info or LogLevel.Key) return;
+            if (!_verbose && level == LogLevel.Info) return;
 
             string stamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
 
@@ -181,7 +174,6 @@ public static class Log
         LogLevel.Warn => "WARN ",
         LogLevel.Error => "ERROR",
         LogLevel.Crash => "CRASH",
-        LogLevel.Key => "KEY  ",
         _ => "INFO "
     };
 

@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Windows.Interop;
 using SystemSpinnerX64.Diagnostics;
@@ -167,19 +166,10 @@ internal static class RawInput
     public const ushort BrightnessIncrement = 0x006F;
     public const ushort BrightnessDecrement = 0x0070;
 
-    // One report as it arrived. The bytes are for the trace, when a usage cannot be read.
+    // One report as it arrived: the usages held in it.
     internal sealed class Press
     {
         public required IReadOnlyList<ushort> Usages { get; init; }
-        public required string Report { get; init; }
-
-        public override string ToString()
-        {
-            var named = new List<string>();
-            foreach (ushort usage in Usages) named.Add($"usage 0x{usage:X4} ({Name(usage)})");
-
-            return $"{string.Join(", ", named)}, report {Report}";
-        }
     }
 
     // Consumer Control: the media and brightness keys of a keyboard live on this page.
@@ -320,7 +310,7 @@ internal static class RawInput
 
             if (held.Count == 0) return null;
 
-            return new Press { Usages = held, Report = Hex(reports, reportSize) };
+            return new Press { Usages = held };
         }
         catch (Exception ex)
         {
@@ -374,37 +364,6 @@ internal static class RawInput
         {
             if (preparsed != IntPtr.Zero) Marshal.FreeHGlobal(preparsed);
         }
-    }
-
-    // The usages of the consumer page worth naming.
-    private static string Name(ushort usage) => usage switch
-    {
-        0x006F => "Brightness Increment",
-        0x0070 => "Brightness Decrement",
-        0x0079 => "Keyboard Backlight Up",
-        0x007A => "Keyboard Backlight Down",
-        0x00B5 => "Media Next",
-        0x00B6 => "Media Previous",
-        0x00B7 => "Media Stop",
-        0x00CD => "Media Play/Pause",
-        0x00E2 => "Mute",
-        0x00E9 => "Volume Up",
-        0x00EA => "Volume Down",
-        _ => "unnamed"
-    };
-
-    // The report byte for byte: all there is to go on when the usages cannot be read.
-    private static string Hex(IntPtr report, int size)
-    {
-        var text = new StringBuilder(size * 3);
-
-        for (int i = 0; i < size; i++)
-        {
-            if (i > 0) text.Append(' ');
-            text.Append(Marshal.ReadByte(report, i).ToString("X2"));
-        }
-
-        return text.ToString();
     }
 }
 
@@ -720,8 +679,6 @@ internal sealed class MediaKeyMonitor : IDisposable
     private const int HcAction = 0;
     private const int WmKeyDown = 0x0100;
     private const int WmSysKeyDown = 0x0104;
-    private const int WmKeyUp = 0x0101;
-    private const int WmSysKeyUp = 0x0105;
     private const int WmInput = 0x00FF;
 
     private const int VkVolumeMute = 0xAD;
@@ -750,12 +707,6 @@ internal sealed class MediaKeyMonitor : IDisposable
     [DllImport("user32.dll")]
     private static extern IntPtr CallNextHookEx(IntPtr hhk, int code, IntPtr wParam, IntPtr lParam);
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetKeyNameTextW(int lParam, [Out] char[] text, int size);
-
-    [DllImport("user32.dll")]
-    private static extern short GetAsyncKeyState(int virtualKey);
-
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint virtualKey);
@@ -766,10 +717,6 @@ internal sealed class MediaKeyMonitor : IDisposable
 
     // Who decides what to do with a key.
     public Func<MediaKey, MediaKeyResult>? Handler { get; set; }
-
-    // Writes every key the hook and the raw input see into the log: what arrived, under which
-    // code, and whether a program put it there. A line per press, so off by default.
-    public bool Trace { get; set; }
 
     // The delegate has to outlive the hook: the garbage collector does not know Windows refers to
     // it, and without this field the hook would one day call freed code.
@@ -889,9 +836,6 @@ internal sealed class MediaKeyMonitor : IDisposable
 
         int message = (int)wParam;
 
-        // Before the filter below: the trace is there for the keys this class does not know.
-        if (Trace) Describe(message, lParam);
-
         if (message is not (WmKeyDown or WmSysKeyDown)) return CallNextHookEx(_hook, code, wParam, lParam);
 
         var data = Marshal.PtrToStructure<KbdLlHookStruct>(lParam);
@@ -925,102 +869,12 @@ internal sealed class MediaKeyMonitor : IDisposable
             : new IntPtr(1);
     }
 
-    // One line per key: what it was, under which code, and what was held with it.
-    private void Describe(int message, IntPtr lParam)
-    {
-        if (message is not (WmKeyDown or WmSysKeyDown or WmKeyUp or WmSysKeyUp)) return;
-
-        try
-        {
-            var data = Marshal.PtrToStructure<KbdLlHookStruct>(lParam);
-
-            bool down = message is WmKeyDown or WmSysKeyDown;
-            bool extended = (data.flags & 0x01) != 0;
-            bool injected = (data.flags & 0x10) != 0;
-
-            var line = new StringBuilder();
-            line.Append(down ? "down " : "up   ");
-            line.Append($"vk 0x{data.vkCode:X2} ({KeyName(data)})");
-            line.Append($", scan 0x{data.scanCode:X2}");
-            if (extended) line.Append(", extended");
-            if (injected) line.Append(", injected by a program");
-
-            string held = Held();
-            if (held.Length > 0) line.Append(", held: ").Append(held);
-
-            Log.Key(line.ToString());
-        }
-        catch (Exception ex)
-        {
-            // The trace must never be what breaks the hook: without the hook the volume keys stop.
-            System.Diagnostics.Debug.WriteLine($"the key was not described: {ex.Message}");
-        }
-    }
-
-    // The name Windows itself puts on the key — "F2", "Volume Up" — in the keyboard layout in use.
-    private static string KeyName(KbdLlHookStruct data)
-    {
-        try
-        {
-            // GetKeyNameText takes the scan code where WM_KEYDOWN keeps it: bits 16 to 23, with
-            // the extended flag at bit 24.
-            int lParam = (int)(data.scanCode << 16) | ((data.flags & 0x01) != 0 ? 1 << 24 : 0);
-
-            var text = new char[64];
-            int length = GetKeyNameTextW(lParam, text, text.Length);
-
-            if (length > 0) return new string(text, 0, length);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"the key name was not read: {ex.Message}");
-        }
-
-        // Keys the layout has no name for — the media and brightness ones among them.
-        return Known(data.vkCode);
-    }
-
-    // Windows names none of these, and a bare number says nothing.
-    private static string Known(uint virtualKey) => virtualKey switch
-    {
-        0xAD => "Volume Mute",
-        0xAE => "Volume Down",
-        0xAF => "Volume Up",
-        0xB0 => "Media Next",
-        0xB1 => "Media Previous",
-        0xB2 => "Media Stop",
-        0xB3 => "Media Play/Pause",
-        0xB4 => "Launch Mail",
-        0xB5 => "Launch Media",
-        0xB6 => "Launch App 1",
-        0xB7 => "Launch App 2",
-        0xA6 => "Browser Back",
-        0xA7 => "Browser Forward",
-        0xFF => "reserved by the driver — the key is handled without a code of its own",
-        _ => "unnamed"
-    };
-
-    private static string Held()
-    {
-        var parts = new List<string>();
-        if (Down(0x11)) parts.Add("Ctrl");
-        if (Down(0x12)) parts.Add("Alt");
-        if (Down(0x10)) parts.Add("Shift");
-        if (Down(0x5B) || Down(0x5C)) parts.Add("Win");
-        return string.Join("+", parts);
-    }
-
-    // The high bit says the key is down right now.
-    private static bool Down(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
-
     // A key read from the raw input. Nothing is taken away from anyone: raw input is a copy, and
     // the press goes its own way regardless.
     private void OnRawInput(IntPtr message)
     {
         RawInput.Press? press = RawInput.Read(message);
         if (press is null) return;
-
-        if (Trace) Log.Key($"HID  {press}");
 
         // Only the brightness keys are taken from the raw input: volume arrives both as a usage
         // and as the virtual key the hook handles, and acting on both moves it two steps.
@@ -1055,8 +909,6 @@ internal sealed class MediaKeyMonitor : IDisposable
         if (msg == WmHotKey && (int)wParam is HotKeyDown or HotKeyUp)
         {
             MediaKey key = (int)wParam == HotKeyUp ? MediaKey.BrightnessUp : MediaKey.BrightnessDown;
-
-            if (Trace) Log.Key($"HOT  {key}");
 
             try { Handler?.Invoke(key); }
             catch (Exception ex) { Log.Error($"handling the {key} key failed", ex); }
