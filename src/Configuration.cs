@@ -196,7 +196,7 @@ public sealed class AppearanceConfig
     public static List<string> DefaultBlackList() => new()
     {
         "SnippingTool*", "ScreenClippingHost", "ShareX", "Greenshot", "Lightshot",
-        "LockApp", "LogonUI",
+        "LockApp", "LogonUI", "dwm",
         "vlc", "mpv", "mpc-hc*", "mpc-be*", "PotPlayer*", "wmplayer", "Video.UI", "Photos", "Microsoft.Photos",
         "chrome", "msedge", "firefox", "brave", "opera", "vivaldi",
         "POWERPNT", "mstsc", "HandBrake",
