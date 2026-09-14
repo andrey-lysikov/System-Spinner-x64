@@ -1,6 +1,8 @@
 # Changelog
 
+## 1.4
 
+* Bugfix
 
 ## 1.3
 
