@@ -1,24 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!-- The installer: where the app goes (the installer's profile, offered first, or Program Files),
-     which shortcuts to make, whether to start it. Built by installer/installer.ps1. -->
+<!-- The installer: for the person installing (in their profile, offered first) or for everyone
+     (Program Files), which shortcuts to make, whether to start it. Each Windows user may have a
+     copy of their own, of any version; a copy for everyone is one per machine. An update touches
+     only the installer's own copy or the one for everyone, never another user's: one UAC prompt
+     first, the Update page, the running app closed, the files replaced and the app started again.
+     A first install asks for rights only at its Install button.
+     Built by installer/installer.ps1. -->
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
-     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
+  <!-- perUserOrMachine: a per-user install is registered under that user alone, so another user
+       neither sees it nor upgrades it, and two users can keep two different versions. -->
   <Package Name="System Spinner x64"
            Manufacturer="$(Manufacturer)"
            Version="$(Version)"
            UpgradeCode="D993C858-1615-4986-B456-173BEFEDA37C"
-           Scope="perMachine"
+           Scope="perUserOrMachine"
            Compressed="yes">
 
     <!-- One cab inside the msi. Compressed hard: most of what goes in is the PawnIO setup. -->
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-    <!-- This is the whole of "is it already here?": a copy under this upgrade code makes the run
-         an update. Same version too, or a rebuild of that number would leave both installed. -->
+    <!-- Same version too, or a rebuild of that number would leave both installed. Which copy is
+         upgraded is decided below, before FindRelatedProducts, by choosing the context it looks in. -->
     <MajorUpgrade AllowSameVersionUpgrades="yes"
                   DowngradeErrorMessage="A newer version of System Spinner x64 is already installed." />
 
@@ -41,8 +47,7 @@
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/andrey-lysikov/System-Spinner-x64" />
     <Property Id="ARPNOREPAIR" Value="1" />
 
-    <!-- What the folder dialog stands on. Both choices are machine-wide installs; only the folder
-         changes, and the profile of the person installing is offered first. -->
+    <!-- What the scope and folder pages stand on: the profile of the person installing first. -->
     <Property Id="ApplicationFolderName" Value="System-Spinner" />
     <Property Id="WixAppFolder" Value="WixPerUserFolder" />
 
@@ -53,10 +58,6 @@
     <StandardDirectory Id="ProgramMenuFolder" />
     <StandardDirectory Id="DesktopFolder" />
     <StandardDirectory Id="TempFolder" />
-
-    <!-- Machine-wide even under /qn, where no dialog runs to put the flag back. ALLUSERS is
-         public, so msiexec ALLUSERS="" would otherwise beat the Property table. -->
-    <SetProperty Id="ALLUSERS" Value="1" Before="FindRelatedProducts" Sequence="both" />
 
     <!-- "Just me" would land in AppData\Local\Apps\System-Spinner, one folder deeper than the
          config and log the app keeps in AppData\Local\System-Spinner. -->
@@ -72,23 +73,165 @@
                  After="WixSetDefaultPerMachineFolder"
                  Sequence="both" />
 
-    <!-- Where the copy being updated is. Windows Installer says a related product exists but
-         never where it put itself, so its own record of the component is what is asked. -->
+    <!-- ===== Which copy is already here, and whose ===== -->
+
+    <!-- A copy of this user's own: every per-user install of this version on leaves its folder in
+         HKCU (the InstallMark component). Nobody else's HKCU is ever read. -->
+    <Property Id="USERCOPYFOLDER" Secure="yes">
+      <RegistrySearch Id="UserCopySearch"
+                      Root="HKCU"
+                      Key="Software\System-Spinner"
+                      Name="InstallFolder"
+                      Type="raw" />
+    </Property>
+
+    <!-- The exe as Windows Installer has it registered: this user's own per-user copy if there is
+         one, otherwise a per-machine copy. Per-machine means for everyone now, but up to 1.3 every
+         install was per-machine, including those put in somebody's profile. -->
+    <!-- Type="file", which gives the folder the file is in: the key path is a file, and "directory"
+         looks for a folder of that name and finds nothing, as it did up to 1.3. -->
     <Property Id="INSTALLEDFOLDER" Secure="yes">
       <ComponentSearch Id="InstalledAppSearch"
-                       Guid="0F8D272E-1348-400B-A2CF-93B2527E70DF" Type="directory" />
+                       Guid="0F8D272E-1348-400B-A2CF-93B2527E70DF" Type="file" />
     </Property>
+
+    <!-- An exe in this user's profile that nothing registered: put there by hand, or left by an
+         install that went wrong. Program Files is not searched the same way: a file found there
+         could belong to another user's per-user install, which is not ours to replace. -->
+    <Property Id="PERUSERCOPY" Secure="yes">
+      <DirectorySearch Id="PerUserFolderSearch" Path="[LocalAppDataFolder]System-Spinner">
+        <FileSearch Id="PerUserExeSearch" Name="System-Spinner.exe" />
+      </DirectorySearch>
+    </Property>
+
+    <!-- A per-machine copy of 1.3 or earlier records nowhere who installed it: not in its
+         registration, not in the uninstall entry, and the marks it left in HKCU are in a hive no
+         other user can read. What can be told exactly is where it lies: in this user's profile,
+         in the folder that holds the profiles, or elsewhere. -->
+
+    <!-- This user's profile, as the logon wrote it: HKCU\Volatile Environment is filled in for the
+         account that signed in, whatever folder its profile ended up in. -->
+    <Property Id="OWNPROFILE">
+      <RegistrySearch Id="OwnProfileSearch"
+                      Root="HKCU"
+                      Key="Volatile Environment"
+                      Name="USERPROFILE"
+                      Type="raw" />
+    </Property>
+
+    <!-- The folder all profiles are made in, from the same list Windows keeps of them. -->
+    <Property Id="PROFILESFOLDER">
+      <RegistrySearch Id="ProfilesFolderSearch"
+                      Root="HKLM"
+                      Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
+                      Name="ProfilesDirectory"
+                      Type="directory"
+                      Bitness="always64" />
+    </Property>
+
+    <!-- With a backslash, or C:\Users\Bob would count C:\Users\Bobby as its own. -->
+    <SetProperty Id="OWNPROFILEFOLDER"
+                 Value="[OWNPROFILE]\"
+                 After="AppSearch"
+                 Sequence="both"
+                 Condition="OWNPROFILE" />
+    <SetProperty Id="PROFILESFOLDER"
+                 Action="SetDefaultProfilesFolder"
+                 Value="[WindowsVolume]Users\"
+                 After="SetOWNPROFILEFOLDER"
+                 Sequence="both"
+                 Condition="NOT PROFILESFOLDER" />
+
+    <!-- 1. This user's own per-user copy wins over everything. -->
+    <SetProperty Action="SetOwnCopyFolder"
+                 Id="COPYFOLDER"
+                 Value="[USERCOPYFOLDER]"
+                 After="SetDefaultProfilesFolder"
+                 Sequence="both"
+                 Condition="NOT Installed AND USERCOPYFOLDER" />
+    <SetProperty Action="SetOwnCopyPerUser"
+                 Id="COPYPERUSER"
+                 Value="1"
+                 After="SetOwnCopyFolder"
+                 Sequence="both"
+                 Condition="NOT Installed AND USERCOPYFOLDER" />
+
+    <!-- 2. A per-machine copy in the profiles folder but not in this user's profile: another
+         user's copy from 1.3 or earlier. Left alone, and the install becomes a per-user one beside
+         it. LocalAppData is asked as well, for the rare account with no Volatile Environment. -->
+    <SetProperty Action="SetOtherUserCopy"
+                 Id="OTHERUSERCOPY"
+                 Value="1"
+                 After="SetOwnCopyPerUser"
+                 Sequence="both"
+                 Condition="NOT Installed AND NOT USERCOPYFOLDER AND INSTALLEDFOLDER AND (INSTALLEDFOLDER ~&lt;&lt; PROFILESFOLDER) AND NOT (OWNPROFILEFOLDER AND INSTALLEDFOLDER ~&lt;&lt; OWNPROFILEFOLDER) AND NOT (INSTALLEDFOLDER ~&lt;&lt; LocalAppDataFolder)" />
+
+    <!-- 3. Any other per-machine copy: for everyone, or this user's own from 1.3 or earlier. It is
+         updated where it is and stays per-machine, since one context cannot upgrade the other. -->
+    <SetProperty Action="SetMachineCopyFolder"
+                 Id="COPYFOLDER"
+                 Value="[INSTALLEDFOLDER]"
+                 After="SetOtherUserCopy"
+                 Sequence="both"
+                 Condition="NOT Installed AND NOT USERCOPYFOLDER AND INSTALLEDFOLDER AND NOT OTHERUSERCOPY" />
+
+    <!-- 4. An unregistered exe in this user's profile: installed over, per-user. -->
+    <SetProperty Action="SetLooseCopyPerUser"
+                 Id="COPYPERUSER"
+                 Value="1"
+                 After="SetMachineCopyFolder"
+                 Sequence="both"
+                 Condition="NOT Installed AND COPYFOLDER = &quot;&quot; AND PERUSERCOPY" />
+    <SetProperty Action="SetLooseCopyFolder"
+                 Id="COPYFOLDER"
+                 Value="[LocalAppDataFolder]System-Spinner\"
+                 After="SetLooseCopyPerUser"
+                 Sequence="both"
+                 Condition="NOT Installed AND COPYFOLDER = &quot;&quot; AND PERUSERCOPY" />
+
+    <!-- Everything that follows turns on this. Both sequences: the dialogs and the install itself
+         run in different processes, and each has to know. -->
+    <SetProperty Action="SetUpdateMode"
+                 Id="UPDATEMODE"
+                 Value="1"
+                 After="SetLooseCopyFolder"
+                 Sequence="both"
+                 Condition="NOT Installed AND COPYFOLDER" />
+
+    <!-- The context, set before FindRelatedProducts, which looks only in the context it is given:
+         per-user finds this user's own installs alone, per-machine the ones for everyone. An update
+         keeps the context of its copy. Beside another user's old copy only per-user is allowed,
+         or FindRelatedProducts would find that copy and RemoveExistingProducts take it away. -->
+    <SetProperty Action="SetPerUserScope"
+                 Id="ALLUSERS"
+                 Value="{}"
+                 After="SetUpdateMode"
+                 Sequence="both"
+                 Condition="NOT Installed AND (COPYPERUSER OR OTHERUSERCOPY)" />
+    <SetProperty Action="SetPerMachineScope"
+                 Id="ALLUSERS"
+                 Value="1"
+                 After="SetPerUserScope"
+                 Sequence="both"
+                 Condition="UPDATEMODE AND NOT COPYPERUSER" />
 
     <!-- An update stays where it already is rather than moving out from under its own shortcuts.
          Naming the folder also stands the stock actions at 998 and 999 down. -->
     <SetProperty Id="APPLICATIONFOLDER"
-                 Value="[INSTALLEDFOLDER]"
-                 After="AppSearch"
+                 Value="[COPYFOLDER]"
+                 After="SetPerMachineScope"
                  Sequence="both"
-                 Condition="NOT Installed AND WIX_UPGRADE_DETECTED AND INSTALLEDFOLDER" />
+                 Condition="UPDATEMODE" />
 
-    <!-- Without this a first install always goes to Program Files: the stock actions read
-         ALLUSERS, which is 1 in a perMachine package, and never WixAppFolder. -->
+    <InstallUISequence>
+      <FindRelatedProducts After="SetAPPLICATIONFOLDER" />
+    </InstallUISequence>
+    <InstallExecuteSequence>
+      <FindRelatedProducts After="SetAPPLICATIONFOLDER" />
+    </InstallExecuteSequence>
+
+    <!-- A first install goes to the profile unless the scope page says otherwise: the stock actions
+         would pick Program Files for anyone Privileged, which an administrator is even unelevated. -->
     <SetProperty Id="APPLICATIONFOLDER"
                  Action="SetDefaultApplicationFolder"
                  Value="[WixPerUserFolder]"
@@ -105,6 +248,17 @@
       <Component Id="MainExe" Guid="0F8D272E-1348-400B-A2CF-93B2527E70DF">
         <File Id="SystemSpinnerExe" Source="$(Exe)" Name="System-Spinner.exe" KeyPath="yes" />
       </Component>
+
+      <!-- Where this copy is. HKMU: HKCU for a per-user install, which is what USERCOPYFOLDER reads,
+           and HKLM for one for everyone, where nothing reads it but it does no harm. -->
+      <Component Id="InstallMark" Guid="AC0500F3-7732-406C-B7EA-5343B8BC8D50">
+        <RegistryValue Root="HKMU"
+                       Key="Software\System-Spinner"
+                       Name="InstallFolder"
+                       Type="string"
+                       Value="[APPLICATIONFOLDER]"
+                       KeyPath="yes" />
+      </Component>
     </ComponentGroup>
 
     <!-- PawnIO, carried rather than fetched: the app will not start without it. In the temporary
@@ -118,7 +272,8 @@
     </ComponentGroup>
 
     <!-- Directly in the menu: one entry deserves no folder. Not advertised, which would show no
-         icon unless one is named in the msi and drag the repair machinery in behind it. -->
+         icon unless one is named in the msi and drag the repair machinery in behind it. The menu
+         and the desktop are the user's own for a per-user install, the shared ones otherwise. -->
     <ComponentGroup Id="StartMenuShortcutFiles" Directory="ProgramMenuFolder">
       <Component Id="StartMenuShortcut" Guid="C0D8CE73-8C33-4E5C-9A24-7C5A03FFB1CE">
         <Shortcut Id="StartMenuShortcutEntry"
@@ -158,7 +313,9 @@
     </ComponentGroup>
 
     <!-- On by default, and a feature each rather than a condition on the component: a feature
-         left out is remembered as left out, a condition would be asked again at removal. -->
+         left out is remembered as left out, a condition would be asked again at removal.
+         An update does not ask these: what the old version had is carried over by
+         MigrateFeatureStates, and only the update options page changes it. -->
     <Property Id="INSTALLSTARTMENUSHORTCUT" Value="1" />
     <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" />
 
@@ -174,13 +331,13 @@
       <Feature Id="StartMenu" Title="Start menu shortcut"
                Description="A shortcut in the Start menu." Level="1">
         <ComponentGroupRef Id="StartMenuShortcutFiles" />
-        <Level Value="0" Condition="INSTALLSTARTMENUSHORTCUT &lt;&gt; 1" />
+        <Level Value="0" Condition="NOT UPDATEMODE AND INSTALLSTARTMENUSHORTCUT &lt;&gt; 1" />
       </Feature>
 
       <Feature Id="Desktop" Title="Desktop shortcut"
                Description="A shortcut on the desktop." Level="1">
         <ComponentGroupRef Id="DesktopShortcutFiles" />
-        <Level Value="0" Condition="INSTALLDESKTOPSHORTCUT &lt;&gt; 1" />
+        <Level Value="0" Condition="NOT UPDATEMODE AND INSTALLDESKTOPSHORTCUT &lt;&gt; 1" />
       </Feature>
     </Feature>
 
@@ -188,8 +345,10 @@
          The app will say what is missing at its first start. -->
     <Property Id="INSTALLPAWNIO" Value="1" Secure="yes" />
 
-    <!-- Deferred, so it runs elevated with no second prompt, and silent. FileRef because a
-         deferred action reads no properties and [TempFolder] would arrive empty. -->
+    <!-- Deferred and not impersonated, so it runs as SYSTEM, silent. That holds for a per-user
+         install too, as long as the installer itself runs elevated, which is why a per-user install
+         asks for rights at its Install button (RelaunchAtExecute). FileRef because a deferred
+         action reads no properties. -->
     <CustomAction Id="InstallPawnIo"
                   FileRef="PawnIoSetupExe"
                   ExeCommand="-install -silent"
@@ -197,21 +356,58 @@
                   Impersonate="no"
                   Return="ignore" />
 
-    <!-- A running copy holds the exe an upgrade must overwrite. It has no ordinary window and
-         runs elevated, so it is asked from the elevated side and then ended. -->
-    <util:CloseApplication Id="CloseRunningApp"
-                           Target="System-Spinner.exe"
-                           CloseMessage="yes"
-                           ElevatedCloseMessage="yes"
-                           TerminateProcess="0"
-                           RebootPrompt="no"
-                           Timeout="10" />
+    <!-- ===== The running app and its autostart: only what belongs to this copy ===== -->
 
-    <!-- Autostart is a scheduled task the app makes for itself, so the installer knows nothing
-         about it: removed here, and a failure is not worth stopping an uninstall over. -->
+    <!-- Only processes whose exe is in this copy's folder: the same app of another user, running in
+         a session left open, belongs to that user. WM_CLOSE first, through taskkill without /f,
+         then the end. No brackets or braces in the commands: the installer would read them as
+         properties and conditional blocks.
+         On an update, before anything is checked or removed: Restart Manager looks for files in
+         use in InstallValidate, and the old version goes in RemoveExistingProducts straight after
+         it. Immediate, since a deferred action there fails with error 2613; the elevated copy of
+         the installer runs it with administrator rights, which the app has too. -->
+    <SetProperty Action="SetStopRunningApp"
+                 Id="WixQuietExecCmdLine"
+                 Sequence="execute"
+                 Before="StopRunningApp"
+                 Condition="UPDATEMODE AND NOT REMOVE~=&quot;ALL&quot;"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;$p = @(Get-Process -Name System-Spinner -ErrorAction SilentlyContinue | Where-Object Path -Like \&quot;[APPLICATIONFOLDER]*\&quot;); taskkill.exe (-split ($p.Id -replace '^', '/pid ')) 2&gt;$null | Out-Null; $p | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue; $p | Stop-Process -Force -ErrorAction SilentlyContinue; $p | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue; exit 0&quot;" />
+    <CustomAction Id="StopRunningApp"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_X64"
+                  Execute="immediate"
+                  Return="ignore" />
+
+    <!-- On an uninstall, deferred as SYSTEM, which can end an elevated process where the user
+         cannot. A per-user copy removed from Settings runs without elevation, and there the app
+         stays running until the restart Windows asks for. -->
+    <SetProperty Id="StopAppForRemoval"
+                 Sequence="execute"
+                 Before="StopAppForRemoval"
+                 Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;$p = @(Get-Process -Name System-Spinner -ErrorAction SilentlyContinue | Where-Object Path -Like \&quot;[APPLICATIONFOLDER]*\&quot;); taskkill.exe (-split ($p.Id -replace '^', '/pid ')) 2&gt;$null | Out-Null; $p | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue; $p | Stop-Process -Force -ErrorAction SilentlyContinue; $p | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue; exit 0&quot;" />
+    <CustomAction Id="StopAppForRemoval"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_X64"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
+    <!-- Autostart is a scheduled task the app makes for itself, one per user ("System-Spinner
+         (user@domain)", or plain "System-Spinner" from 1.3 and earlier), so the installer knows
+         nothing about them. Every one of them that starts this copy's exe goes, whoever made it:
+         the copy is gone for all of them. Tasks of other copies stay. The filter works on the
+         task XML and takes the names from its URI, since a script block would need braces; -and
+         runs the removal only when something matched. A failure is not worth stopping an
+         uninstall over. -->
+    <SetProperty Id="RemoveAutostartTask"
+                 Sequence="execute"
+                 Before="RemoveAutostartTask"
+                 Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;$x = @(Get-ScheduledTask -TaskPath \ -TaskName System-Spinner* -ErrorAction SilentlyContinue | Export-ScheduledTask) -like \&quot;*[APPLICATIONFOLDER]System-Spinner.exe*\&quot;; $n = @($x -replace '(?s).*&lt;URI&gt;\\?(.*?)&lt;/URI&gt;.*', '$1'); $n.Count -and (Unregister-ScheduledTask -TaskPath \ -TaskName $n -Confirm:$false -ErrorAction SilentlyContinue) | Out-Null; exit 0&quot;" />
     <CustomAction Id="RemoveAutostartTask"
-                  Directory="APPLICATIONFOLDER"
-                  ExeCommand="[System64Folder]schtasks.exe /delete /tn &quot;System-Spinner&quot; /f"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_X64"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
@@ -224,16 +420,181 @@
 
       <!-- Only on a real uninstall. An upgrade removes the old version with REMOVE=ALL as well,
            and UPGRADINGPRODUCTCODE is set on exactly that half and on nothing else. -->
+      <Custom Action="StopAppForRemoval" Before="RemoveAutostartTask"
+              Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="RemoveAutostartTask" Before="RemoveFiles"
               Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+
+      <Custom Action="StopRunningApp" Before="InstallValidate"
+              Condition="UPDATEMODE AND NOT REMOVE~=&quot;ALL&quot;" />
     </InstallExecuteSequence>
+
+    <!-- ===== Administrator rights: when they are asked for ===== -->
+
+    <!-- The trick both prompts below use. The page without rights starts this same msi elevated
+         and closes without a word. ELEVATED keeps the elevated copy from doing it again; Privileged
+         cannot, being set for an administrator in the unelevated copy too. UILevel 5 leaves /qn
+         and /qb alone.
+         The exit code is turned over on purpose. 1 means the elevated copy started: the action
+         fails, and the run ends through FatalError, whose page is not shown. 0 means UAC was
+         refused, and the refusal is said. The installer cannot read what a process returned into
+         a property, and without a DLL of our own this is the only way to tell the two apart. -->
+
+    <!-- An update: once, before its first page.
+         An update of a copy for everyone passes ALLUSERS=1 on: Installed is settled when the
+         package opens, before any action, so without it running the same msi again would not
+         find itself installed and would not open the maintenance pages. -->
+    <SetProperty Id="RELAUNCHSCOPE"
+                 Value="ALLUSERS=1"
+                 Sequence="ui"
+                 Before="SetRelaunchElevated"
+                 Condition="UPDATEMODE AND NOT COPYPERUSER AND NOT ELEVATED AND UILevel = 5" />
+    <SetProperty Id="ELEVATIONREQUESTED"
+                 Value="1"
+                 Sequence="ui"
+                 Before="RelaunchElevated"
+                 Condition="UPDATEMODE AND NOT ELEVATED AND UILevel = 5" />
+    <SetProperty Action="SetRelaunchElevated"
+                 Id="WixQuietExecCmdLine"
+                 Sequence="ui"
+                 Before="RelaunchElevated"
+                 Condition="UPDATEMODE AND NOT ELEVATED AND UILevel = 5"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;Start-Process -FilePath '[System64Folder]msiexec.exe' -Verb RunAs -ArgumentList '/i \&quot;[OriginalDatabase]\&quot; ELEVATED=1 [RELAUNCHSCOPE]' -ErrorAction SilentlyContinue; exit (0 + $?)&quot;" />
+    <CustomAction Id="RelaunchElevated"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_X64"
+                  Execute="immediate"
+                  Return="check" />
+
+    <!-- An install or a removal from these pages: at the button that starts it, as the pages were
+         filled in by the person installing. For everyone, Windows Installer asks by itself and
+         keeps that person as the installing user. For one user it never asks: a per-user install
+         needs no rights of its own, but PawnIO does, and so does closing the app on removal.
+         So the elevated copy is started then, with every choice the pages made, and goes straight
+         to the progress page. -->
+    <SetProperty Id="INSTALLRELAUNCH"
+                 Value="1"
+                 Sequence="ui"
+                 After="UpdateDlg"
+                 Condition="NOT ELEVATED AND UILevel = 5 AND NOT UPDATEMODE AND (NOT ALLUSERS OR (ALLUSERS = 2 AND MSIINSTALLPERUSER = 1)) AND ((NOT Installed AND &amp;Main = 3) OR (Installed AND &amp;Main = 2))" />
+
+    <!-- The folder is handed over without its closing backslash, which would escape the quote
+         after it; the | before the quote keeps that backslash from doing so here. Double quotes
+         throughout, since a profile folder may hold an apostrophe. -->
+    <SetProperty Action="SetRelaunchInstall"
+                 Id="WixQuietExecCmdLine"
+                 Sequence="ui"
+                 After="SetINSTALLRELAUNCH"
+                 Condition="INSTALLRELAUNCH AND NOT Installed"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;$f = \&quot;[APPLICATIONFOLDER]|\&quot;.TrimEnd('|').TrimEnd('\'); Start-Process -FilePath \&quot;[System64Folder]msiexec.exe\&quot; -Verb RunAs -ArgumentList \&quot;/i `\&quot;[OriginalDatabase]`\&quot; ELEVATED=1 PRESETINSTALL=1 ALLUSERS=`\&quot;[ALLUSERS]`\&quot; MSIINSTALLPERUSER=`\&quot;[MSIINSTALLPERUSER]`\&quot; APPLICATIONFOLDER=`\&quot;$f`\&quot; INSTALLSTARTMENUSHORTCUT=`\&quot;[INSTALLSTARTMENUSHORTCUT]`\&quot; INSTALLDESKTOPSHORTCUT=`\&quot;[INSTALLDESKTOPSHORTCUT]`\&quot; LAUNCHAFTERINSTALL=`\&quot;[LAUNCHAFTERINSTALL]`\&quot;\&quot; -ErrorAction SilentlyContinue; exit (0 + $?)&quot;" />
+
+    <!-- The removal needs no pages of its own any more: the progress bar is enough. -->
+    <SetProperty Action="SetRelaunchRemove"
+                 Id="WixQuietExecCmdLine"
+                 Sequence="ui"
+                 After="SetRelaunchInstall"
+                 Condition="INSTALLRELAUNCH AND Installed"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;Start-Process -FilePath \&quot;[System64Folder]msiexec.exe\&quot; -Verb RunAs -ArgumentList \&quot;/x [ProductCode] /qb ELEVATED=1\&quot; -ErrorAction SilentlyContinue; exit (0 + $?)&quot;" />
+
+    <SetProperty Action="SetLateElevationRequested"
+                 Id="ELEVATIONREQUESTED"
+                 Value="1"
+                 Sequence="ui"
+                 After="SetRelaunchRemove"
+                 Condition="INSTALLRELAUNCH" />
+
+    <CustomAction Id="RelaunchAtExecute"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_X64"
+                  Execute="immediate"
+                  Return="check" />
+
+    <!-- Past the pages there is no room for one more: a message, and the run ends. -->
+    <CustomAction Id="AdminRefused"
+                  Error="Administrator rights are needed: [ProductName] runs with them, and so does its installer, which puts in the PawnIO driver and closes the running app. Windows was asked for those rights and they were not given, so nothing has been changed. Run the installer again and allow it to make changes." />
+
+    <!-- ===== The Update page in place of the stock first pages ===== -->
+
+    <!-- The update options page starts from what is there now, not from the first-install defaults. -->
+    <SetProperty Id="UPDSTARTMENU"
+                 Value="1"
+                 Sequence="ui"
+                 After="MigrateFeatureStates"
+                 Condition="UPDATEMODE AND &amp;StartMenu = 3" />
+    <SetProperty Id="UPDDESKTOP"
+                 Value="1"
+                 Sequence="ui"
+                 After="SetUPDSTARTMENU"
+                 Condition="UPDATEMODE AND &amp;Desktop = 3" />
+
+    <!-- The stock first pages cannot be overridden, not being virtual, so an update walks round
+         them: Installed hides AdvancedWelcomeEulaDlg, PATCH then hides MaintenanceWelcomeDlg,
+         and both are cleared straight after, PATCH being public and bound for the install itself.
+         So does an install whose pages were already filled in by the copy without rights
+         (PRESETINSTALL): it has nothing left to ask and goes straight to the progress page.
+         Nothing here may point at WelcomeDlg: that drags WixUI_Minimal into the build. -->
+    <SetProperty Action="HideWelcomeForUpdate"
+                 Id="Installed"
+                 Value="1"
+                 Sequence="ui"
+                 Before="AdvancedWelcomeEulaDlg"
+                 Condition="(UPDATEMODE OR PRESETINSTALL) AND NOT Installed AND NOT ELEVATIONREQUESTED" />
+    <SetProperty Action="HideMaintenanceForUpdate"
+                 Id="PATCH"
+                 Value="1"
+                 Sequence="ui"
+                 After="AdvancedWelcomeEulaDlg"
+                 Condition="(UPDATEMODE OR PRESETINSTALL) AND NOT ELEVATIONREQUESTED" />
+    <SetProperty Action="ClearInstalledForUpdate"
+                 Id="Installed"
+                 Value="{}"
+                 Sequence="ui"
+                 After="MaintenanceWelcomeDlg"
+                 Condition="(UPDATEMODE OR PRESETINSTALL) AND NOT ELEVATIONREQUESTED" />
+    <SetProperty Action="ClearPatchForUpdate"
+                 Id="PATCH"
+                 Value="{}"
+                 Sequence="ui"
+                 After="ClearInstalledForUpdate"
+                 Condition="(UPDATEMODE OR PRESETINSTALL) AND NOT ELEVATIONREQUESTED" />
+
+    <!-- Started from the elevated copy, the app gets its rights with no second prompt. After
+         ExecuteAction, so only once the update has gone through. A property of its own, the
+         installer allowing a check box property one page only. -->
+    <Property Id="UPDLAUNCH" Value="1" />
+
+    <SetProperty Action="SetUpdatedAppTarget"
+                 Id="WixShellExecTarget"
+                 Value="[#SystemSpinnerExe]"
+                 Sequence="ui"
+                 After="ExecuteAction"
+                 Condition="UPDATEMODE AND ELEVATED AND UPDLAUNCH = 1" />
+
+    <InstallUISequence>
+      <Custom Action="RelaunchElevated" After="SetUPDDESKTOP"
+              Condition="UPDATEMODE AND NOT ELEVATED AND UILevel = 5" />
+      <Show Dialog="AdminNeededDlg" After="RelaunchElevated" Condition="ELEVATIONREQUESTED" />
+      <Show Dialog="override UserExit" OnExit="cancel" Condition="NOT ELEVATIONREQUESTED" />
+      <Show Dialog="override FatalError" OnExit="error" Condition="NOT ELEVATIONREQUESTED" />
+
+      <Show Dialog="UpdateDlg" After="ClearPatchForUpdate"
+            Condition="UPDATEMODE AND NOT Installed AND NOT ELEVATIONREQUESTED" />
+
+      <Custom Action="RelaunchAtExecute" After="SetLateElevationRequested" Condition="INSTALLRELAUNCH" />
+      <Custom Action="AdminRefused" After="RelaunchAtExecute" Condition="INSTALLRELAUNCH" />
+
+      <Custom Action="LaunchApplication" After="SetUpdatedAppTarget"
+              Condition="UPDATEMODE AND ELEVATED AND UPDLAUNCH = 1" />
+    </InstallUISequence>
 
     <!-- The advanced set: the one that asks whom the install is for and brings the folder page. -->
     <ui:WixUI Id="WixUI_Advanced" />
     <WixVariable Id="WixUILicenseRtf" Value="$(License)" />
 
     <!-- Through the shell, not started directly: the app demands administrator rights, and a
-         program started by the installer never gets the prompt for them (error 1631). -->
+         program started by the installer never gets the prompt for them (error 1631). Started
+         from the elevated copy, as after a per-user install, it needs no prompt; after an install
+         for everyone the pages have no rights, and the app asks for its own. -->
     <Property Id="LAUNCHAFTERINSTALL" Value="1" />
 
     <CustomAction Id="SetAppTarget" Property="WixShellExecTarget" Value="[#SystemSpinnerExe]" />
@@ -242,24 +603,19 @@
     <!-- Our shortcuts page, between the folder page and the last one. The tens in Ordering put
          ours after the stock jumps (one to seven); the later of two next-dialogs decides. -->
     <UI>
-      <!-- The stock page clears ALLUSERS for "just me". This puts it back, later in the order
-           and therefore last: the package is perMachine whichever folder was chosen. -->
-      <Publish Dialog="InstallScopeDlg" Control="Next" Property="ALLUSERS" Value="1" Order="8" />
-
       <!-- The stock set skips the folder page for a per-user install; that half is claimed here. -->
       <Publish Dialog="InstallScopeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg"
                Condition="WixAppFolder = &quot;WixPerUserFolder&quot;" Order="10" />
 
+      <!-- Beside another user's old copy there is no scope to choose (see SetPerUserScope), so
+           "Advanced" goes straight to the folder, and back from there. -->
+      <Publish Dialog="AdvancedWelcomeEulaDlg" Control="Advanced" Event="NewDialog" Value="InstallDirDlg"
+               Condition="OTHERUSERCOPY" Order="10" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="AdvancedWelcomeEulaDlg"
+               Condition="OTHERUSERCOPY" Order="10" />
+
       <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ShortcutsDlg" Order="10" />
       <Publish Dialog="ShortcutsDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" />
-
-      <!-- On an update neither the scope nor the folder is a question, so "Advanced" passes both
-           pages. The stock jumps out of the first page are ordered one to three. -->
-      <Publish Dialog="AdvancedWelcomeEulaDlg" Control="Advanced" Event="NewDialog"
-               Value="ShortcutsDlg" Condition="WIX_UPGRADE_DETECTED" Order="20" />
-
-      <Publish Dialog="ShortcutsDlg" Control="Back" Event="NewDialog"
-               Value="AdvancedWelcomeEulaDlg" Condition="WIX_UPGRADE_DETECTED" Order="10" />
       <Publish Dialog="ShortcutsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
       <!-- Claimed only while installing: during maintenance the last page returns to the
@@ -267,12 +623,13 @@
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ShortcutsDlg"
                Condition="NOT Installed" Order="10" />
 
-      <!-- Only after a fresh install: the same page ends a repair and an uninstall too. The stock
-           event that closes it sits at 999, so both of these run before it. -->
+      <!-- Only after a fresh install: the same page ends a repair and an uninstall too, and an
+           update has started the app already. The stock event that closes it sits at 999, so
+           both of these run before it. -->
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="SetAppTarget"
-               Condition="LAUNCHAFTERINSTALL = 1 AND NOT Installed" Order="1" />
+               Condition="LAUNCHAFTERINSTALL = 1 AND NOT Installed AND NOT UPDATEMODE" Order="1" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"
-               Condition="LAUNCHAFTERINSTALL = 1 AND NOT Installed" Order="2" />
+               Condition="LAUNCHAFTERINSTALL = 1 AND NOT Installed AND NOT UPDATEMODE" Order="2" />
     </UI>
   </Package>
 </Wix>

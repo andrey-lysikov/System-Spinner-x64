@@ -24,6 +24,7 @@ $msi     = Join-Path $output 'System-Spinner.msi'
 
 $packageWxs   = Join-Path $wixDir 'Package.wxs'
 $shortcutsWxs = Join-Path $wixDir 'ShortcutsDlg.wxs'
+$updateWxs    = Join-Path $wixDir 'UpdateDlg.wxs'
 
 $pawnDir  = Join-Path $output 'pawnio'
 $pawnExe  = Join-Path $pawnDir 'PawnIO_setup.exe'
@@ -184,7 +185,7 @@ try {
         -d "PawnIO=$pawn" `
         -ext WixToolset.UI.wixext `
         -ext WixToolset.Util.wixext `
-        $packageWxs $shortcutsWxs `
+        $packageWxs $shortcutsWxs $updateWxs `
         -o $msi
     if ($LASTEXITCODE -ne 0) { throw 'The msi was not built.' }
 

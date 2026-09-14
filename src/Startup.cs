@@ -12,9 +12,11 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Security.Principal;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Xml.Linq;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
 using SystemSpinnerX64.Localization;
@@ -321,9 +323,21 @@ internal static class Elevation
 
 // Autostart through a Task Scheduler task, not a Startup folder shortcut: the app needs
 // administrator rights, and a task with highest privileges is asked about once, at creation.
+// A task of its own for every Windows user: each may have a copy of their own, of another version
+// and in another folder, and a task named the same for all of them would be overwritten by
+// whoever turned autostart on last.
 internal static class AutoStart
 {
-    public static bool IsEnabled() => Run("/Query", "/TN", AppParameters.Identity.TaskName) == 0;
+    private static readonly XNamespace TaskXml = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+
+    // Account and domain both: a local Bob and a domain Bob are two people on one machine. Neither
+    // name can hold a character a task name refuses.
+    public static string TaskName { get; } = NameFor(Environment.UserName, Environment.UserDomainName);
+
+    private static string NameFor(string user, string domain) =>
+        $"{AppParameters.Identity.TaskName} ({user}@{domain})";
+
+    public static bool IsEnabled() => Run("/Query", "/TN", TaskName) == 0;
 
     // Creates or recreates the task.
     public static string? Enable()
@@ -331,34 +345,84 @@ internal static class AutoStart
         string? exe = Environment.ProcessPath;
         if (string.IsNullOrEmpty(exe)) return Text.NoOwnExePath;
 
-        // /RL HIGHEST — with highest privileges, the whole point of this.
-        // /F — replace an existing task silently: simpler than comparing its parameters.
-        int code = Run("/Create", "/TN", AppParameters.Identity.TaskName, "/TR", $"\"{exe}\"",
-                       "/SC", "ONLOGON", "/RL", "HIGHEST", "/F");
-
-        if (code == 0)
-        {
-            Log.Event($"autostart enabled: task \"{AppParameters.Identity.TaskName}\" → {exe}");
-            return null;
-        }
-
-        Log.Warn($"could not create the autostart task, schtasks returned code {code}");
-        return Text.SchedulerRefused(code);
+        return Create(exe);
     }
 
     // Removes the task. Returns an error text, or null on success.
     public static string? Disable()
     {
-        int code = Run("/Delete", "/TN", AppParameters.Identity.TaskName, "/F");
+        int code = Run("/Delete", "/TN", TaskName, "/F");
 
         if (code == 0)
         {
-            Log.Event("autostart disabled: task removed");
+            Log.Event($"autostart disabled: task \"{TaskName}\" removed");
             return null;
         }
 
         Log.Warn($"could not remove the autostart task, schtasks returned code {code}");
         return Text.SchedulerRefused(code);
+    }
+
+    // From XML rather than /SC ONLOGON: that switch fires at the logon of any user and stops the
+    // app after 72 hours and on battery. This one waits for this user's own logon and nothing else.
+    private static string? Create(string exe)
+    {
+        using WindowsIdentity me = WindowsIdentity.GetCurrent();
+        string user = me.User?.Value ?? me.Name;
+
+        var task = new XDocument(
+            new XElement(TaskXml + "Task", new XAttribute("version", "1.2"),
+                new XElement(TaskXml + "RegistrationInfo",
+                    new XElement(TaskXml + "Description", $"Starts {AppParameters.Identity.Name} when {me.Name} signs in.")),
+                new XElement(TaskXml + "Triggers",
+                    new XElement(TaskXml + "LogonTrigger",
+                        new XElement(TaskXml + "Enabled", "true"),
+                        new XElement(TaskXml + "UserId", user))),
+                new XElement(TaskXml + "Principals",
+                    new XElement(TaskXml + "Principal", new XAttribute("id", "Author"),
+                        new XElement(TaskXml + "UserId", user),
+                        new XElement(TaskXml + "LogonType", "InteractiveToken"),
+                        // With highest privileges: the whole point of this.
+                        new XElement(TaskXml + "RunLevel", "HighestAvailable"))),
+                new XElement(TaskXml + "Settings",
+                    new XElement(TaskXml + "MultipleInstancesPolicy", "IgnoreNew"),
+                    new XElement(TaskXml + "DisallowStartIfOnBatteries", "false"),
+                    new XElement(TaskXml + "StopIfGoingOnBatteries", "false"),
+                    new XElement(TaskXml + "ExecutionTimeLimit", "PT0S"),
+                    new XElement(TaskXml + "Enabled", "true")),
+                new XElement(TaskXml + "Actions", new XAttribute("Context", "Author"),
+                    new XElement(TaskXml + "Exec",
+                        new XElement(TaskXml + "Command", exe)))));
+
+        string file = Path.Combine(Path.GetTempPath(), $"{AppParameters.Identity.Name}-task-{Guid.NewGuid():N}.xml");
+
+        try
+        {
+            // UTF-16, which is what schtasks expects of a task file and what the writer declares.
+            using (var writer = new StreamWriter(file, append: false, Encoding.Unicode))
+                task.Save(writer);
+
+            // /F — replace an existing task silently: simpler than comparing its parameters.
+            int code = Run("/Create", "/TN", TaskName, "/XML", file, "/F");
+
+            if (code == 0)
+            {
+                Log.Event($"autostart enabled: task \"{TaskName}\" → {exe}");
+                return null;
+            }
+
+            Log.Warn($"could not create the autostart task, schtasks returned code {code}");
+            return Text.SchedulerRefused(code);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("could not write the autostart task file", ex);
+            return Text.SchedulerRefused(-1);
+        }
+        finally
+        {
+            try { File.Delete(file); } catch (Exception) { /* a temporary file; Windows clears the folder */ }
+        }
     }
 
     // Runs schtasks without a console window and returns its exit code.

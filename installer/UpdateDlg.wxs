@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- The pages of an update, which replaces the stock first pages when a copy is already here:
+     one page that says what will happen, one with the shortcuts behind "Advanced", and the one
+     shown when administrator rights for the update were refused. Same geometry as ShortcutsDlg. -->
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <UI>
+      <Dialog Id="UpdateDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes"
+                 NoPrefix="yes" Text="{\WixUI_Font_Title}Update" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15"
+                 Transparent="yes" NoPrefix="yes" Text="[ProductName] is already on this computer." />
+
+        <Control Id="Text" Type="Text" X="20" Y="60" Width="330" Height="40" Transparent="yes"
+                 NoPrefix="yes"
+                 Text="It will be updated to version [ProductVersion] where it is now:&#10;[APPLICATIONFOLDER]" />
+
+        <!-- Whose copy this is. ALLUSERS is settled by now: 1 for everyone, empty for one user. -->
+        <Control Id="ScopeMachine" Type="Text" X="20" Y="105" Width="330" Height="15" Transparent="yes"
+                 NoPrefix="yes" ShowCondition="ALLUSERS = 1" HideCondition="ALLUSERS &lt;&gt; 1"
+                 Text="This copy is for all users of this computer." />
+        <Control Id="ScopeUser" Type="Text" X="20" Y="105" Width="330" Height="15" Transparent="yes"
+                 NoPrefix="yes" ShowCondition="ALLUSERS &lt;&gt; 1" HideCondition="ALLUSERS = 1"
+                 Text="This copy is yours alone; copies of other users are not touched." />
+
+        <Control Id="Note" Type="Text" X="20" Y="130" Width="330" Height="60" Transparent="yes"
+                 NoPrefix="yes"
+                 Text="If this copy is running, it is closed for the update and started again when the update is done. The settings, the log and the shortcuts are kept; Advanced changes the shortcuts." />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="Advanced" Type="PushButton" X="20" Y="243" Width="56" Height="17"
+                 Text="!(loc.AdvancedWelcomeEulaDlgAdvanced)">
+          <Publish Event="NewDialog" Value="UpdateOptionsDlg" />
+        </Control>
+
+        <!-- What the options page holds, applied whether it was opened or not. -->
+        <Control Id="Update" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes"
+                 Text="Update">
+          <Publish Event="AddLocal" Value="StartMenu" Condition="UPDSTARTMENU" />
+          <Publish Event="Remove" Value="StartMenu" Condition="NOT UPDSTARTMENU" />
+          <Publish Event="AddLocal" Value="Desktop" Condition="UPDDESKTOP" />
+          <Publish Event="Remove" Value="Desktop" Condition="NOT UPDDESKTOP" />
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes"
+                 Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="UpdateOptionsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes"
+                 NoPrefix="yes" Text="{\WixUI_Font_Title}Update options" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15"
+                 Transparent="yes" NoPrefix="yes" Text="Ticked is what there is now." />
+
+        <Control Id="StartMenuCheckBox" Type="CheckBox" X="20" Y="70" Width="330" Height="17"
+                 Property="UPDSTARTMENU" CheckBoxValue="1"
+                 Text="A shortcut in the Start menu" />
+
+        <Control Id="DesktopCheckBox" Type="CheckBox" X="20" Y="95" Width="330" Height="17"
+                 Property="UPDDESKTOP" CheckBoxValue="1"
+                 Text="A shortcut on the desktop" />
+
+        <Control Id="LaunchCheckBox" Type="CheckBox" X="20" Y="120" Width="330" Height="17"
+                 Property="UPDLAUNCH" CheckBoxValue="1"
+                 Text="Start the app when the update is done" />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
+                 Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="UpdateDlg" />
+        </Control>
+
+        <!-- The same as on the first page. -->
+        <Control Id="Update" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes"
+                 Text="Update">
+          <Publish Event="AddLocal" Value="StartMenu" Condition="UPDSTARTMENU" />
+          <Publish Event="Remove" Value="StartMenu" Condition="NOT UPDSTARTMENU" />
+          <Publish Event="AddLocal" Value="Desktop" Condition="UPDDESKTOP" />
+          <Publish Event="Remove" Value="Desktop" Condition="NOT UPDDESKTOP" />
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes"
+                 Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- UAC was refused. Closing ends the run through UserExit, whose page is not shown. -->
+      <Dialog Id="AdminNeededDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes"
+                 NoPrefix="yes" Text="{\WixUI_Font_Title}Administrator rights are needed" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15"
+                 Transparent="yes" NoPrefix="yes" Text="Nothing has been changed." />
+
+        <Control Id="Text" Type="Text" X="20" Y="60" Width="330" Height="80" Transparent="yes"
+                 NoPrefix="yes"
+                 Text="[ProductName] runs with administrator rights, and so does its installer: it puts in the PawnIO driver, and on an update it closes the running app. Windows was asked for those rights and they were not given.&#10;&#10;Run the installer again and allow it to make changes." />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="Close" Type="PushButton" X="304" Y="243" Width="56" Height="17"
+                 Default="yes" Cancel="yes" Text="!(loc.WixUIFinish)">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+    </UI>
+  </Fragment>
+</Wix>

@@ -27,7 +27,8 @@ internal static class AppParameters
         // Program Files, say.
         public const string AppFolder = "System-Spinner";
 
-        // The task in Task Scheduler that starts the app with Windows.
+        // The task in Task Scheduler that starts the app with Windows: this, followed by the user
+        // it belongs to. Alone, it is the one task for the whole machine of 1.3 and earlier.
         public const string TaskName = "System-Spinner";
 
         // The ETW session the frame counter raises.
