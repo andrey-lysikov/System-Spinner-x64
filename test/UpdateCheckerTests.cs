@@ -1,6 +1,7 @@
 //  Copyright © AndreyLysikov
 //  SPDX-License-Identifier: Apache-2.0
 
+using System.Reflection;
 using SystemSpinnerX64.Startup;
 using Xunit;
 
@@ -44,5 +45,16 @@ public class UpdateCheckerTests
         string version = SystemSpinnerX64.AppParameters.Identity.Version;
 
         Assert.Equal(2, version.Split('.').Length);
+    }
+
+    [Fact]
+    public void Версия_в_проекте_записана_двумя_числами()
+    {
+        // <Version> itself, as written in the csproj. The check above cannot see a third number:
+        // the app reads only the first two, so "1.4.1" there would quietly show as 1.4.
+        string? written = typeof(SystemSpinnerX64.AppParameters).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+
+        Assert.Matches(@"^\d+\.\d+$", written ?? "");
     }
 }

@@ -154,7 +154,10 @@ try {
     $manufacturer = "$($properties.SelectSingleNode('/Project/PropertyGroup/Company').InnerText)".Trim()
     if (-not $manufacturer) { throw "No <Company> in $project" }
 
-    $msiVersion = if ($Version -match '^\d+\.\d+$') { "$Version.0" } else { $Version }
+    if ($Version -notmatch '^\d+\.\d+$') { throw "The version must be two numbers, like 1.4, not $Version" }
+
+    # An msi wants three numbers; the third is always zero and is never shown to the user.
+    $msiVersion = "$Version.0"
 
     Write-Step 'Fetching the PawnIO driver setup'
 
@@ -178,6 +181,7 @@ try {
 
     & wix build -arch x64 `
         -d "Version=$msiVersion" `
+        -d "DisplayVersion=$Version" `
         -d "Manufacturer=$manufacturer" `
         -d "Exe=$exe" `
         -d "Icon=$(Join-Path $repo 'pictures\icon.ico')" `

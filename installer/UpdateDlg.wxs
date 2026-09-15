@@ -19,7 +19,7 @@
 
         <Control Id="Text" Type="Text" X="20" Y="60" Width="330" Height="40" Transparent="yes"
                  NoPrefix="yes"
-                 Text="It will be updated to version [ProductVersion] where it is now:&#10;[APPLICATIONFOLDER]" />
+                 Text="It will be updated to version $(DisplayVersion) where it is now:&#10;[APPLICATIONFOLDER]" />
 
         <!-- Whose copy this is. ALLUSERS is settled by now: 1 for everyone, empty for one user. -->
         <Control Id="ScopeMachine" Type="Text" X="20" Y="105" Width="330" Height="15" Transparent="yes"

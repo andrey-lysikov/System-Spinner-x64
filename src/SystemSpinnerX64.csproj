@@ -19,6 +19,8 @@
     <Copyright>© Andrey Lysikov, Apache 2.0 licence.</Copyright>
     <Description>System monitoring: an overlay over games and an animated tray icon outside them.</Description>
     <Version>1.4</Version>
+    <!-- Two numbers, and only them: without this the product version gets "+<commit>" appended. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <PropertyGroup>
