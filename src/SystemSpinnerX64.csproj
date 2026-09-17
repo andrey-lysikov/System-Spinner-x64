@@ -9,6 +9,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>System-Spinner</AssemblyName>
     <RootNamespace>SystemSpinnerX64</RootNamespace>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <!-- All of this shows in the exe properties and in the Explorer details pane -->
