@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Devices;
 using SystemSpinnerX64.Diagnostics;
+using SystemSpinnerX64.Lighting;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Monitoring;
 using SystemSpinnerX64.Osd;
@@ -47,8 +48,19 @@ public sealed class ModeSupervisor : IDisposable
     private readonly DispatcherTimer _updateTimer = new();
     private readonly DispatcherTimer _displayTimer = new();
     private readonly DispatcherTimer _wakeTimer = new();
+    private readonly DispatcherTimer _skyTimer = new();
+    private readonly DispatcherTimer _themeTimer = new();
 
     private StatsWindow? _stats;
+
+    // The motherboard lighting, when the machine has an Aura controller.
+    private AuraSunlight? _aura;
+
+    // The earliest word of a graphics driver reloading. Made in Start, on the UI thread.
+    private GpuDriverWatch? _gpuWatch;
+
+    // What the Sun & Moon spinner last drew, so the minute tick only redraws on a change.
+    private SkyIcon.State? _skyShown;
 
     private bool _inGame;
 
@@ -130,6 +142,17 @@ public sealed class ModeSupervisor : IDisposable
             CheckForUpdates(announceEither: false);
         };
 
+        // The sun and the moon move slowly: a look once a minute, and a redraw only when the
+        // picture would actually differ.
+        _skyTimer.Interval = AppParameters.Aura.SkyRefresh;
+        _skyTimer.Tick += (_, _) => RefreshSky();
+
+        _themeTimer.Interval = AppParameters.Spinning.ThemeSettle;
+        _themeTimer.Tick += (_, _) => ApplyTheme();
+
+        Sky.Configure(cfg.Spinner);
+
+        SystemEvents.DisplaySettingsChanging += OnDisplaySettingsChanging;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
@@ -157,10 +180,24 @@ public sealed class ModeSupervisor : IDisposable
 
         StartMediaKeys();
 
+        // Before the first poll: a driver can be reloading at boot as well.
+        try
+        {
+            _gpuWatch = new GpuDriverWatch();
+            _gpuWatch.AdapterChanged += reason => _hardware.PauseGpu(reason);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("the display adapter watch did not start", ex);
+        }
+
         _metrics.Start();
         _modeTimer.Start();
         _updateTimer.Start();
         _displayTimer.Start();
+        _skyTimer.Start();
+
+        DetectAura();
 
         if (_excludedApps.Count > 0)
             Log.Info("the panel is kept away from: " + string.Join(", ", _excludedApps.Select(p => p.Text)));
@@ -341,6 +378,13 @@ public sealed class ModeSupervisor : IDisposable
 
         _tray.ShowTip(Tip(r));
 
+        if (_aura is not null)
+        {
+            WarnConfig w = _cfg.Warn;
+            double heat = w.EnableWarnColor ? WarnHeat.Of(r.CpuTempC, w.CpuTemp, r.GpuTempC, w.GpuTemp) : 0;
+            _aura.Feed(heat, r.BusiestLoad / 100.0);
+        }
+
         _stats?.Apply(snapshot);
 
         LogReadings(r);
@@ -393,6 +437,17 @@ public sealed class ModeSupervisor : IDisposable
     {
         SpinnerStyle style = SpinnerCatalog.Validate(_cfg.Spinner.Style);
 
+        if (style.Drawn)
+        {
+            // The place is looked up once; until then the sun is placed by the time zone alone.
+            Sky.EnsureResolved();
+            _skyShown = SkyIcon.Now();
+        }
+        else
+        {
+            _skyShown = null;
+        }
+
         _animator.Invert = _cfg.Spinner.InvertRotation;
         _animator.Load(style, _cfg.Spinner.Effect,
                        System.Windows.Forms.SystemInformation.SmallIconSize.Width,
@@ -405,6 +460,61 @@ public sealed class ModeSupervisor : IDisposable
         }
 
         if (_inGame || !_cfg.SpinOnDesktop) _animator.Stop();
+    }
+
+    // The Sun & Moon spinner follows the sky: a new picture only when the rays, the phase or the
+    // choice between the two would change.
+    private void RefreshSky()
+    {
+        if (_skyShown is null) return;
+
+        Sky.EnsureResolved();
+        if (SkyIcon.Now() != _skyShown) ReloadSpinner();
+    }
+
+    // --- The Aura lighting ---
+
+    // Looked for off the UI thread: asking a HID device that is not the controller a driver
+    // expects waits out a timeout, and the tray must not freeze meanwhile. The menu item appears
+    // for any controller a driver knows.
+    private void DetectAura()
+    {
+        int ledsPerChannel = _cfg.Aura.LedsPerChannel;
+
+        _ = Task.Run(() =>
+        {
+            ILightDevice? device = LightDevices.Open(ledsPerChannel);
+
+            if (_overlay.Dispatcher.HasShutdownStarted)
+            {
+                device?.Dispose();
+                return;
+            }
+
+            _ = _overlay.Dispatcher.BeginInvoke(() =>
+            {
+                if (device is null)
+                {
+                    Log.Info("lighting: no supported controller — the Aura Sunlight item stays out of the menu");
+                    return;
+                }
+
+                Log.Event($"lighting: controller found — {device.Describe()}");
+
+                _aura = new AuraSunlight(_cfg.Aura, device);
+                if (_cfg.Aura.Enable) _aura.Enable();
+
+                _tray.ShowAura(true);
+            });
+        });
+    }
+
+    private void SetAura(bool enabled)
+    {
+        if (_aura is null) return;
+
+        if (enabled) _aura.Enable();
+        else _aura.Disable();
     }
 
     // --- The status window ---
@@ -545,6 +655,9 @@ public sealed class ModeSupervisor : IDisposable
         _tray.UpdateRequested += () => CheckForUpdates(announceEither: true);
         _tray.AutoStartToggled += SetAutoStart;
         _tray.SpinnerChanged += ReloadSpinner;
+        _tray.AuraToggled += SetAura;
+        _tray.AuraLookChanged += () => _aura?.Restyle();
+        _tray.AuraBrightnessChanged += () => _aura?.Rescale();
 
         _tray.IntervalChanged += () =>
         {
@@ -658,9 +771,15 @@ public sealed class ModeSupervisor : IDisposable
     {
         if (e.Mode != PowerModes.Resume) return;
 
+        // The graphics driver starts over on a wake, much as it does on a reload.
+        _hardware.PauseGpu("the machine woke up");
+
         // One timer for every wake-up rather than a new one each time: a machine can report
         // resuming twice in a row, and each of those would otherwise leave a timer behind.
         _ = _overlay.Dispatcher.BeginInvoke(() => Settle("the machine woke up"));
+
+        // The controller comes back on its own saved effect and has to be taken over again.
+        _aura?.Recover("the machine woke up");
     }
 
     // Asks the screens again in a while, and goes on asking while they answer nothing over DDC.
@@ -673,7 +792,18 @@ public sealed class ModeSupervisor : IDisposable
         _wakeTimer.Start();
     }
 
-    private void OnDisplaySettingsChanged(object? sender, EventArgs e) =>
+    // A graphics driver reload changes the screen configuration too. The card is let alone at once,
+    // here on the system events thread: the queue to the UI thread could let one more poll through.
+    private void OnDisplaySettingsChanging(object? sender, EventArgs e) =>
+        _hardware.PauseGpu("the screen configuration is changing");
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        _hardware.PauseGpu("the screen configuration changed");
+        OnDisplaySettingsSettled();
+    }
+
+    private void OnDisplaySettingsSettled() =>
         _overlay.Dispatcher.BeginInvoke(() =>
         {
             // A monitor was attached, detached or rescaled: the screen the panel was put on may be
@@ -698,17 +828,29 @@ public sealed class ModeSupervisor : IDisposable
         // General arrives on a theme change too: there is no separate event for it.
         if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color)) return;
 
+        // It also arrives in bursts — four in a second when a remote session connects — and each
+        // would rebuild every frame of the spinner. The timer starts over with every one of them,
+        // so the rebuild happens once, after the last.
         _overlay.Dispatcher.BeginInvoke(() =>
         {
-            ReloadSpinner();
-            _tray.ApplyTheme();
-            _osd.ApplyTheme();
-            _stats?.ApplyTheme();
+            _themeTimer.Stop();
+            _themeTimer.Start();
         });
+    }
+
+    private void ApplyTheme()
+    {
+        _themeTimer.Stop();
+
+        ReloadSpinner();
+        _tray.ApplyTheme();
+        _osd.ApplyTheme();
+        _stats?.ApplyTheme();
     }
 
     public void Dispose()
     {
+        SystemEvents.DisplaySettingsChanging -= OnDisplaySettingsChanging;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
@@ -718,6 +860,11 @@ public sealed class ModeSupervisor : IDisposable
         _updateTimer.Stop();
         _displayTimer.Stop();
         _wakeTimer.Stop();
+        _skyTimer.Stop();
+        _themeTimer.Stop();
+
+        _gpuWatch?.Dispose();
+        _aura?.Dispose();
 
         _stats?.Close();
         _overlay.Close();

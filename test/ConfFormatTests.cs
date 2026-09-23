@@ -92,7 +92,7 @@ public class ConfFormatTests
         // What 1.0.0 wrote has no [FullScreenOverlay]; the startup writes the file back with it.
         AppConfig old = ConfFormat.Read("[General]\nDebug = false\n[Hardware]\nGpuIndex = 0\n[Spinner]\nStyle = Loader\n");
 
-        Assert.Equal(new[] { "FullScreenOverlay" }, old.MissingSections);
+        Assert.Equal(new[] { "FullScreenOverlay", "Aura" }, old.MissingSections);
         Assert.Empty(ConfFormat.Read(ConfFormat.Write(new AppConfig())).MissingSections);
     }
 

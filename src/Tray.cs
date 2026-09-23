@@ -11,6 +11,7 @@ using System.Linq;
 using System.Windows.Forms;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
+using SystemSpinnerX64.Lighting;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Platform;
 using SystemSpinnerX64.Spinner;
@@ -31,7 +32,7 @@ internal sealed class MenuColors : ProfessionalColorTable
         UseSystemColors = false;
     }
 
-    private Color Surface => _dark ? Color.FromArgb(0x2B, 0x2B, 0x2B) : Color.FromArgb(0xF9, 0xF9, 0xF9);
+    internal Color Surface => _dark ? Color.FromArgb(0x2B, 0x2B, 0x2B) : Color.FromArgb(0xF9, 0xF9, 0xF9);
     private Color Hover => _dark ? Color.FromArgb(0x3D, 0x3D, 0x3D) : Color.FromArgb(0xE9, 0xE9, 0xE9);
     private Color Edge => _dark ? Color.FromArgb(0x45, 0x45, 0x45) : Color.FromArgb(0xE0, 0xE0, 0xE0);
 
@@ -73,6 +74,9 @@ internal sealed class MenuRenderer : ToolStripProfessionalRenderer
     }
 
     public Color Foreground => _dark ? Color.FromArgb(0xF0, 0xF0, 0xF0) : Color.FromArgb(0x1A, 0x1A, 0x1A);
+
+    // The menu background, for a control hosted in it that paints itself.
+    public Color Background => ((MenuColors)ColorTable).Surface;
 
     // A disabled item: the same colour at half strength.
     public Color Disabled => _dark ? Color.FromArgb(0x88, 0x88, 0x88) : Color.FromArgb(0x8A, 0x8A, 0x8A);
@@ -121,6 +125,7 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _externalAddressItem;
     private readonly ToolStripMenuItem _invertItem;
     private readonly ToolStripMenuItem _overlayItem;
+    private readonly ToolStripMenuItem _auraItem;
 
     private readonly Icon _fallbackIcon;
 
@@ -131,6 +136,9 @@ public sealed class TrayIcon : IDisposable
     public event Action? OsdChanged;
     public event Action? LanguageChanged;
     public event Action? OverlayChanged;
+    public event Action<bool>? AuraToggled;
+    public event Action? AuraLookChanged;
+    public event Action? AuraBrightnessChanged;
     public event Action? UpdateRequested;
     public event Action? ExitRequested;
 
@@ -145,12 +153,25 @@ public sealed class TrayIcon : IDisposable
         _externalAddressItem = Check(Text.MenuExternalAddress, _cfg.Stats.ShowExternalAddress);
         _invertItem = Check(Text.MenuInvertRotation, _cfg.Spinner.InvertRotation);
         _overlayItem = Check(Text.MenuOverlay, _cfg.ShowOverlayInGames);
+        _auraItem = Check(Text.MenuAuraSunlight, _cfg.Aura.Enable);
+        _auraItem.Visible = false;
+
+        // A plain drop-down rather than a menu one: a menu keeps a check-mark strip on the left and
+        // an arrow strip on the right of every item, and round the palette both would stand empty.
+        // The chosen effect carries its mark in its text instead.
+        _auraItem.DropDown = new ToolStripDropDown
+        {
+            LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow,
+            Padding = new Padding(8, 4, 8, 4)
+        };
 
         _displaysItem = new ToolStripMenuItem(Text.MenuDisplays);
 
         WireItems();
         BuildMenu();
         ApplyTheme();
+
+        _menu.SizeChanged += OnMenuResized;
 
         // The menu is not handed to NotifyIcon: it is opened by hand in ShowMenu, which knows
         // where the taskbar is.
@@ -286,6 +307,13 @@ public sealed class TrayIcon : IDisposable
             Save();
             OverlayChanged?.Invoke();
         };
+
+        _auraItem.CheckedChanged += (_, _) =>
+        {
+            _cfg.Aura.Enable = _auraItem.Checked;
+            Save();
+            AuraToggled?.Invoke(_auraItem.Checked);
+        };
     }
 
     // Builds the menu again. The permanent items get new titles, the submenus are built from
@@ -299,6 +327,7 @@ public sealed class TrayIcon : IDisposable
         _externalAddressItem.Text = Text.MenuExternalAddress;
         _invertItem.Text = Text.MenuInvertRotation;
         _overlayItem.Text = Text.MenuOverlay;
+        _auraItem.Text = Text.MenuAuraSunlight;
 
         // The config and the log open in a text editor rather than whatever the shell picks:
         // .conf and .log may have no association, and a click would offer "choose a program".
@@ -321,6 +350,7 @@ public sealed class TrayIcon : IDisposable
         // time have to be let go of by hand, or every language change leaves a set behind.
         ReleasePreviews();
         ReleaseBuiltItems();
+        BuildAuraMenu();
 
         _menu.Items.Clear();
         _menu.Items.AddRange(new ToolStripItem[]
@@ -329,6 +359,7 @@ public sealed class TrayIcon : IDisposable
             _autoStartItem,
             _languageItem,
             _externalAddressItem,
+            _auraItem,
             new ToolStripSeparator(),
             _displaysItem,
             StepsMenu(),
@@ -351,28 +382,53 @@ public sealed class TrayIcon : IDisposable
         ShowDisplays(Array.Empty<(string, bool)>());
     }
 
-    // Opens the menu at the pointer.
+    // Where the pointer was when the menu was asked for: the menu is put against it.
+    private System.Drawing.Point _menuAnchor;
+
+    // Opens the menu at the pointer, away from the edge the taskbar is on.
+    //
+    // Placed by hand rather than by a direction handed to Show: that direction works from the size
+    // the menu had when it was last laid out, and the menu is laid out at the scale the app started
+    // with. Started over a remote session at 100 % and opened on a 150 % monitor, the menu came up
+    // far too high, then shifted sideways — it grew after it had been placed. So it is shown
+    // transparent, put in place by the size it has once it is on its monitor, and only then shown;
+    // should it still grow afterwards, it is put in place again.
     private void ShowMenu()
     {
-        System.Drawing.Point pointer = Control.MousePosition;
-        System.Drawing.Rectangle work = Screen.FromPoint(pointer).WorkingArea;
-
-        bool above = pointer.Y > work.Top + work.Height / 2;
-        bool toTheLeft = pointer.X > work.Left + work.Width / 2;
-
-        ToolStripDropDownDirection direction = (above, toTheLeft) switch
-        {
-            (true, true) => ToolStripDropDownDirection.AboveLeft,
-            (true, false) => ToolStripDropDownDirection.AboveRight,
-            (false, true) => ToolStripDropDownDirection.BelowLeft,
-            _ => ToolStripDropDownDirection.BelowRight
-        };
+        _menuAnchor = Control.MousePosition;
 
         // Activation goes to an invisible tool window of ours: something must be in the foreground
         // for the menu to close on a click elsewhere, and a menu doing that gets a taskbar button.
         Win32.SetForegroundWindow(_owner.Handle);
 
-        _menu.Show(pointer, direction);
+        _menu.Opacity = 0;
+        _menu.Show(_menuAnchor);
+        PlaceMenu();
+        _menu.Opacity = 1;
+    }
+
+    private void PlaceMenu()
+    {
+        System.Drawing.Point pointer = _menuAnchor;
+        System.Drawing.Rectangle work = Screen.FromPoint(pointer).WorkingArea;
+        Size size = _menu.Size;
+
+        // Above the pointer on the lower half of the screen, to its left on the right half: the
+        // corner of the menu sits at the pointer, the menu away from the taskbar.
+        int x = pointer.X > work.Left + work.Width / 2 ? pointer.X - size.Width : pointer.X;
+        int y = pointer.Y > work.Top + work.Height / 2 ? pointer.Y - size.Height : pointer.Y;
+
+        // Never past the edge of the work area, whatever size it came out.
+        x = Math.Clamp(x, work.Left, Math.Max(work.Left, work.Right - size.Width));
+        y = Math.Clamp(y, work.Top, Math.Max(work.Top, work.Bottom - size.Height));
+
+        if (_menu.Location != new System.Drawing.Point(x, y)) _menu.Location = new System.Drawing.Point(x, y);
+    }
+
+    // The menu rescaled for its monitor after it was placed: put it against the pointer again.
+    private void OnMenuResized(object? sender, EventArgs e)
+    {
+        if (_menu.Visible) PlaceMenu();
     }
 
     // An invisible window the menu can be activated through.
@@ -426,9 +482,102 @@ public sealed class TrayIcon : IDisposable
         return root;
     }
 
+    // The lighting item is there from the start but hidden: whether the machine has a controller
+    // is known only after the startup has looked.
+    public void ShowAura(bool available) => _auraItem.Visible = available;
+
+    // Under the lighting switch: the palette, and the effect below it. A click on the item itself
+    // still ticks it on and off; pointing at it opens this.
+    private void BuildAuraMenu()
+    {
+        foreach (ToolStripItem old in _auraItem.DropDownItems.Cast<ToolStripItem>().ToList()) old.Dispose();
+        _auraItem.DropDownItems.Clear();
+
+        // The caption and the font go in before the host is made: they decide the palette's size.
+        var palette = new PaletteControl { Font = _menu.Font, Title = Text.AuraBaseColor };
+        if (Rgb.TryParse(_cfg.Aura.Color, out Rgb current)) palette.Selected = current;
+
+        palette.Picked += color =>
+        {
+            _cfg.Aura.Color = color.ToString();
+            Save();
+            AuraLookChanged?.Invoke();
+
+            // A swatch is not a menu item, so the menu has to be told it is done.
+            _menu.Close();
+        };
+
+        _auraItem.DropDownItems.Add(new MenuHost(palette));
+        _auraItem.DropDownItems.Add(new ToolStripSeparator());
+
+        (AuraEffect Effect, string Title)[] effects =
+        {
+            (AuraEffect.Solid, Text.AuraSolid),
+            (AuraEffect.Breathing, Text.AuraBreathing),
+            (AuraEffect.Rainbow, Text.AuraRainbow)
+        };
+
+        var items = new List<(ToolStripMenuItem Item, AuraEffect Effect, string Title)>();
+
+        void Mark()
+        {
+            foreach ((ToolStripMenuItem item, AuraEffect effect, string title) in items)
+                item.Text = (_cfg.Aura.Effect == effect ? "●  " : "○  ") + title;
+        }
+
+        foreach ((AuraEffect effect, string title) in effects)
+        {
+            // A menu drop-down lines its items up on the left by itself; a plain one centres them.
+            var item = new ToolStripMenuItem(title) { TextAlign = ContentAlignment.MiddleLeft };
+
+            item.Click += (_, _) =>
+            {
+                _cfg.Aura.Effect = effect;
+                Mark();
+                Save();
+                AuraLookChanged?.Invoke();
+            };
+
+            items.Add((item, effect, title));
+            _auraItem.DropDownItems.Add(item);
+        }
+
+        Mark();
+
+        // The ceiling the sun brings the light up to. The light follows the thumb as it moves; the
+        // file is written once, when it is let go.
+        var slider = new BrightnessSlider
+        {
+            Font = _menu.Font,
+            Title = Text.AuraMaxBrightness,
+            Value = (int)Math.Round(_cfg.Aura.Brightness)
+        };
+        slider.FitWidth(palette.Width);
+
+        slider.ValueChanging += value =>
+        {
+            _cfg.Aura.Brightness = value;
+            AuraBrightnessChanged?.Invoke();
+        };
+
+        slider.ValueCommitted += value =>
+        {
+            _cfg.Aura.Brightness = value;
+            Save();
+            AuraBrightnessChanged?.Invoke();
+        };
+
+        _auraItem.DropDownItems.Add(new ToolStripSeparator());
+        _auraItem.DropDownItems.Add(new MenuHost(slider));
+    }
+
     // The first frame of a set next to its name: "Delay" does not tell you what it looks like.
     private static Image? Preview(SpinnerStyle style)
     {
+        // Drawn in the colour of the menu text, which the icon would otherwise vanish into.
+        if (style.Drawn)
+            return SkyIcon.Render(SkyIcon.Now(), 16, Theme.AreWindowsDark() ? Color.White : Color.Black);
+
         try
         {
             // A set of one frame has only the first; everywhere else the second is taken — the
@@ -577,6 +726,13 @@ public sealed class TrayIcon : IDisposable
         {
             item.ForeColor = item.Enabled ? renderer.Foreground : renderer.Disabled;
 
+            // The palette and the slider paint themselves and need the menu's colours handed to them.
+            if (item is MenuHost { Control: { } hosted })
+            {
+                hosted.BackColor = renderer.Background;
+                hosted.ForeColor = renderer.Foreground;
+            }
+
             if (item is not ToolStripMenuItem { HasDropDownItems: true } parent) continue;
 
             parent.DropDown.RenderMode = ToolStripRenderMode.Professional;
@@ -665,7 +821,7 @@ public sealed class TrayIcon : IDisposable
     {
         var permanent = new HashSet<ToolStripItem>
         {
-            _overlayItem, _autoStartItem, _languageItem, _externalAddressItem,
+            _overlayItem, _autoStartItem, _languageItem, _externalAddressItem, _auraItem,
             _displaysItem, _alwaysOsdItem, _invertItem
         };
 
