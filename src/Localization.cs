@@ -106,6 +106,33 @@ internal static class Text
         "Spinners", "Спиннеры", "Spinners", "Spinners",
         "Spinners", "Spinners", "Spinners", "Spinners");
 
+    // A name, not a phrase: the tick in front of it says whether it is on, in every language.
+    public static string MenuAuraSunlight => "Aura Sunlight";
+
+    // Above the palette: the colour picked there is the base one, the warning colours for heat are
+    // worked out from it.
+    public static string AuraBaseColor => S(
+        "Base colour", "Основной цвет", "اللون الأساسي", "主颜色",
+        "Couleur principale", "Grundfarbe", "Colore principale", "基本色");
+
+    // The slider for the ceiling the sun brings the lighting up to.
+    public static string AuraMaxBrightness => S(
+        "Maximum brightness", "Максимальная яркость", "أقصى سطوع", "最大亮度",
+        "Luminosité maximale", "Maximale Helligkeit", "Luminosità massima", "最大輝度");
+
+    // The lighting effects under Aura Sunlight.
+    public static string AuraSolid => S(
+        "Solid", "Постоянный", "ثابت", "常亮",
+        "Fixe", "Statisch", "Fisso", "点灯");
+
+    public static string AuraBreathing => S(
+        "Breathing", "Дыхание", "تنفس", "呼吸",
+        "Respiration", "Atmen", "Respiro", "呼吸");
+
+    public static string AuraRainbow => S(
+        "Rainbow", "Радуга", "قوس قزح", "彩虹",
+        "Arc-en-ciel", "Regenbogen", "Arcobaleno", "虹");
+
     public static string MenuUpdateInterval => S(
         "Data update every", "Обновлять данные каждые", "تحديث البيانات كل", "数据更新间隔",
         "Mise à jour toutes les", "Daten aktualisieren alle", "Aggiorna i dati ogni",
