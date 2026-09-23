@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
 using LibreHardwareMonitor.Hardware;
@@ -165,9 +166,59 @@ public sealed class HardwareMonitor : IDisposable
         }
     }
 
+    // Until then the graphics card is left alone, in UTC ticks. Set from any thread.
+    private long _gpuPausedUntil;
+
+    // The card's sensors were opened before a driver reload and have to be opened again.
+    private volatile bool _gpuStale;
+
+    // The graphics driver may be reloading — an update, a recovery from a hang. The handle NVML
+    // keeps then points into a driver that is gone, and reading the power through it kills the
+    // process outright: an access violation in native code, which no catch can stop. So the card
+    // is not touched until the driver has settled, and then its sensors are opened afresh.
+    public void PauseGpu(string reason)
+    {
+        Interlocked.Exchange(ref _gpuPausedUntil, (DateTime.UtcNow + AppParameters.Polling.GpuDriverSettle).Ticks);
+
+        if (!_gpuStale) Log.Event($"GPU sensors paused: {reason}");
+        _gpuStale = true;
+    }
+
+    // Closes the card's sensors and opens them again, which starts NVML over on the new driver.
+    private void ReopenGpu()
+    {
+        _gpuStale = false;
+
+        try
+        {
+            _computer.IsGpuEnabled = false;
+            _computer.IsGpuEnabled = true;
+            Rebind();
+
+            Log.Event($"GPU sensors reopened: {_gpu?.Name ?? "no graphics card found"}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("the GPU sensors did not reopen", ex);
+        }
+    }
+
     public Readings Read()
     {
-        _computer.Accept(_visitor);
+        bool gpuPaused = DateTime.UtcNow.Ticks < Interlocked.Read(ref _gpuPausedUntil);
+        if (!gpuPaused && _gpuStale) ReopenGpu();
+
+        // While paused the card keeps showing what it last read: a few seconds of a stale value
+        // are nothing next to the process going down.
+        if (gpuPaused)
+        {
+            foreach (IHardware hw in _computer.Hardware)
+                if (!FanClassifier.IsGpu(hw)) hw.Accept(_visitor);
+        }
+        else
+        {
+            _computer.Accept(_visitor);
+        }
 
         SensorNamesConfig names = _cfg.Sensors;
 
@@ -311,10 +362,15 @@ public sealed class HardwareMonitor : IDisposable
     private static double? ReadFan(IEnumerable<IHardware> sources, IReadOnlyList<string> names, bool average) =>
         average ? AverageFans(sources, names) : FindFan(sources, names);
 
+    // A card stopping its fans reads one wild value on the way down — 320 000 to 980 000 rpm were
+    // logged, between a thousand and zero — the tachometer's near-zero period turned into a speed.
+    // No fan, pump or blower goes anywhere near this, so such a reading is no reading.
+    internal static bool IsPlausibleFan(float rpm) => rpm >= 0 && rpm <= AppParameters.Sensors.MaxFanRpm;
+
     private static double? FindFan(IEnumerable<IHardware> sources, IReadOnlyList<string> names)
     {
         var sensors = sources.SelectMany(h => Collect(h, SensorType.Fan))
-                             .Where(s => s.Value.HasValue)
+                             .Where(s => s.Value is float rpm && IsPlausibleFan(rpm))
                              .ToList();
         if (sensors.Count == 0) return null;
 
@@ -374,7 +430,7 @@ public sealed class HardwareMonitor : IDisposable
 
         // The same hardware can arrive twice — the card itself and the card in the source list.
         var sensors = sources.SelectMany(h => Collect(h, SensorType.Fan))
-                             .Where(s => s.Value.HasValue)
+                             .Where(s => s.Value is float rpm && IsPlausibleFan(rpm))
                              .GroupBy(s => s.Identifier.ToString())
                              .Select(g => g.First())
                              .Where(s => names.Any(n =>

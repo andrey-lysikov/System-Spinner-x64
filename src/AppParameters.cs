@@ -171,6 +171,71 @@ internal static class AppParameters
 
         // The set shown when the config names one that is not there.
         public const string FallbackName = "Loader";
+
+        // How long the settings have to stay quiet before the frames are rebuilt for a new theme:
+        // a remote session connecting sends four changes in a second.
+        public static readonly TimeSpan ThemeSettle = TimeSpan.FromMilliseconds(500);
+    }
+
+    // The Aura lighting and the Sun & Moon spinner.
+    internal static class Aura
+    {
+        // Ramp on a click: fast enough to read as a response to the gesture.
+        public static readonly TimeSpan ToggleFade = TimeSpan.FromSeconds(2.5);
+
+        // Daily drift: half a minute for the full span, so the change goes unnoticed.
+        public static readonly TimeSpan DriftFade = TimeSpan.FromSeconds(30);
+
+        // The brightness slider being dragged: quick enough to follow the thumb, still not a jump.
+        public static readonly TimeSpan AdjustFade = TimeSpan.FromSeconds(0.4);
+
+        // How long after the slider moved a new goal still counts as the slider's.
+        public static readonly TimeSpan AdjustWindow = TimeSpan.FromSeconds(1);
+
+        // Frame period while the light is actually moving.
+        public static readonly TimeSpan Frame = TimeSpan.FromMilliseconds(50);
+
+        // Idle tick. Nothing is written, it only keeps the response to a change short.
+        public static readonly TimeSpan IdleTick = TimeSpan.FromSeconds(1);
+
+        // The sun barely moves in five minutes, and the fade smooths the step anyway.
+        public static readonly TimeSpan LevelRefresh = TimeSpan.FromMinutes(5);
+
+        // Standing still the colour is still restated now and then, in case something else
+        // touched the controller meanwhile.
+        public static readonly TimeSpan KeepAlive = TimeSpan.FromMinutes(2);
+
+        // Smoothing constant for the heat tint, so the colour drifts instead of stepping with
+        // every sensor poll.
+        public static readonly TimeSpan HeatSmoothing = TimeSpan.FromSeconds(1.5);
+
+        // How far below WarnCpuTemp and WarnGpuTemp the colour starts to move, degrees.
+        public const double WarnRampDegrees = 15;
+
+        // How far a blood-moon pulse dips at its lowest. A third reads as breathing.
+        public const double PulseDepth = 1.0 / 3.0;
+
+        // How often to ask whether tonight is a total lunar eclipse.
+        public static readonly TimeSpan BloodCheck = TimeSpan.FromMinutes(5);
+
+        // How long to wait before looking for a controller that stopped answering.
+        public static readonly TimeSpan ReopenDelay = TimeSpan.FromSeconds(10);
+
+        // How often a failed IP lookup is tried again, and how soon the level is looked at again
+        // while the latitude is only a guess.
+        public static readonly TimeSpan LocationRetry = TimeSpan.FromMinutes(1);
+
+        // Cloud cover does not change faster than this.
+        public static readonly TimeSpan WeatherRefresh = TimeSpan.FromMinutes(15);
+
+        // How often the lighting state goes to the log.
+        public static readonly TimeSpan LogPeriod = TimeSpan.FromMinutes(5);
+
+        // The Sun & Moon spinner is redrawn no more often than this.
+        public static readonly TimeSpan SkyRefresh = TimeSpan.FromMinutes(1);
+
+        // The most LEDs per channel the config may ask for. Each driver has its own, lower, limit.
+        public const int MaxLedsPerChannel = 1000;
     }
 
     // How often the machine is asked about itself.
@@ -187,6 +252,10 @@ internal static class AppParameters
 
         // How many process icons the poll keeps: as many as the window shows.
         public const int ProcessIconCache = 64;
+
+        // How long the graphics card is left alone after its driver may have reloaded. The driver
+        // comes back in a second or two; the screens settle a little after.
+        public static readonly TimeSpan GpuDriverSettle = TimeSpan.FromSeconds(5);
     }
 
     // The frame counter and its ETW session.
@@ -244,6 +313,9 @@ internal static class AppParameters
     {
         // What excludes the efficient cores from the clock when there are no explicit P-cores.
         public const string ClockExclude = "E-Core";
+
+        // Above this a fan reading is a glitch, not a speed. Server blowers stop short of it.
+        public const float MaxFanRpm = 20_000;
     }
 
     // Finding out the address the world sees.

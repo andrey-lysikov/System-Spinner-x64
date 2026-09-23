@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5
+
+* Add Aura argb controll if supported
+* Add Spinner Sun & Moon
+* Bugfix
+
 ## 1.4
 
 * Bugfix

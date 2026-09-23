@@ -16,8 +16,10 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Spinner;
 
-// One set of tray animation frames.
-public sealed record SpinnerStyle(string Name, int FrameCount, bool SupportsEffect, int SpeedCoefficient);
+// One set of tray animation frames. A drawn one has no pictures in the assembly: its single frame
+// is painted when it is loaded, from whatever it shows at that moment.
+public sealed record SpinnerStyle(string Name, int FrameCount, bool SupportsEffect, int SpeedCoefficient,
+                                  bool Drawn = false);
 
 // How the animation frames are coloured.
 public enum SpinnerEffect
@@ -42,6 +44,14 @@ internal static class SpinnerFrames
     // Frames fitted into a size square.
     public static List<Bitmap> Load(SpinnerStyle style, SpinnerEffect effect, int size, bool lightTheme)
     {
+        // The sun or the moon, in the colour the effect asks for; as drawn means as the taskbar
+        // wants it, since the glyph has no colours of its own.
+        if (style.Drawn)
+        {
+            Color glyph = Silhouette(effect, lightTheme) ?? (lightTheme ? Color.Black : Color.White);
+            return new List<Bitmap> { SkyIcon.Render(SkyIcon.Now(), size, glyph) };
+        }
+
         var sources = new List<Bitmap>(style.FrameCount);
 
         for (int index = 0; index < style.FrameCount; index++)
@@ -234,7 +244,13 @@ public static class SpinnerCatalog
         "Cat", "Pikachu", "Rotation Color Well"
     };
 
-    public static IReadOnlyList<SpinnerStyle> All { get; } = Discover();
+    // The sun by day and the moon in its phase by night, redrawn as they move.
+    public const string SunAndMoon = "Sun & Moon";
+
+    public static IReadOnlyList<SpinnerStyle> All { get; } = Discover()
+        .Append(new SpinnerStyle(SunAndMoon, 1, SupportsEffect: true, SpeedCoefficient: 1, Drawn: true))
+        .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+        .ToList();
 
     public static SpinnerStyle Fallback { get; } =
         All.FirstOrDefault(s => s.Name.Equals(AppParameters.Spinning.FallbackName, StringComparison.OrdinalIgnoreCase))

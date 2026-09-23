@@ -7,6 +7,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using SystemSpinnerX64.Diagnostics;
+using SystemSpinnerX64.Lighting;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Spinner;
 
@@ -194,8 +195,9 @@ internal static class ConfFormat
     private const string EnableKey = "Enable";
 
     // Every section the file is meant to have; one that is missing is written back with defaults.
-    public static readonly string[] Sections = { General, Hardware, OverlaySection, SpinnerSection };
+    public static readonly string[] Sections = { General, Hardware, OverlaySection, SpinnerSection, AuraSection };
     private const string SpinnerSection = "Spinner";
+    private const string AuraSection = "Aura";
 
     // Milliseconds in a second: the file speaks seconds, the timers milliseconds.
     private const double Second = 1000.0;
@@ -269,6 +271,7 @@ internal static class ConfFormat
 
         WarnConfig n = cfg.Warn;
         n.Color = file.Text(Hardware, "WarnColor") ?? n.Color;
+        n.EnableWarnColor = file.Flag(Hardware, nameof(n.EnableWarnColor)) ?? n.EnableWarnColor;
         n.CpuTemp = file.Number(Hardware, "WarnCpuTemp") ?? n.CpuTemp;
         n.GpuTemp = file.Number(Hardware, "WarnGpuTemp") ?? n.GpuTemp;
         n.SysMem = file.Percent(Hardware, "WarnSysMem") ?? n.SysMem;
@@ -298,6 +301,21 @@ internal static class ConfFormat
         sp.Style = file.Text(SpinnerSection, nameof(sp.Style)) ?? sp.Style;
         sp.Effect = file.Choice<SpinnerEffect>(SpinnerSection, nameof(sp.Effect)) ?? sp.Effect;
         sp.InvertRotation = file.Flag(SpinnerSection, nameof(sp.InvertRotation)) ?? sp.InvertRotation;
+        sp.DimAbove = file.Number(SpinnerSection, nameof(sp.DimAbove)) ?? sp.DimAbove;
+        sp.FullBelow = file.Number(SpinnerSection, nameof(sp.FullBelow)) ?? sp.FullBelow;
+        sp.TimeZone = file.Text(SpinnerSection, nameof(sp.TimeZone)) ?? sp.TimeZone;
+        sp.Sanitize();
+
+        AuraConfig au = cfg.Aura;
+        au.Enable = file.Flag(AuraSection, nameof(au.Enable)) ?? au.Enable;
+        au.Color = file.Text(AuraSection, nameof(au.Color)) ?? au.Color;
+        au.Effect = file.Choice<AuraEffect>(AuraSection, nameof(au.Effect)) ?? au.Effect;
+        au.Speed = file.Whole(AuraSection, nameof(au.Speed)) ?? au.Speed;
+        au.Brightness = file.Percent(AuraSection, nameof(au.Brightness)) ?? au.Brightness;
+        au.VisibleFrom = file.Percent(AuraSection, nameof(au.VisibleFrom)) ?? au.VisibleFrom;
+        au.WeatherCloud = file.Flag(AuraSection, nameof(au.WeatherCloud)) ?? au.WeatherCloud;
+        au.LedsPerChannel = file.Whole(AuraSection, nameof(au.LedsPerChannel)) ?? au.LedsPerChannel;
+        au.Sanitize();
 
         return cfg;
     }
@@ -432,7 +450,10 @@ internal static class ConfFormat
          .Value("WarnGpuMem", n.GpuMem, "%")
          .Value("WarnSwapMem", n.SwapMem, "%")
          .Value("WarnCpuUsage", n.CpuUsage, "%")
-         .Value("WarnGpuUsage", n.GpuUsage, "%");
+         .Value("WarnGpuUsage", n.GpuUsage, "%").Blank();
+
+        w.Note("Tint the Aura lighting towards a warning colour as WarnCpuTemp or WarnGpuTemp nears.")
+         .Value(nameof(n.EnableWarnColor), n.EnableWarnColor);
 
         AppearanceConfig a = cfg.Appearance;
         w.Section(OverlaySection);
@@ -475,13 +496,51 @@ internal static class ConfFormat
         w.Note("Full-screen applications the panel is not shown over.")
          .Value(nameof(a.BlackListApplications), a.BlackListApplications);
 
-        // The spinner keys speak for themselves; the sets and the effects are listed in the menu.
+        // The first three keys speak for themselves; the sets and the effects are listed in the
+        // menu. The sun keys do not, and they drive the Aura lighting as well.
         SpinnerConfig sp = cfg.Spinner;
         w.Section(SpinnerSection);
 
         w.Value(nameof(sp.Style), sp.Style)
          .Value(nameof(sp.Effect), sp.Effect.ToString())
-         .Value(nameof(sp.InvertRotation), sp.InvertRotation);
+         .Value(nameof(sp.InvertRotation), sp.InvertRotation).Blank();
+
+        w.Note("Sun & Moon: sun elevation in degrees. The rays shrink from DimAbove down to FullBelow,",
+               "and the Aura lighting comes up over the same span, full below FullBelow.")
+         .Value(nameof(sp.DimAbove), sp.DimAbove)
+         .Value(nameof(sp.FullBelow), sp.FullBelow).Blank();
+
+        w.Note("Where the sun is: IANA id, Windows zone name, offset like +03:00, or Auto.",
+               "The longitude comes from it, the latitude from the IP address.")
+         .Value(nameof(sp.TimeZone), sp.TimeZone);
+
+        AuraConfig au = cfg.Aura;
+        w.Section(AuraSection);
+
+        w.Note("Motherboard lighting on a supported controller, dark by day and up after sunset.",
+               "Switched from the Spinners menu, which offers it only when a controller is found.",
+               "The sun span and the time zone are those of [Spinner].")
+         .Value(nameof(au.Enable), au.Enable).Blank();
+
+        w.Note("One colour for every LED — #RRGGBB or a name such as Orange.")
+         .Value(nameof(au.Color), au.Color).Blank();
+
+        w.Note("Solid, Breathing or Rainbow, and the pace of the last two from 1 to 10 (5).")
+         .Value(nameof(au.Effect), au.Effect.ToString())
+         .Value(nameof(au.Speed), au.Speed).Blank();
+
+        w.Note("Brightness once the sun is below FullBelow (100 %).")
+         .Value(nameof(au.Brightness), au.Brightness, "%").Blank();
+
+        w.Note("Lowest brightness the LEDs actually show; lower levels count as zero.")
+         .Value(nameof(au.VisibleFrom), au.VisibleFrom, "%").Blank();
+
+        w.Note("Cloud cover through Open-Meteo makes an overcast evening go dark earlier.")
+         .Value(nameof(au.WeatherCloud), au.WeatherCloud).Blank();
+
+        w.Note("LEDs on every addressable channel of the controller (300). Longer than a controller",
+               "can address is lit up to its own limit — 120 on an Aura header.")
+         .Value(nameof(au.LedsPerChannel), au.LedsPerChannel);
 
         return w.ToString();
     }

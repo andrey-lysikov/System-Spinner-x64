@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using SystemSpinnerX64.Lighting;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Monitoring;
 using SystemSpinnerX64.Spinner;
@@ -41,6 +42,7 @@ public sealed class AppConfig
     public SpinnerConfig Spinner { get; set; } = new();
     public OsdConfig Osd { get; set; } = new();
     public StatsConfig Stats { get; set; } = new();
+    public AuraConfig Aura { get; set; } = new();
 
     // Where the config will land, without reading it: the log needs this before parsing starts.
     // Not named Directory so it does not shadow System.IO.Directory here.
@@ -214,6 +216,63 @@ public sealed class SpinnerConfig
     public SpinnerEffect Effect { get; set; } = SpinnerEffect.Original;
 
     public bool InvertRotation { get; set; }
+
+    // Sun elevation in degrees. The Sun & Moon spinner shows the rays shrinking between the two,
+    // and the lighting comes up over the same span: off above DimAbove, full below FullBelow.
+    public double DimAbove { get; set; } = 10;
+    public double FullBelow { get; set; } = -6;
+
+    // Where the sun is looked for: IANA id, Windows zone name, offset like +03:00, or Auto. The
+    // longitude comes from it, the latitude from the IP address.
+    public string TimeZone { get; set; } = "Auto";
+
+    // A band the wrong way round, or too thin, would divide by zero.
+    public void Sanitize()
+    {
+        if (DimAbove - FullBelow >= 0.1) return;
+
+        DimAbove = 10;
+        FullBelow = -6;
+    }
+}
+
+// The motherboard lighting on a supported controller, driven by the sun as sunlight-flow does it.
+// Where the sun stands — the thresholds and the time zone — comes from SpinnerConfig: the Sun &
+// Moon spinner needs it with or without the lighting, and there is one sun for both.
+public sealed class AuraConfig
+{
+    // Switched from the Spinners menu, which only offers it when a controller is found.
+    public bool Enable { get; set; }
+
+    // #RRGGBB or a colour name. Every LED shows the same colour.
+    public string Color { get; set; } = "#0078FF";
+
+    public AuraEffect Effect { get; set; } = AuraEffect.Solid;
+
+    // Pace of Breathing and Rainbow, 1..10.
+    public int Speed { get; set; } = 5;
+
+    // The ceiling, per cent: what the lighting comes up to once the sun is down.
+    public double Brightness { get; set; } = 100;
+
+    // Lowest brightness the LEDs actually show, per cent; lower levels count as zero.
+    public double VisibleFrom { get; set; } = 15;
+
+    // Cloud cover through Open-Meteo makes an overcast evening go dark earlier.
+    public bool WeatherCloud { get; set; } = true;
+
+    // LEDs taken to hang on every addressable channel of every controller: none of them can tell
+    // what is plugged in. A driver drives no more than its protocol can address.
+    public int LedsPerChannel { get; set; } = 300;
+
+    // Values that would divide by zero or ask for more than the controller has.
+    public void Sanitize()
+    {
+        Speed = Math.Clamp(Speed, 1, 10);
+        Brightness = Math.Clamp(Brightness, 0, 100);
+        VisibleFrom = Math.Clamp(VisibleFrom, 0, 100);
+        LedsPerChannel = Math.Clamp(LedsPerChannel, 0, AppParameters.Aura.MaxLedsPerChannel);
+    }
 }
 
 // The status window, opened by a left click on the tray icon.
@@ -256,6 +315,10 @@ public sealed class OsdConfig
 public sealed class WarnConfig
 {
     public string Color { get; set; } = "#FF6A52";
+
+    // Tint the Aura lighting towards a warning colour as CpuTemp or GpuTemp nears its threshold.
+    // The colour moves, never the brightness: the sun alone decides how bright it is.
+    public bool EnableWarnColor { get; set; } = true;
 
     public double CpuTemp { get; set; } = 85;
     public double GpuTemp { get; set; } = 83;
