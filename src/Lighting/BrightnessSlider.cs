@@ -34,7 +34,7 @@ internal sealed class BrightnessSlider : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
 
-        Font = SystemFonts.MenuFont ?? Font;
+        // No font of its own, as with the palette: the menu's, which follows the monitor's scale.
         FitWidth(LogicalToDeviceUnits(190));
     }
 
@@ -82,6 +82,13 @@ internal sealed class BrightnessSlider : Control
     protected override void OnFontChanged(EventArgs e)
     {
         base.OnFontChanged(e);
+        FitWidth(Width);
+    }
+
+    // The insets, the track and the thumb are in device pixels, and so is the height they add up to.
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        base.OnDpiChangedAfterParent(e);
         FitWidth(Width);
     }
 
@@ -139,8 +146,14 @@ internal sealed class BrightnessSlider : Control
         Graphics g = e.Graphics;
         g.Clear(BackColor);
 
-        TextRenderer.DrawText(g, _title, Font, new Point(0, Inset), ForeColor, TextFormatFlags.NoPrefix);
-        TextRenderer.DrawText(g, $"{_value} %", Font, new Rectangle(0, Inset, Width, LineHeight), ForeColor,
+        // The value keeps its place on the right; a caption too long for what is left is cut with
+        // an ellipsis rather than run under it.
+        string value = $"{_value} %";
+        int valueWidth = TextRenderer.MeasureText(g, value, Font, Size.Empty, TextFormatFlags.NoPrefix).Width;
+
+        TextRenderer.DrawText(g, _title, Font, new Rectangle(0, Inset, Math.Max(0, Width - valueWidth - Gap), LineHeight),
+                              ForeColor, TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g, value, Font, new Rectangle(0, Inset, Width, LineHeight), ForeColor,
                               TextFormatFlags.Right | TextFormatFlags.NoPrefix);
 
         g.SmoothingMode = SmoothingMode.AntiAlias;

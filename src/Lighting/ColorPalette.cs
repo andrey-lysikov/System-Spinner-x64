@@ -44,6 +44,25 @@ internal sealed class MenuHost : ToolStripControlHost
         Padding = Padding.Empty;
         Size = control.Size;
     }
+
+    // The control refits itself when the font or the scale changes, and the item keeps up with it:
+    // a size taken once would clip it, or leave a gap, after a move to another monitor.
+    protected override void OnSubscribeControlEvents(Control? control)
+    {
+        base.OnSubscribeControlEvents(control);
+        if (control is not null) control.SizeChanged += FollowControl;
+    }
+
+    protected override void OnUnsubscribeControlEvents(Control? control)
+    {
+        base.OnUnsubscribeControlEvents(control);
+        if (control is not null) control.SizeChanged -= FollowControl;
+    }
+
+    private void FollowControl(object? sender, EventArgs e)
+    {
+        if (Control.Size != Size) Size = Control.Size;
+    }
 }
 
 // The palette as a menu item: a caption, then a grid of swatches with the current colour framed.
@@ -61,7 +80,9 @@ internal sealed class PaletteControl : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
 
-        Font = SystemFonts.MenuFont ?? Font;
+        // No font of its own: it takes the menu's, which is already right for the monitor. A font
+        // set here would be scaled once more on a change of scale, and come out larger than the
+        // menu items next to it.
         Fit();
     }
 

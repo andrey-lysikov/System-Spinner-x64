@@ -2,13 +2,9 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 using System;
-using System.Globalization;
-using System.Net.Http;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SystemSpinnerX64.Configuration;
-using SystemSpinnerX64.Diagnostics;
 using SystemSpinnerX64.Spinner;
 
 namespace SystemSpinnerX64.Lighting;
@@ -16,54 +12,20 @@ namespace SystemSpinnerX64.Lighting;
 // top, so an overcast evening goes dark earlier.
 internal sealed class SunLevel
 {
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
-
-    private DateTime _weatherStamp = DateTime.MinValue;
-    private double _cloudFactor;
-    private Task<double>? _fetch;
-
     public double LastElevation { get; private set; }
 
     // The last level was worked out with cloud cover older than it should be, while a fresh one
     // was being fetched: the next look is worth taking soon.
     public bool CloudStale { get; private set; }
 
-    private bool CloudFresh => DateTime.UtcNow - _weatherStamp < AppParameters.Aura.WeatherRefresh;
+    // The weather is shared with the Sun & Moon spinner: whichever asked last, the answer serves
+    // both. A failed request counts as checked, so it is not repeated sooner than the refresh.
+    private static bool CloudFresh => Sky.WeatherChecked;
 
-    // One request at a time: a look that comes while one is on its way waits for that one.
-    private Task<double> CloudFactorAsync(Location loc, CancellationToken ct)
+    private static async Task<double> CloudFactorAsync(CancellationToken ct)
     {
-        if (CloudFresh) return Task.FromResult(_cloudFactor);
-        if (_fetch is { IsCompleted: false }) return _fetch;
-
-        return _fetch = FetchCloudAsync(loc, ct);
-    }
-
-    // 0.0 is clear sky, 1.0 is heavy overcast. Any failure quietly yields 0.
-    private async Task<double> FetchCloudAsync(Location loc, CancellationToken ct)
-    {
-        try
-        {
-            CultureInfo inv = CultureInfo.InvariantCulture;
-            string url = "https://api.open-meteo.com/v1/forecast" +
-                         $"?latitude={loc.Latitude.ToString(inv)}" +
-                         $"&longitude={loc.Longitude.ToString(inv)}" +
-                         "&current=cloud_cover";
-
-            // Cloud cover directly, not derived from radiation: at high latitudes a clear sky never
-            // reaches the radiation of a tropical noon.
-            using JsonDocument doc = JsonDocument.Parse(await Http.GetStringAsync(url, ct).ConfigureAwait(false));
-            double cover = doc.RootElement.GetProperty("current").GetProperty("cloud_cover").GetDouble();
-            _cloudFactor = Math.Clamp(cover / 100.0, 0, 1);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            Log.Info($"aura: cloud cover unavailable — {ex.Message}");
-            _cloudFactor = 0.0;
-        }
-
-        _weatherStamp = DateTime.UtcNow;
-        return _cloudFactor;
+        WeatherReport? report = await Sky.WeatherAsync().WaitAsync(ct).ConfigureAwait(false);
+        return report?.CloudCover ?? 0.0;
     }
 
     // The ceiling is Brightness from [Aura]; the span the sun ramps over comes from [Spinner].
@@ -93,13 +55,13 @@ internal sealed class SunLevel
         {
             if (waitForWeather || CloudFresh)
             {
-                cloud = await CloudFactorAsync(loc, ct).ConfigureAwait(false);
+                cloud = await CloudFactorAsync(ct).ConfigureAwait(false);
             }
             else
             {
-                cloud = _cloudFactor;
+                cloud = Sky.CloudCover;
                 CloudStale = true;
-                _ = CloudFactorAsync(loc, ct);
+                _ = Sky.WeatherAsync();
             }
         }
 
