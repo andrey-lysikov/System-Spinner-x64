@@ -217,14 +217,9 @@ public sealed class SpinnerConfig
 
     public bool InvertRotation { get; set; }
 
-    // Sun elevation in degrees. The Sun & Moon spinner shows the rays shrinking between the two,
-    // and the lighting comes up over the same span: off above DimAbove, full below FullBelow.
+    // Sun elevation in degrees for the Aura lighting: off above DimAbove, full below FullBelow.
     public double DimAbove { get; set; } = 10;
     public double FullBelow { get; set; } = -6;
-
-    // Where the sun is looked for: IANA id, Windows zone name, offset like +03:00, or Auto. The
-    // longitude comes from it, the latitude from the IP address.
-    public string TimeZone { get; set; } = "Auto";
 
     // A band the wrong way round, or too thin, would divide by zero.
     public void Sanitize()
@@ -237,8 +232,8 @@ public sealed class SpinnerConfig
 }
 
 // The motherboard lighting on a supported controller, driven by the sun as sunlight-flow does it.
-// Where the sun stands — the thresholds and the time zone — comes from SpinnerConfig: the Sun &
-// Moon spinner needs it with or without the lighting, and there is one sun for both.
+// The thresholds of the sun come from SpinnerConfig: the Sun & Moon spinner uses DimAbove with or
+// without the lighting, and there is one sun for both.
 public sealed class AuraConfig
 {
     // Switched from the Spinners menu, which only offers it when a controller is found.

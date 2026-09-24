@@ -225,14 +225,18 @@ internal static class AppParameters
         // while the latitude is only a guess.
         public static readonly TimeSpan LocationRetry = TimeSpan.FromMinutes(1);
 
-        // Cloud cover does not change faster than this.
-        public static readonly TimeSpan WeatherRefresh = TimeSpan.FromMinutes(15);
+        // The weather is asked for no more often than this, by the lighting and the Sun & Moon
+        // spinner together; a failed request waits it out as well.
+        public static readonly TimeSpan WeatherRefresh = TimeSpan.FromMinutes(30);
 
         // How often the lighting state goes to the log.
         public static readonly TimeSpan LogPeriod = TimeSpan.FromMinutes(5);
 
         // The Sun & Moon spinner is redrawn no more often than this.
         public static readonly TimeSpan SkyRefresh = TimeSpan.FromMinutes(1);
+
+        // An older answer is worse than none: past this the sky is shown clear.
+        public static readonly TimeSpan SkyWeatherStale = TimeSpan.FromHours(3);
 
         // The most LEDs per channel the config may ask for. Each driver has its own, lower, limit.
         public const int MaxLedsPerChannel = 1000;
