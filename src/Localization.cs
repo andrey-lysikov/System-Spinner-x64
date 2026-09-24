@@ -385,7 +385,7 @@ internal static class Text
 
     public static string StatsMemory => S(
         "MEM Usage", "Занято памяти", "استخدام الذاكرة", "内存占用",
-        "Mémoire utilisée", "Speicherauslastung", "Memoria usata", "メモリ使用率");
+        "Mémoire utilisée", "RAM-Auslastung", "Memoria usata", "メモリ使用率");
 
     public static string StatsGpuMemory => S(
         "GPU MEM", "Видеопамять", "ذاكرة الرسوم", "显存",

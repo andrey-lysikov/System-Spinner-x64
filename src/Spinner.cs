@@ -16,9 +16,9 @@ using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Spinner;
 
-// One set of tray animation frames. A drawn one has no pictures in the assembly: its single frame
-// is painted when it is loaded, from whatever it shows at that moment.
-public sealed record SpinnerStyle(string Name, int FrameCount, bool SupportsEffect, int SpeedCoefficient,
+// One set of tray animation frames. A drawn one is painted in code when it is loaded, from
+// whatever it shows at that moment. The defaults are what most sets use.
+public sealed record SpinnerStyle(string Name, int FrameCount, bool SupportsEffect = true, int SpeedCoefficient = 1,
                                   bool Drawn = false);
 
 // How the animation frames are coloured.
@@ -44,13 +44,9 @@ internal static class SpinnerFrames
     // Frames fitted into a size square.
     public static List<Bitmap> Load(SpinnerStyle style, SpinnerEffect effect, int size, bool lightTheme)
     {
-        // The sun or the moon, in the colour the effect asks for; as drawn means as the taskbar
-        // wants it, since the glyph has no colours of its own.
+        // The sun or the moon: in colour as drawn, or one colour for a silhouette effect.
         if (style.Drawn)
-        {
-            Color glyph = Silhouette(effect, lightTheme) ?? (lightTheme ? Color.Black : Color.White);
-            return new List<Bitmap> { SkyIcon.Render(SkyIcon.Now(), size, glyph) };
-        }
+            return SkyIcon.Frames(SkyIcon.Now(), size, Silhouette(effect, lightTheme));
 
         var sources = new List<Bitmap>(style.FrameCount);
 
@@ -234,7 +230,7 @@ public static class SpinnerCatalog
     // Sets a silhouette does not suit: the drawing lives by its own colours.
     private static readonly HashSet<string> NoEffect = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Cirrcles", "Color Well", "Dots", "Grey Loader", "Loader", "Pie",
+        "Cirrcles", "Color Well", "Dots", "Football", "Grey Loader", "Loader", "Pie",
         "Rainbow Pie", "Rotation Color Well"
     };
 
@@ -244,11 +240,11 @@ public static class SpinnerCatalog
         "Cat", "Pikachu", "Rotation Color Well"
     };
 
-    // The sun by day and the moon in its phase by night, redrawn as they move.
-    public const string SunAndMoon = "Sun & Moon";
-
     public static IReadOnlyList<SpinnerStyle> All { get; } = Discover()
-        .Append(new SpinnerStyle(SunAndMoon, 1, SupportsEffect: true, SpeedCoefficient: 1, Drawn: true))
+        // The Sun frames are the day of Sun & Moon now, not a set of their own.
+        .Where(s => !s.Name.Equals(SkyIcon.SunFrames, StringComparison.OrdinalIgnoreCase))
+        // The turning sun by day, the moon in its phase by night, under a cloud when it is overcast.
+        .Append(new SpinnerStyle("Sun & Moon", SkyIcon.FrameCount, Drawn: true))
         .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
         .ToList();
 
@@ -264,8 +260,10 @@ public static class SpinnerCatalog
     public static SpinnerStyle Validate(string name) => Find(name) ?? Fallback;
 
     // Resource name of one frame.
-    public static string ResourceName(SpinnerStyle style, int index) =>
-        $"{ResourcePrefix}{style.Name}/{index.ToString(CultureInfo.InvariantCulture)}.png";
+    public static string ResourceName(SpinnerStyle style, int index) => ResourceName(style.Name, index);
+
+    public static string ResourceName(string set, int index) =>
+        $"{ResourcePrefix}{set}/{index.ToString(CultureInfo.InvariantCulture)}.png";
 
     private static IReadOnlyList<SpinnerStyle> Discover() =>
         Group(typeof(SpinnerCatalog).Assembly.GetManifestResourceNames());

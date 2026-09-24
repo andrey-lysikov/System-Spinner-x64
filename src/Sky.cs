@@ -2,6 +2,7 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
@@ -94,11 +95,182 @@ internal static class Moon
         Illumination(Phase(utc)) > 0.985 && Math.Abs(Latitude(utc)) < 0.9;
 }
 
+// What the sky looks like overhead, coarse enough for a picture.
+internal enum SkyWeather
+{
+    Clear,
+    Cloudy,
+    Rainy
+}
+
+// One answer from a weather service. Cloud cover is 0 for a clear sky and 1 for heavy overcast;
+// the source says where it came from, for the log.
+internal sealed record WeatherReport(double CloudCover, SkyWeather Weather, string Source);
+
+// The weather services, in order: Open-Meteo, and ProjectEOL when it does not answer — from some
+// networks api.open-meteo.com is out of reach while the rest of the internet is not.
+internal static class WeatherSources
+{
+    // Fifteen seconds for each: long enough for a slow answer, short enough that an unreachable
+    // first service does not hold the second one back for long.
+    internal static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+    // From half the sky covered a cloud is drawn.
+    internal const double CloudyFrom = 0.5;
+
+    public static async Task<WeatherReport?> FetchAsync(Location l, CancellationToken ct) =>
+        await OpenMeteo.FetchAsync(l, ct).ConfigureAwait(false)
+        ?? await ProjectEol.FetchAsync(l, ct).ConfigureAwait(false);
+}
+
+// Open-Meteo: free and without a key. One request carries what both the lighting and the Sun &
+// Moon spinner need.
+internal static class OpenMeteo
+{
+    // WMO weather interpretation codes, as Open-Meteo reports them: 2 and 3 are partly cloudy and
+    // overcast, 45 and 48 fog, 51 and up drizzle, rain, snow, showers and thunderstorms.
+    public static SkyWeather FromCode(int code) => code switch
+    {
+        2 or 3 or 45 or 48 => SkyWeather.Cloudy,
+        >= 51 => SkyWeather.Rainy,
+        _ => SkyWeather.Clear
+    };
+
+    // A cloud is drawn from half the sky covered whatever the code says: Open-Meteo reports
+    // a "mainly clear" 1 under a good deal of cloud.
+    public static SkyWeather Classify(int code, double cloudCover)
+    {
+        SkyWeather weather = FromCode(code);
+        return weather == SkyWeather.Clear && cloudCover >= WeatherSources.CloudyFrom ? SkyWeather.Cloudy : weather;
+    }
+
+    // Cloud cover directly, not derived from radiation: at high latitudes a clear sky never
+    // reaches the radiation of a tropical noon.
+    public static string Url(Location l) => string.Create(CultureInfo.InvariantCulture,
+        $"https://api.open-meteo.com/v1/forecast?latitude={l.Latitude:F2}&longitude={l.Longitude:F2}&current=cloud_cover,weather_code");
+
+    // Null for an answer that is not one.
+    public static WeatherReport? Parse(string json)
+    {
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(json);
+            JsonElement current = doc.RootElement.GetProperty("current");
+
+            double cover = Math.Clamp(current.GetProperty("cloud_cover").GetDouble() / 100.0, 0, 1);
+            int code = current.GetProperty("weather_code").GetInt32();
+
+            return new WeatherReport(cover, Classify(code, cover), $"Open-Meteo, code {code}");
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            return null;
+        }
+    }
+
+    public static async Task<WeatherReport?> FetchAsync(Location l, CancellationToken ct)
+    {
+        try
+        {
+            return Parse(await WeatherSources.Http.GetStringAsync(Url(l), ct).ConfigureAwait(false));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            Log.Info($"sky: Open-Meteo unavailable — {ex.Message}");
+            return null;
+        }
+    }
+}
+
+// ProjectEOL: the NOAA GFS forecast, through the keyless endpoint it keeps for MCP clients. One
+// JSON-RPC call to its forecast tool for the current hour, no session needed.
+internal static class ProjectEol
+{
+    public const string Url = "https://weatherapi.projecteol.ru/mcp/";
+
+    private const string Cloud = "surface.cloud_area_fraction";
+    private const string Precipitation = "surface.precipitation_flux";
+
+    // Rain from a tenth of a millimetre an hour: below that the model's drizzle is noise.
+    private const double RainFrom = 0.1 / 3600;   // kg m-2 s-1
+
+    public static string Request(Location l, DateTime utc) => JsonSerializer.Serialize(new
+    {
+        jsonrpc = "2.0",
+        id = 1,
+        method = "tools/call",
+        @params = new
+        {
+            name = "get_weather_forecast",
+            arguments = new
+            {
+                latitude = Math.Round(l.Latitude, 2),
+                longitude = Math.Round(l.Longitude, 2),
+                start = new DateTime(utc.Year, utc.Month, utc.Day, utc.Hour, 0, 0, DateTimeKind.Utc)
+                    .ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+                hours = 1,
+                parameters = new[] { Cloud, Precipitation }
+            }
+        }
+    });
+
+    public static SkyWeather Classify(double cloudCover, double precipitationFlux) =>
+        precipitationFlux >= RainFrom ? SkyWeather.Rainy
+        : cloudCover >= WeatherSources.CloudyFrom ? SkyWeather.Cloudy
+        : SkyWeather.Clear;
+
+    // Null for an error, or an answer that is not one.
+    public static WeatherReport? Parse(string json)
+    {
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(json);
+            JsonElement result = doc.RootElement.GetProperty("result");
+            if (result.TryGetProperty("isError", out JsonElement error) && error.ValueKind == JsonValueKind.True) return null;
+
+            JsonElement values = result.GetProperty("structuredContent").GetProperty("forecast")[0].GetProperty("values");
+            double cover = Math.Clamp(values.GetProperty(Cloud).GetProperty("value").GetDouble(), 0, 1);
+            double flux = Math.Max(0, values.GetProperty(Precipitation).GetProperty("value").GetDouble());
+
+            return new WeatherReport(cover, Classify(cover, flux),
+                string.Create(CultureInfo.InvariantCulture, $"ProjectEOL, {flux * 3600:0.##} mm/h"));
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException
+                                       or FormatException or IndexOutOfRangeException)
+        {
+            return null;
+        }
+    }
+
+    public static async Task<WeatherReport?> FetchAsync(Location l, CancellationToken ct)
+    {
+        try
+        {
+            using var content = new StringContent(Request(l, DateTime.UtcNow), System.Text.Encoding.UTF8, "application/json");
+            using var request = new HttpRequestMessage(HttpMethod.Post, Url) { Content = content };
+            request.Headers.Accept.ParseAdd("application/json");
+            request.Headers.Accept.ParseAdd("text/event-stream");
+
+            using HttpResponseMessage response = await WeatherSources.Http.SendAsync(request, ct).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+
+            WeatherReport? report = Parse(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+            if (report is null) Log.Info("sky: ProjectEOL gave no forecast");
+            return report;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            Log.Info($"sky: ProjectEOL unavailable — {ex.Message}");
+            return null;
+        }
+    }
+}
+
 // ByIp is false while the IP lookup has not succeeded yet, so the latitude is a guess.
 internal sealed record Location(double Latitude, double Longitude, string Source, bool ByIp);
 
-// Latitude comes from the IP address, longitude from the time zone: a person sets the zone,
-// while an IP may point at a VPN exit. If both agree, longitude uses IP too.
+// Latitude comes from the IP address, longitude from the system time zone: a person sets the
+// zone, while an IP may point at a VPN exit. If both agree, longitude uses IP too.
 internal static class Geo
 {
     // Moscow, when nothing else works.
@@ -108,23 +280,21 @@ internal static class Geo
 
     // Where the sun is taken to be before the network has answered: the zone gives the
     // longitude, and the latitude is either the last one found or a guess.
-    public static Location Guess(string timeZone, Location? previous = null)
+    public static Location Guess(Location? previous = null)
     {
-        (string zoneName, TimeSpan offset) = ResolveZone(timeZone);
-        double lonFromTz = Math.Clamp(offset.TotalHours * 15.0, -180, 180);
+        (string zoneName, double lonFromTz) = Zone();
 
         return previous is { ByIp: true }
             ? new Location(previous.Latitude, lonFromTz, $"{zoneName}, earlier IP", ByIp: true)
             : new Location(FallbackLatitude, lonFromTz, $"{zoneName}, default latitude", ByIp: false);
     }
 
-    public static async Task<Location> ResolveAsync(string timeZone, Location? previous, CancellationToken ct)
+    public static async Task<Location> ResolveAsync(Location? previous, CancellationToken ct)
     {
-        (string zoneName, TimeSpan offset) = ResolveZone(timeZone);
-        double lonFromTz = Math.Clamp(offset.TotalHours * 15.0, -180, 180);
+        (string zoneName, double lonFromTz) = Zone();
 
         (double Latitude, double Longitude)? byIp = await FromIpAsync(ct).ConfigureAwait(false);
-        if (byIp is null) return Guess(timeZone, previous);
+        if (byIp is null) return Guess(previous);
 
         // Half a zone: beyond that the gap can no longer be explained by sitting near one edge
         // of the time zone.
@@ -144,56 +314,12 @@ internal static class Geo
     public static string Describe(Location l) => string.Create(CultureInfo.InvariantCulture,
         $"{l.Latitude:F2}, {l.Longitude:F2} ({l.Source})");
 
-    // Auto means the system zone. Otherwise an IANA id such as Europe/Moscow, a Windows zone
-    // name, or a plain UTC offset like +03:00.
-    private static (string Name, TimeSpan Offset) ResolveZone(string setting)
+    // The system zone, by its IANA name, and the longitude its offset stands for.
+    private static (string Name, double Longitude) Zone()
     {
-        DateTime now = DateTime.UtcNow;
-
-        if (string.IsNullOrWhiteSpace(setting) ||
-            setting.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase))
-        {
-            TimeZoneInfo local = TimeZoneInfo.Local;
-            return (ToIana(local.Id), local.GetUtcOffset(now));
-        }
-
-        string value = setting.Trim().Trim('"');
-
-        try
-        {
-            TimeZoneInfo zone = TimeZoneInfo.FindSystemTimeZoneById(value);
-            return (zone.Id, zone.GetUtcOffset(now));
-        }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-        {
-            if (TryParseOffset(value, out TimeSpan offset)) return (value, offset);
-
-            Log.Warn($"[Spinner] TimeZone: unknown zone \"{value}\" — the system one is used");
-            TimeZoneInfo local = TimeZoneInfo.Local;
-            return (ToIana(local.Id), local.GetUtcOffset(now));
-        }
-    }
-
-    private static string ToIana(string windowsId) =>
-        TimeZoneInfo.TryConvertWindowsIdToIanaId(windowsId, out string? iana) ? iana : windowsId;
-
-    internal static bool TryParseOffset(string value, out TimeSpan offset)
-    {
-        offset = TimeSpan.Zero;
-
-        string text = value.StartsWith("UTC", StringComparison.OrdinalIgnoreCase) ? value[3..] : value;
-        text = text.Trim();
-        if (text.Length == 0) return true;
-
-        int sign = text[0] == '-' ? -1 : 1;
-        if (text[0] is '+' or '-') text = text[1..];
-
-        if (!TimeSpan.TryParse(text.Contains(':') ? text : $"{text}:00",
-                               CultureInfo.InvariantCulture, out TimeSpan parsed))
-            return false;
-
-        offset = sign < 0 ? -parsed : parsed;
-        return Math.Abs(offset.TotalHours) <= 14;
+        TimeZoneInfo local = TimeZoneInfo.Local;
+        string name = TimeZoneInfo.TryConvertWindowsIdToIanaId(local.Id, out string? iana) ? iana : local.Id;
+        return (name, Math.Clamp(local.GetUtcOffset(DateTime.UtcNow).TotalHours * 15.0, -180, 180));
     }
 
     private static async Task<(double Latitude, double Longitude)?> FromIpAsync(CancellationToken ct)
@@ -231,6 +357,14 @@ internal static class Sky
     private static Task? _resolving;
     private static DateTime _lastAttempt = DateTime.MinValue;
 
+    // Whether an IP lookup has finished at all, found or not. Only the first one is waited for.
+    private static bool _lookedUp;
+
+    private static WeatherReport? _report;
+    private static DateTime _reportStamp = DateTime.MinValue;
+    private static DateTime _weatherAttempt = DateTime.MinValue;
+    private static Task<WeatherReport?>? _weatherFetch;
+
     // The thresholds and the time zone, from [Spinner].
     public static SpinnerConfig Config => _cfg;
 
@@ -240,8 +374,89 @@ internal static class Sky
     {
         get
         {
-            lock (Gate) return _location ??= Geo.Guess(_cfg.TimeZone);
+            lock (Gate) return _location ??= Geo.Guess();
         }
+    }
+
+    // The weather is kept here for whoever needs it, and asked for by nobody else: the lighting
+    // when it is on and the evening is near, the Sun & Moon spinner while it is the spinner. Both
+    // share one answer, and together they ask no more often than WeatherRefresh.
+
+    // Whether an answer, or a failed try, is recent enough that asking again would be too soon.
+    public static bool WeatherChecked
+    {
+        get
+        {
+            lock (Gate)
+                return _weatherFetch is not { IsCompleted: false } &&
+                       DateTime.UtcNow - _weatherAttempt < AppParameters.Aura.WeatherRefresh;
+        }
+    }
+
+    // The last cloud cover known, however old: what the lighting goes on while a new one comes.
+    public static double CloudCover
+    {
+        get
+        {
+            lock (Gate) return _report?.CloudCover ?? 0.0;
+        }
+    }
+
+    // What the Sun & Moon spinner shows overhead: clear until an answer comes, and again once it
+    // is too old.
+    public static SkyWeather Weather
+    {
+        get
+        {
+            lock (Gate)
+                return _report is not null && DateTime.UtcNow - _reportStamp < AppParameters.Aura.SkyWeatherStale
+                    ? _report.Weather
+                    : SkyWeather.Clear;
+        }
+    }
+
+    // The weather: the one known while it is fresh, the request already on its way, or a new one.
+    // A failed request is not repeated sooner either, and leaves the last answer in place.
+    public static Task<WeatherReport?> WeatherAsync()
+    {
+        lock (Gate)
+        {
+            if (_weatherFetch is { IsCompleted: false }) return _weatherFetch;
+            if (DateTime.UtcNow - _weatherAttempt < AppParameters.Aura.WeatherRefresh) return Task.FromResult(_report);
+
+            _weatherAttempt = DateTime.UtcNow;
+            Location place = _location ??= Geo.Guess();
+
+            return _weatherFetch = Task.Run(async () =>
+            {
+                WeatherReport? found = await WeatherSources.FetchAsync(place, CancellationToken.None).ConfigureAwait(false);
+
+                lock (Gate)
+                {
+                    if (found is null) return _report;
+
+                    _report = found;
+                    _reportStamp = DateTime.UtcNow;
+                }
+
+                Log.Info($"sky: weather {found.Weather}, cloud cover {found.CloudCover:P0} ({found.Source}) " +
+                         $"at {Geo.Describe(place)}");
+                return found;
+            });
+        }
+    }
+
+    // For the Sun & Moon spinner. The first IP lookup is waited for — a few seconds more than the
+    // weather for the time zone's guess. Later ones are not: while the IP service fails, a new
+    // lookup starts every minute, and waiting on each would mean no weather at all.
+    public static void EnsureWeather()
+    {
+        lock (Gate)
+        {
+            if (!_lookedUp && _resolving is { IsCompleted: false }) return;
+        }
+
+        _ = WeatherAsync();
     }
 
     public static double Elevation(DateTime utc)
@@ -262,12 +477,15 @@ internal static class Sky
 
             _lastAttempt = DateTime.UtcNow;
             Location? previous = _location;
-            string zone = _cfg.TimeZone;
 
             _resolving = Task.Run(async () =>
             {
-                Location found = await Geo.ResolveAsync(zone, previous, CancellationToken.None).ConfigureAwait(false);
-                lock (Gate) _location = found;
+                Location found = await Geo.ResolveAsync(previous, CancellationToken.None).ConfigureAwait(false);
+                lock (Gate)
+                {
+                    _location = found;
+                    _lookedUp = true;
+                }
                 Log.Info($"sky: location {Geo.Describe(found)}");
             });
         }

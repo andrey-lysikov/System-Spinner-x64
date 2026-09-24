@@ -493,8 +493,9 @@ public sealed class TrayIcon : IDisposable
         foreach (ToolStripItem old in _auraItem.DropDownItems.Cast<ToolStripItem>().ToList()) old.Dispose();
         _auraItem.DropDownItems.Clear();
 
-        // The caption and the font go in before the host is made: they decide the palette's size.
-        var palette = new PaletteControl { Font = _menu.Font, Title = Text.AuraBaseColor };
+        // The caption goes in before the host is made: it decides the palette's size. The font is
+        // the menu's own, taken once the palette is in it.
+        var palette = new PaletteControl { Title = Text.AuraBaseColor };
         if (Rgb.TryParse(_cfg.Aura.Color, out Rgb current)) palette.Selected = current;
 
         palette.Picked += color =>
@@ -548,11 +549,13 @@ public sealed class TrayIcon : IDisposable
         // file is written once, when it is let go.
         var slider = new BrightnessSlider
         {
-            Font = _menu.Font,
             Title = Text.AuraMaxBrightness,
             Value = (int)Math.Round(_cfg.Aura.Brightness)
         };
+
+        // As wide as the palette, now and after the palette refits for a new font or scale.
         slider.FitWidth(palette.Width);
+        palette.SizeChanged += (_, _) => slider.FitWidth(palette.Width);
 
         slider.ValueChanging += value =>
         {
@@ -574,9 +577,9 @@ public sealed class TrayIcon : IDisposable
     // The first frame of a set next to its name: "Delay" does not tell you what it looks like.
     private static Image? Preview(SpinnerStyle style)
     {
-        // Drawn in the colour of the menu text, which the icon would otherwise vanish into.
+        // In colour, as it is drawn: the first frame of what the sky shows now.
         if (style.Drawn)
-            return SkyIcon.Render(SkyIcon.Now(), 16, Theme.AreWindowsDark() ? Color.White : Color.Black);
+            return SkyIcon.Render(SkyIcon.Now(), 0, 16, tint: null);
 
         try
         {

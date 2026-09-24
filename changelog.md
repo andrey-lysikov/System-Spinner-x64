@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6
+
+* Add new spinners: Football and Wheel
+* Sun and Moon now is colored
+* Bugfix
+
 ## 1.5
 
 * Add Aura argb controll if supported

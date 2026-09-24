@@ -82,6 +82,21 @@ internal sealed class AuraSunlight : IDisposable
 
     public bool IsEnabled => _enabled;
 
+    // For the tooltip: what the lamps give now, on its way to the goal while a fade runs. Read off
+    // the loop thread; a value a frame old is fine.
+    public double Light => Output();
+
+    // What the lamps give: the level, raised toward the Brightness ceiling as the machine heats up,
+    // so the warning colour shows at full strength even on a dim evening. Never lowered, and the
+    // heat is let go of with dark lamps, so by day nothing comes on.
+    private double Output()
+    {
+        double level = Volatile.Read(ref _displayLevel);
+        double ceiling = Math.Clamp(_cfg.Brightness / 100.0, 0, 1);
+
+        return level < ceiling ? level + (ceiling - level) * Volatile.Read(ref _heat) : level;
+    }
+
     public void Enable()
     {
         if (_enabled) return;
@@ -251,7 +266,7 @@ internal sealed class AuraSunlight : IDisposable
                 {
                     logStamp = now;
                     Log.Info($"aura: brightness {_displayLevel:F3} -> {goal:F3}, sun {_level.LastElevation:F1}°, " +
-                             $"heat {_heat:F2}, frames {written}");
+                             $"heat {_heat:F2}, output {Output():F3}, frames {written}");
                     written = 0;
                 }
 
@@ -276,7 +291,7 @@ internal sealed class AuraSunlight : IDisposable
     {
         ILightDevice device = _device!;
 
-        double output = _displayLevel;
+        double output = Output();
         if (pulsing)
         {
             // Breathing, not blinking: a third off at most, so the light never drops out.

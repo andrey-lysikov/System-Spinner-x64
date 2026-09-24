@@ -370,9 +370,7 @@ public sealed class NetworkMonitor
     {
         try
         {
-            string page = await Http.GetStringAsync(AppParameters.Network.ExternalAddressUrl);
-            Match match = AddressInPage.Match(page);
-            return match.Success ? match.Groups["ip"].Value : null;
+            return ParseAddress(await Http.GetStringAsync(AppParameters.Network.ExternalAddressUrl));
         }
         catch (Exception ex)
         {

@@ -299,11 +299,12 @@ internal static class ConfFormat
 
         SpinnerConfig sp = cfg.Spinner;
         sp.Style = file.Text(SpinnerSection, nameof(sp.Style)) ?? sp.Style;
+        // Sun became the day of Sun & Moon.
+        if (sp.Style.Equals("Sun", StringComparison.OrdinalIgnoreCase)) sp.Style = "Sun & Moon";
         sp.Effect = file.Choice<SpinnerEffect>(SpinnerSection, nameof(sp.Effect)) ?? sp.Effect;
         sp.InvertRotation = file.Flag(SpinnerSection, nameof(sp.InvertRotation)) ?? sp.InvertRotation;
         sp.DimAbove = file.Number(SpinnerSection, nameof(sp.DimAbove)) ?? sp.DimAbove;
         sp.FullBelow = file.Number(SpinnerSection, nameof(sp.FullBelow)) ?? sp.FullBelow;
-        sp.TimeZone = file.Text(SpinnerSection, nameof(sp.TimeZone)) ?? sp.TimeZone;
         sp.Sanitize();
 
         AuraConfig au = cfg.Aura;
@@ -505,21 +506,17 @@ internal static class ConfFormat
          .Value(nameof(sp.Effect), sp.Effect.ToString())
          .Value(nameof(sp.InvertRotation), sp.InvertRotation).Blank();
 
-        w.Note("Sun & Moon: sun elevation in degrees. The rays shrink from DimAbove down to FullBelow,",
-               "and the Aura lighting comes up over the same span, full below FullBelow.")
+        w.Note("Sun elevation in degrees for the Aura lighting: it comes up from DimAbove",
+               "and is full below FullBelow.")
          .Value(nameof(sp.DimAbove), sp.DimAbove)
-         .Value(nameof(sp.FullBelow), sp.FullBelow).Blank();
-
-        w.Note("Where the sun is: IANA id, Windows zone name, offset like +03:00, or Auto.",
-               "The longitude comes from it, the latitude from the IP address.")
-         .Value(nameof(sp.TimeZone), sp.TimeZone);
+         .Value(nameof(sp.FullBelow), sp.FullBelow);
 
         AuraConfig au = cfg.Aura;
         w.Section(AuraSection);
 
         w.Note("Motherboard lighting on a supported controller, dark by day and up after sunset.",
                "Switched from the Spinners menu, which offers it only when a controller is found.",
-               "The sun span and the time zone are those of [Spinner].")
+               "The sun span is that of [Spinner]; the place comes from the IP address and the system time zone.")
          .Value(nameof(au.Enable), au.Enable).Blank();
 
         w.Note("One colour for every LED — #RRGGBB or a name such as Orange.")

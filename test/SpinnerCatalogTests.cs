@@ -93,10 +93,22 @@ public class SpinnerCatalogTests
         animator.Dispose();
     }
 
+    [Theory]
+    [InlineData("Wheel", true)]
+    [InlineData("Football", false)]     // lives by its own colours: a silhouette is a plain disc
+    public void Колесо_и_мяч_есть_в_списке(string name, bool effect)
+    {
+        SpinnerStyle? style = SpinnerCatalog.Find(name);
+
+        Assert.NotNull(style);
+        Assert.Equal(24, style!.FrameCount);
+        Assert.Equal(effect, style.SupportsEffect);
+    }
+
     [Fact]
     public void Имя_ресурса_собирается_из_набора_и_номера()
     {
-        SpinnerStyle style = new("Color Well", 20, true, 1);
+        SpinnerStyle style = new("Color Well", 20, SupportsEffect: false);
 
         Assert.Equal("Spinners/Color Well/7.png", SpinnerCatalog.ResourceName(style, 7));
     }
