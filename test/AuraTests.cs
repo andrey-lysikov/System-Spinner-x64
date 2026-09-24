@@ -2,6 +2,7 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Lighting;
@@ -209,23 +210,13 @@ public class AuraTests
         Assert.InRange(Moon.Illumination(Moon.Phase(new DateTime(2026, 3, 19, 1, 0, 0, DateTimeKind.Utc))), 0.0, 0.03);
     }
 
-    [Theory]
-    [InlineData("+03:00", 3)]
-    [InlineData("UTC-5", -5)]
-    [InlineData("5:30", 5.5)]
-    public void Смещение_пояса_разбирается(string text, double hours)
-    {
-        Assert.True(Geo.TryParseOffset(text, out TimeSpan offset));
-        Assert.Equal(hours, offset.TotalHours);
-    }
-
     [Fact]
     public void Настройки_Aura_переживают_запись_и_чтение()
     {
         var written = new AppConfig
         {
             Warn = { EnableWarnColor = false },
-            Spinner = { Style = SpinnerCatalog.SunAndMoon, DimAbove = 6, FullBelow = -3, TimeZone = "+03:00" },
+            Spinner = { Style = "Sun & Moon", DimAbove = 6, FullBelow = -3 },
             Aura =
             {
                 Enable = true, Color = "Orange", Effect = AuraEffect.Breathing, Speed = 8,
@@ -236,10 +227,9 @@ public class AuraTests
         AppConfig read = ConfFormat.Read(ConfFormat.Write(written));
 
         Assert.False(read.Warn.EnableWarnColor);
-        Assert.Equal(SpinnerCatalog.SunAndMoon, read.Spinner.Style);   // "&" in the name survives
+        Assert.Equal("Sun & Moon", read.Spinner.Style);   // "&" in the name survives
         Assert.Equal(6, read.Spinner.DimAbove);
         Assert.Equal(-3, read.Spinner.FullBelow);
-        Assert.Equal("+03:00", read.Spinner.TimeZone);
         Assert.True(read.Aura.Enable);
         Assert.Equal("Orange", read.Aura.Color);
         Assert.Equal(AuraEffect.Breathing, read.Aura.Effect);
@@ -280,39 +270,141 @@ public class AuraTests
     [Fact]
     public void Солнце_и_луна_есть_среди_спиннеров()
     {
-        SpinnerStyle? sky = SpinnerCatalog.Find(SpinnerCatalog.SunAndMoon);
+        SpinnerStyle? sky = SpinnerCatalog.Find("Sun & Moon");
 
         Assert.NotNull(sky);
         Assert.True(sky!.Drawn);
-        Assert.Equal(1, sky.FrameCount);
+        Assert.Equal(SkyIcon.FrameCount, sky.FrameCount);
     }
 
     [Fact]
-    public void Солнце_и_луна_рисуются_без_ресурсов()
+    public void Кадры_солнца_не_отдельный_спиннер()
     {
-        var animator = new SpinnerAnimator();
-        animator.Load(SpinnerCatalog.Validate(SpinnerCatalog.SunAndMoon), SpinnerEffect.Auto, 16, lightTheme: true);
+        // The Sun frames are the day of Sun & Moon: they stay in the assembly but not in the menu.
+        Assert.Null(SpinnerCatalog.Find("Sun"));
+        for (int index = 0; index < SkyIcon.FrameCount; index++)
+            Assert.NotNull(typeof(SkyIcon).Assembly.GetManifestResourceStream(SpinnerCatalog.ResourceName(SkyIcon.SunFrames, index)));
+    }
 
-        // One drawn frame, standing still: it is redrawn by the minute, not animated.
-        Assert.True(animator.HasFrames);
-        Assert.False(animator.IsSpinning);
+    [Fact]
+    public void Выбранное_солнце_становится_солнцем_и_луной()
+    {
+        AppConfig read = ConfFormat.Read("[Spinner]\nStyle = Sun\n");
 
-        animator.Dispose();
+        Assert.Equal("Sun & Moon", read.Spinner.Style);
     }
 
     [Theory]
-    [InlineData(true, 8, 0)]
-    [InlineData(false, 0, 8)]     // full moon
-    [InlineData(false, 0, 0)]     // new moon: the outline alone
-    public void Иконка_неба_что_то_рисует(bool sunUp, int fill, int phase)
+    [InlineData(true, (int)SkyWeather.Clear)]
+    [InlineData(true, (int)SkyWeather.Rainy)]
+    [InlineData(false, (int)SkyWeather.Clear)]
+    [InlineData(false, (int)SkyWeather.Cloudy)]
+    public void Солнце_и_луна_крутятся_в_цвете(bool sunUp, int weather)
     {
-        using Bitmap icon = SkyIcon.Render(new SkyIcon.State(sunUp, fill, phase), 32, Color.White);
+        var state = new SkyIcon.State(sunUp, Dusk: 0, Phase: 5, Blood: false, (SkyWeather)weather);
+        List<Bitmap> frames = SkyIcon.Frames(state, 16, tint: null);
 
-        bool drawn = false;
-        for (int y = 0; y < icon.Height && !drawn; y++)
-            for (int x = 0; x < icon.Width && !drawn; x++)
-                drawn = icon.GetPixel(x, y).A > 0;
+        // Day and night move over the same loop: the sun turns, the moon's face turns, the cloud sways.
+        Assert.Equal(SkyIcon.FrameCount, frames.Count);
+        Assert.All(frames, f => Assert.Equal(16, f.Width));
+        frames.ForEach(f => f.Dispose());
+    }
 
-        Assert.True(drawn);
+    [Theory]
+    [InlineData((int)SkyWeather.Clear, 1)]         // a plain glyph of the moon has nothing that moves
+    [InlineData((int)SkyWeather.Rainy, SkyIcon.FrameCount)]
+    public void Силуэт_луны_движется_только_под_тучей(int weather, int count)
+    {
+        var state = new SkyIcon.State(SunUp: false, Dusk: 0, Phase: 8, Blood: false, (SkyWeather)weather);
+        List<Bitmap> frames = SkyIcon.Frames(state, 16, Color.White);
+
+        Assert.Equal(count, frames.Count);
+        frames.ForEach(f => f.Dispose());
+    }
+
+    [Fact]
+    public void Солнце_краснеет_к_горизонту_от_порога_подсветки()
+    {
+        DateTime utc = new(2026, 6, 21, 12, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal(SkyIcon.DuskSteps, SkyIcon.At(utc, elevation: 0.01, dimAbove: 10, SkyWeather.Clear).Dusk);
+        Assert.Equal(0, SkyIcon.At(utc, elevation: 10, dimAbove: 10, SkyWeather.Clear).Dusk);
+        // The haze follows DimAbove, where the lighting starts to come up.
+        Assert.True(SkyIcon.At(utc, elevation: 10, dimAbove: 20, SkyWeather.Clear).Dusk > 0);
+        Assert.Equal(0, SkyIcon.At(utc, elevation: -5, dimAbove: 10, SkyWeather.Clear).Dusk);
+    }
+
+    [Theory]
+    [InlineData(0, (int)SkyWeather.Clear)]
+    [InlineData(1, (int)SkyWeather.Clear)]
+    [InlineData(2, (int)SkyWeather.Cloudy)]
+    [InlineData(3, (int)SkyWeather.Cloudy)]
+    [InlineData(45, (int)SkyWeather.Cloudy)]
+    [InlineData(61, (int)SkyWeather.Rainy)]
+    [InlineData(95, (int)SkyWeather.Rainy)]
+    public void Коды_погоды_делятся_на_ясно_облачно_и_дождь(int code, int weather) =>
+        Assert.Equal((SkyWeather)weather, OpenMeteo.FromCode(code));
+
+    [Theory]
+    [InlineData(1, 0.3, (int)SkyWeather.Clear)]
+    [InlineData(1, 0.6, (int)SkyWeather.Cloudy)]     // "mainly clear" under half the sky of cloud
+    [InlineData(0, 0.9, (int)SkyWeather.Cloudy)]
+    [InlineData(61, 0.2, (int)SkyWeather.Rainy)]     // rain stays rain, whatever the cover
+    public void Облачность_дорисовывает_тучку_когда_код_ясный(int code, double cover, int weather) =>
+        Assert.Equal((SkyWeather)weather, OpenMeteo.Classify(code, cover));
+
+    [Fact]
+    public void Один_ответ_погоды_несёт_облачность_и_код()
+    {
+        WeatherReport? report = OpenMeteo.Parse(
+            """{"current":{"time":"2026-09-24T09:00","interval":900,"cloud_cover":75,"weather_code":61}}""");
+
+        Assert.NotNull(report);
+        Assert.Equal(0.75, report!.CloudCover, 3);
+        Assert.Equal(SkyWeather.Rainy, report.Weather);
+
+        Assert.Null(OpenMeteo.Parse("""{"error":true,"reason":"bad"}"""));
+        Assert.Equal("https://api.open-meteo.com/v1/forecast?latitude=55.76&longitude=37.62&current=cloud_cover,weather_code",
+                     OpenMeteo.Url(new Location(55.7558, 37.6176, "test", ByIp: true)));
+    }
+
+    [Theory]
+    [InlineData(0.30, 0.0, (int)SkyWeather.Clear)]
+    [InlineData(0.694, 8e-7, (int)SkyWeather.Cloudy)]      // a trace of drizzle is not rain
+    [InlineData(0.20, 5.6e-5, (int)SkyWeather.Rainy)]     // 0.2 mm an hour
+    public void ProjectEOL_делится_на_ясно_облачно_и_дождь(double cover, double flux, int weather) =>
+        Assert.Equal((SkyWeather)weather, ProjectEol.Classify(cover, flux));
+
+    [Fact]
+    public void Ответ_ProjectEOL_читается()
+    {
+        // The answer of weatherapi.projecteol.ru for Moscow, as it came, trimmed to what is read.
+        WeatherReport? report = ProjectEol.Parse("""
+            {"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "…"}],
+             "structuredContent": {"provider": "noaa-gfs", "latitude": 55.76, "longitude": 37.62,
+              "forecast": [{"time": "2026-09-24T12:00:00Z", "values": {
+                "surface.cloud_area_fraction": {"value": 0.694, "unit": "1"},
+                "surface.precipitation_flux": {"value": 8.000000000039226e-07, "unit": "kg m-2 s-1"}}}]}}}
+            """);
+
+        Assert.NotNull(report);
+        Assert.Equal(0.694, report!.CloudCover, 3);
+        Assert.Equal(SkyWeather.Cloudy, report.Weather);
+
+        Assert.Null(ProjectEol.Parse("""{"jsonrpc": "2.0", "id": 1, "result": {"isError": true, "content": []}}"""));
+        Assert.Null(ProjectEol.Parse("""{"jsonrpc": "2.0", "id": 1, "error": {"code": -32602, "message": "bad"}}"""));
+    }
+
+    [Fact]
+    public void Запрос_к_ProjectEOL_на_текущий_час()
+    {
+        string request = ProjectEol.Request(new Location(55.7558, 37.6176, "test", ByIp: true),
+                                            new DateTime(2026, 9, 24, 12, 41, 5, DateTimeKind.Utc));
+
+        Assert.Contains("\"method\":\"tools/call\"", request);
+        Assert.Contains("\"name\":\"get_weather_forecast\"", request);
+        Assert.Contains("\"latitude\":55.76", request);
+        Assert.Contains("\"start\":\"2026-09-24T12:00:00Z\"", request);
+        Assert.Contains("surface.precipitation_flux", request);
     }
 }
