@@ -178,7 +178,7 @@ public sealed class HardwareMonitor : IDisposable
     // is not touched until the driver has settled, and then its sensors are opened afresh.
     public void PauseGpu(string reason)
     {
-        Interlocked.Exchange(ref _gpuPausedUntil, (DateTime.UtcNow + AppParameters.Polling.GpuDriverSettle).Ticks);
+        Interlocked.Exchange(ref _gpuPausedUntil, (DateTime.UtcNow + AppParameters.Displays.Settle).Ticks);
 
         if (!_gpuStale) Log.Event($"GPU sensors paused: {reason}");
         _gpuStale = true;

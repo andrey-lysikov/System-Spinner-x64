@@ -175,8 +175,8 @@ public sealed class FpsCounter : IDisposable
 
     public FpsCounter()
     {
-        _frames = new FrameWindow(AppParameters.Fps.AverageWindowSeconds,
-                                  AppParameters.Fps.StaleFramesSeconds);
+        _frames = new FrameWindow(AppParameters.Fps.AverageWindow.TotalSeconds,
+                                  AppParameters.Fps.StaleFrames.TotalSeconds);
     }
 
     public void Start()
@@ -340,10 +340,10 @@ public sealed class FpsCounter : IDisposable
             }
 
             if (_providersReported || double.IsNaN(_firstDxgkSeen)) return;
-            if (Now - _firstDxgkSeen < AppParameters.Fps.ProviderReportSeconds) return;
+            if (Now - _firstDxgkSeen < AppParameters.Fps.ProviderReport.TotalSeconds) return;
 
             _providersReported = true;
-            Log.Info($"events over {AppParameters.Fps.ProviderReportSeconds:0} s from process {pid}: " +
+            Log.Info($"events over {AppParameters.Fps.ProviderReport.TotalSeconds:0} s from process {pid}: " +
                      $"DXGI={_providerEvents[(int)Source.Dxgi]}, " +
                      $"D3D9={_providerEvents[(int)Source.D3d9]}, " +
                      $"DxgKrnl={_providerEvents[(int)Source.DxgKrnl]}" +
@@ -388,7 +388,7 @@ public sealed class FpsCounter : IDisposable
             return true;
         }
 
-        if (Now - _lastSeen[(int)_source] < AppParameters.Fps.SourceStaleSeconds) return false;
+        if (Now - _lastSeen[(int)_source] < AppParameters.Fps.SourceStale.TotalSeconds) return false;
 
         _source = source;
         _frames.ClearFrames();
@@ -426,7 +426,7 @@ public sealed class FpsCounter : IDisposable
             : (1, id, rank);
 
         double elapsed = Now - _probeStarted;
-        if (elapsed < AppParameters.Fps.TaskProbeSeconds) return false;
+        if (elapsed < AppParameters.Fps.TaskProbe.TotalSeconds) return false;
 
         ChooseDxgkEvent(elapsed);
         return _dxgkEventId >= 0 && id == _dxgkEventId;
@@ -469,7 +469,7 @@ public sealed class FpsCounter : IDisposable
     private void ReportIfNothingMatches()
     {
         if (_noMatchReported || _dxgkEventId >= 0) return;
-        if (Now - _firstDxgkSeen < AppParameters.Fps.NoMatchReportSeconds) return;
+        if (Now - _firstDxgkSeen < AppParameters.Fps.NoMatchReport.TotalSeconds) return;
 
         if (_seenTasks.Values.Sum() < AppParameters.Fps.MinEventsToComplain) return;
 

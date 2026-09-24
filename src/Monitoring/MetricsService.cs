@@ -338,7 +338,7 @@ public sealed class NetworkMonitor
 
         // The delay is not politeness towards someone else's service but towards ours: right after
         // a network change the route may not be up yet and the request would be wasted.
-        _lookupAllowedAt = DateTime.UtcNow.AddSeconds(AppParameters.Network.LookupDelaySeconds);
+        _lookupAllowedAt = DateTime.UtcNow + AppParameters.Network.LookupDelay;
 
         Task.Run(async () =>
         {

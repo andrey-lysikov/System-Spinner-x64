@@ -48,7 +48,7 @@ public sealed class OsdController : IDisposable
         _window.Show(percent, kind, _cfg.Osd.AdjustmentSteps);
 
         _hide.Stop();
-        _hide.Interval = TimeSpan.FromSeconds(AppParameters.Osd.VisibleSeconds);
+        _hide.Interval = AppParameters.Osd.Visible;
         _hide.Start();
     }
 

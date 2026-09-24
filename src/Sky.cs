@@ -389,7 +389,7 @@ internal static class Sky
         {
             lock (Gate)
                 return _weatherFetch is not { IsCompleted: false } &&
-                       DateTime.UtcNow - _weatherAttempt < AppParameters.Aura.WeatherRefresh;
+                       DateTime.UtcNow - _weatherAttempt < AppParameters.Sky.WeatherRefresh;
         }
     }
 
@@ -409,7 +409,7 @@ internal static class Sky
         get
         {
             lock (Gate)
-                return _report is not null && DateTime.UtcNow - _reportStamp < AppParameters.Aura.SkyWeatherStale
+                return _report is not null && DateTime.UtcNow - _reportStamp < AppParameters.Sky.WeatherStale
                     ? _report.Weather
                     : SkyWeather.Clear;
         }
@@ -422,7 +422,7 @@ internal static class Sky
         lock (Gate)
         {
             if (_weatherFetch is { IsCompleted: false }) return _weatherFetch;
-            if (DateTime.UtcNow - _weatherAttempt < AppParameters.Aura.WeatherRefresh) return Task.FromResult(_report);
+            if (DateTime.UtcNow - _weatherAttempt < AppParameters.Sky.WeatherRefresh) return Task.FromResult(_report);
 
             _weatherAttempt = DateTime.UtcNow;
             Location place = _location ??= Geo.Guess();
@@ -473,7 +473,7 @@ internal static class Sky
         {
             if (_location is { ByIp: true }) return;
             if (_resolving is { IsCompleted: false }) return;
-            if (DateTime.UtcNow - _lastAttempt < AppParameters.Aura.LocationRetry) return;
+            if (DateTime.UtcNow - _lastAttempt < AppParameters.Sky.LocationRetry) return;
 
             _lastAttempt = DateTime.UtcNow;
             Location? previous = _location;

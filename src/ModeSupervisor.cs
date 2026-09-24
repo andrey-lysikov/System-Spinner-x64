@@ -111,7 +111,7 @@ public sealed class ModeSupervisor : IDisposable
 
         WireTray();
 
-        _modeTimer.Interval = TimeSpan.FromSeconds(AppParameters.Polling.ModeCheckSeconds);
+        _modeTimer.Interval = AppParameters.Polling.ModeCheck;
         _modeTimer.Tick += (_, _) => UpdateMode();
 
         _fpsTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(AppParameters.Polling.MinIntervalMs, cfg.UpdateIntervalMs));
@@ -124,7 +124,7 @@ public sealed class ModeSupervisor : IDisposable
 
         // A screen that has just woken or switched resolution answers nothing over DDC for a few
         // seconds, and one asked too early is written off until the hourly look. So: ask again.
-        _wakeTimer.Interval = AppParameters.Displays.ResumeDelay;
+        _wakeTimer.Interval = AppParameters.Displays.Settle;
         _wakeTimer.Tick += (_, _) =>
         {
             _wakeTimer.Stop();
@@ -144,7 +144,7 @@ public sealed class ModeSupervisor : IDisposable
 
         // The sun and the moon move slowly: a look once a minute, and a redraw only when the
         // picture would actually differ.
-        _skyTimer.Interval = AppParameters.Aura.SkyRefresh;
+        _skyTimer.Interval = AppParameters.Sky.Refresh;
         _skyTimer.Tick += (_, _) => RefreshSky();
 
         _themeTimer.Interval = AppParameters.Spinning.ThemeSettle;
@@ -426,7 +426,7 @@ public sealed class ModeSupervisor : IDisposable
     // Writes to the log what the panel shows — for checking against Task Manager or HWiNFO.
     private void LogReadings(Readings r)
     {
-        TimeSpan period = TimeSpan.FromSeconds(AppParameters.Polling.ReadingsLogSeconds);
+        TimeSpan period = AppParameters.Polling.ReadingsLog;
         if (DateTime.UtcNow - _lastReadingsLog < period) return;
 
         _lastReadingsLog = DateTime.UtcNow;

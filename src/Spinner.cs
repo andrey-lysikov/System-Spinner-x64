@@ -396,7 +396,7 @@ public sealed class SpinnerAnimator : IDisposable
         // The load is divided by the frame count: in a long set one frame is a smaller share of
         // the cycle, and without this long sets would spin visibly faster at the same load.
         double load = Math.Clamp(loadPercent / _icons.Count, 1.0, 100.0);
-        double interval = Math.Max(AppParameters.Spinning.MinIntervalSeconds,
+        double interval = Math.Max(AppParameters.Spinning.MinInterval.TotalSeconds,
                                    0.25 / load * _style.SpeedCoefficient);
 
         if (_interval > 0 &&

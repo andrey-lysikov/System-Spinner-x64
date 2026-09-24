@@ -408,7 +408,7 @@ internal sealed class AuraSunlight : IDisposable
             // While the latitude is still a guess, or the cloud cover is still on its way, the next
             // look comes sooner: the answer may well be in by then.
             if (!Sky.Location.ByIp || _level.CloudStale)
-                _levelStamp = DateTime.UtcNow - AppParameters.Aura.LevelRefresh + AppParameters.Aura.LocationRetry;
+                _levelStamp = DateTime.UtcNow - AppParameters.Aura.LevelRefresh + AppParameters.Sky.LocationRetry;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -86,9 +86,11 @@ internal static class AppParameters
         // plugging in headphones changes where the volume goes.
         public static readonly TimeSpan AudioCheckPeriod = TimeSpan.FromMinutes(5);
 
-        // How long to wait after the machine wakes up. Windows says "resumed" before the screens
-        // have come back: asked straight away, a monitor answers nothing over DDC.
-        public static readonly TimeSpan ResumeDelay = TimeSpan.FromSeconds(5);
+        // How long the hardware is given to come round after a wake, a mode change or a graphics
+        // driver reload. Windows says "resumed" before the screens have come back, and asked
+        // straight away a monitor answers nothing over DDC; the driver takes a second or two, and
+        // until then its sensors must not be read.
+        public static readonly TimeSpan Settle = TimeSpan.FromSeconds(5);
 
         // How many times a screen that answers nothing over DDC is asked again after a mode change.
         public const int SettleTries = 4;
@@ -122,9 +124,6 @@ internal static class AppParameters
 
         // Width of the volume panel in WPF units.
         public const double OsdWidth = 300;
-
-        // How many process icons the chart window keeps converted.
-        public const int ChartIconCache = 128;
     }
 
     // The panel over a game.
@@ -147,8 +146,8 @@ internal static class AppParameters
     // What the tray menu offers.
     internal static class Menu
     {
-        // Poll periods in the menu, milliseconds.
-        public static readonly int[] Intervals = { 1000, 1500, 2000, 3000 };
+        // Poll periods in the menu, milliseconds. The shortest is the floor the poll allows.
+        public static readonly int[] Intervals = { Polling.MinIntervalMs, 1500, 2000, 3000 };
 
         // Adjustment step counts — the same four as the macOS version.
         public static readonly int[] Steps = { 8, 16, 24, 32 };
@@ -158,7 +157,7 @@ internal static class AppParameters
     internal static class Spinning
     {
         // No faster than 120 frames a second: past that the eye sees no difference.
-        public const double MinIntervalSeconds = 1.0 / 120.0;
+        public static readonly TimeSpan MinInterval = TimeSpan.FromSeconds(1.0 / 120.0);
 
         // How much the computed speed has to change before the timer is rebuilt.
         public const double SpeedTolerance = 0.15;
@@ -177,7 +176,7 @@ internal static class AppParameters
         public static readonly TimeSpan ThemeSettle = TimeSpan.FromMilliseconds(500);
     }
 
-    // The Aura lighting and the Sun & Moon spinner.
+    // The Aura lighting.
     internal static class Aura
     {
         // Ramp on a click: fast enough to read as a response to the gesture.
@@ -221,25 +220,29 @@ internal static class AppParameters
         // How long to wait before looking for a controller that stopped answering.
         public static readonly TimeSpan ReopenDelay = TimeSpan.FromSeconds(10);
 
-        // How often a failed IP lookup is tried again, and how soon the level is looked at again
-        // while the latitude is only a guess.
+        // How often the lighting state goes to the log.
+        public static readonly TimeSpan LogPeriod = TimeSpan.FromMinutes(5);
+
+        // The most LEDs per channel the config may ask for. Each driver has its own, lower, limit.
+        public const int MaxLedsPerChannel = 1000;
+    }
+
+    // Where the sun is and what the weather does: read by the lighting and the Sun & Moon spinner.
+    internal static class Sky
+    {
+        // How often a failed IP lookup is tried again, and how soon the lighting looks at its
+        // level again while the latitude is only a guess.
         public static readonly TimeSpan LocationRetry = TimeSpan.FromMinutes(1);
 
         // The weather is asked for no more often than this, by the lighting and the Sun & Moon
         // spinner together; a failed request waits it out as well.
         public static readonly TimeSpan WeatherRefresh = TimeSpan.FromMinutes(30);
 
-        // How often the lighting state goes to the log.
-        public static readonly TimeSpan LogPeriod = TimeSpan.FromMinutes(5);
+        // An older answer is worse than none: past this the sky is shown clear.
+        public static readonly TimeSpan WeatherStale = TimeSpan.FromHours(3);
 
         // The Sun & Moon spinner is redrawn no more often than this.
-        public static readonly TimeSpan SkyRefresh = TimeSpan.FromMinutes(1);
-
-        // An older answer is worse than none: past this the sky is shown clear.
-        public static readonly TimeSpan SkyWeatherStale = TimeSpan.FromHours(3);
-
-        // The most LEDs per channel the config may ask for. Each driver has its own, lower, limit.
-        public const int MaxLedsPerChannel = 1000;
+        public static readonly TimeSpan Refresh = TimeSpan.FromMinutes(1);
     }
 
     // How often the machine is asked about itself.
@@ -249,39 +252,36 @@ internal static class AppParameters
         public const int MinIntervalMs = 1000;
 
         // How often the program re-checks which of its two faces fits.
-        public const double ModeCheckSeconds = 1;
+        public static readonly TimeSpan ModeCheck = TimeSpan.FromSeconds(1);
 
         // How often the current readings go to the log at Info.
-        public const double ReadingsLogSeconds = 10;
+        public static readonly TimeSpan ReadingsLog = TimeSpan.FromSeconds(10);
 
-        // How many process icons the poll keeps: as many as the window shows.
-        public const int ProcessIconCache = 64;
-
-        // How long the graphics card is left alone after its driver may have reloaded. The driver
-        // comes back in a second or two; the screens settle a little after.
-        public static readonly TimeSpan GpuDriverSettle = TimeSpan.FromSeconds(5);
+        // How many process icons are kept, by the poll and, converted, by the chart window. More
+        // than the longest process list the config allows, so a full list never evicts itself.
+        public const int ProcessIconCache = 128;
     }
 
     // The frame counter and its ETW session.
     internal static class Fps
     {
         // Silence longer than this means the graphics interface changed.
-        public const double SourceStaleSeconds = 2.0;
+        public static readonly TimeSpan SourceStale = TimeSpan.FromSeconds(2);
 
         // Frames older than this no longer count towards the average.
-        public const double StaleFramesSeconds = 2.0;
+        public static readonly TimeSpan StaleFrames = TimeSpan.FromSeconds(2);
 
         // How long a DxgKrnl task is watched before its rate is judged.
-        public const double TaskProbeSeconds = 1.0;
+        public static readonly TimeSpan TaskProbe = TimeSpan.FromSeconds(1);
 
         // How often to say in the log that no task matched.
-        public const double NoMatchReportSeconds = 5.0;
+        public static readonly TimeSpan NoMatchReport = TimeSpan.FromSeconds(5);
 
         // Fewer events than this is not enough to complain about: nothing was drawn.
         public const int MinEventsToComplain = 300;
 
         // How long events are counted before the tally goes to the log.
-        public const double ProviderReportSeconds = 8.0;
+        public static readonly TimeSpan ProviderReport = TimeSpan.FromSeconds(8);
 
         // How long DXGI and D3D9 are given before Vulkan and OpenGL are tried.
         public static readonly TimeSpan FallbackCheckDelay = TimeSpan.FromSeconds(4);
@@ -289,9 +289,9 @@ internal static class AppParameters
         // How often after that the choice is reconsidered.
         public static readonly TimeSpan FallbackCheckPeriod = TimeSpan.FromSeconds(3);
 
-        // The window the frame rate is averaged over, seconds. Shorter reacts faster and jumps;
-        // longer is steadier and lags behind what the eye sees.
-        public const double AverageWindowSeconds = 1.0;
+        // The window the frame rate is averaged over. Shorter reacts faster and jumps; longer is
+        // steadier and lags behind what the eye sees.
+        public static readonly TimeSpan AverageWindow = TimeSpan.FromSeconds(1);
 
         // An event arriving more often than this fires several times per frame and cannot be
         // a frame counter.
@@ -305,8 +305,8 @@ internal static class AppParameters
     // The volume and brightness panel.
     internal static class Osd
     {
-        // How long it stays up after the last key press, seconds.
-        public const double VisibleSeconds = 2.5;
+        // How long it stays up after the last key press.
+        public static readonly TimeSpan Visible = TimeSpan.FromSeconds(2.5);
 
         // Distance from the bottom edge of the screen, in WPF units.
         public const double BottomInset = 140;
@@ -332,7 +332,7 @@ internal static class AppParameters
         public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
         // How long to wait before asking after the network changed: the route may not be up yet.
-        public const int LookupDelaySeconds = 15;
+        public static readonly TimeSpan LookupDelay = TimeSpan.FromSeconds(15);
 
         // How long to wait before trying again when the request failed. Without it a single
         // timeout would leave the address blank until the network changes or the app restarts.

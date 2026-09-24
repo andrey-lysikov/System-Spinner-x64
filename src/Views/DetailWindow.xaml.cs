@@ -169,7 +169,7 @@ public partial class DetailWindow : Window
         }
 
         // The dictionary does not grow without bound: the list is short and processes come and go.
-        if (_icons.Count > AppParameters.Layout.ChartIconCache) _icons.Clear();
+        if (_icons.Count > AppParameters.Polling.ProcessIconCache) _icons.Clear();
 
         _icons[process.Pid] = source;
         return source;
