@@ -67,6 +67,15 @@ internal sealed class AuraSunlight : IDisposable
 
     private double _effectPhase;
 
+    // Held dark for sleep, restart, shutdown or exit, whatever the switch says. The whole light is
+    // faded out through _master, on top of the level, so the heat tint goes down with it.
+    private volatile bool _dark;
+    private bool _wasDark;
+    private DateTime _darkStart;
+    private double _master = 1.0;
+    private readonly ManualResetEventSlim _darkened = new(false);
+    private bool _disposed;
+
     private bool _blood;
     private double _pulsePhase;
     private DateTime _bloodChecked = DateTime.MinValue;
@@ -94,7 +103,8 @@ internal sealed class AuraSunlight : IDisposable
         double level = Volatile.Read(ref _displayLevel);
         double ceiling = Math.Clamp(_cfg.Brightness / 100.0, 0, 1);
 
-        return level < ceiling ? level + (ceiling - level) * Volatile.Read(ref _heat) : level;
+        double output = level < ceiling ? level + (ceiling - level) * Volatile.Read(ref _heat) : level;
+        return output * Volatile.Read(ref _master);
     }
 
     public void Enable()
@@ -171,6 +181,35 @@ internal sealed class AuraSunlight : IDisposable
         Wake();
     }
 
+    // Sleep, restart, shutdown or exit: the light fades out instead of being cut off, or of being
+    // left on for the controller to keep. The same fade as a switch-off from the menu; blocks until
+    // it is done and the black frame after it has gone out.
+    public void Darken(string reason)
+    {
+        if (_disposed) return;
+
+        if (!_dark)
+        {
+            Log.Event($"aura: fading out — {reason}");
+            _dark = true;
+            Wake();
+        }
+
+        if (!_darkened.Wait(AppParameters.Aura.ToggleFade + AppParameters.Aura.Frame))
+            Log.Info("aura: the fade-out did not finish in time");
+    }
+
+    // Back from sleep: the light comes up again as it does on a switch-on.
+    public void Relight(string reason)
+    {
+        if (_disposed || !_dark) return;
+
+        Log.Info($"aura: lighting up again — {reason}");
+        _darkened.Reset();
+        _dark = false;
+        Wake();
+    }
+
     private static AuraLook LookOf(AuraConfig cfg)
     {
         if (!Rgb.TryParse(cfg.Color, out Rgb color))
@@ -211,10 +250,19 @@ internal sealed class AuraSunlight : IDisposable
                 if (devicesChanged) _takenOver = false;
                 if (_device is null && (_enabled || _displayLevel > 0)) devicesChanged |= Reopen(now);
 
+                bool dark = _dark;
+                if (dark != _wasDark)
+                {
+                    _wasDark = dark;
+                    if (dark) StartDark(now);
+                    else Relit();
+                }
+
                 // Until the first level is known the lamps hold where they are, so the ramp that
                 // follows is the quick one of a switch-on rather than the slow daily drift.
                 double goal = _enabled ? (_levelKnown ? _targetLevel : _displayLevel) : 0.0;
                 bool moving = Advance(goal);
+                if (dark) moving |= AdvanceDark(now);
 
                 if (now - _bloodChecked > AppParameters.Aura.BloodCheck)
                 {
@@ -227,7 +275,7 @@ internal sealed class AuraSunlight : IDisposable
                     }
                 }
 
-                bool lit = _displayLevel > 0.0005;
+                bool lit = _displayLevel > 0.0005 && _master > 0;
 
                 // Dark lamps have nothing to tint, so the heat is let go of with them.
                 moving |= AdvanceHeat(lit ? Volatile.Read(ref _heatTarget) : 0.0, dt);
@@ -261,6 +309,9 @@ internal sealed class AuraSunlight : IDisposable
                     lastWrite = now;
                     written++;
                 }
+
+                // The last frame of the fade has gone out, black, or there was nothing to darken.
+                if (dark && _master <= 0 && !_darkened.IsSet) _darkened.Set();
 
                 if (now - logStamp > AppParameters.Aura.LogPeriod && (_enabled || moving))
                 {
@@ -370,6 +421,41 @@ internal sealed class AuraSunlight : IDisposable
         }
     }
 
+    // A light that is ours and on is faded out; one that is already dark, or that the controller
+    // still runs on its own effect, is left as it is.
+    private void StartDark(DateTime now)
+    {
+        _darkStart = now;
+        if (!_takenOver || _device is null || Output() < 0.0005) Volatile.Write(ref _master, 0.0);
+    }
+
+    // Eased in, as the level is: 1 - t³ from wherever the light stands. True while still moving,
+    // including the frame that reaches zero, so that black is actually sent.
+    private bool AdvanceDark(DateTime now)
+    {
+        if (_master <= 0) return false;
+
+        double t = Math.Clamp((now - _darkStart).TotalSeconds / AppParameters.Aura.ToggleFade.TotalSeconds, 0, 1);
+        Volatile.Write(ref _master, 1.0 - t * t * t);
+        return true;
+    }
+
+    // Starts from dark with the quick ramp of a switch-on, once the level is known again: the sun
+    // may well have moved while the machine slept.
+    private void Relit()
+    {
+        _displayLevel = 0;
+        _fadeFrom = 0;
+        _fadeTo = 0;
+        _fadeReported = true;
+        Volatile.Write(ref _master, 1.0);
+
+        _levelKnown = false;
+        _quickLevel = true;
+        _levelStamp = DateTime.MinValue;
+        _toggling = true;
+    }
+
     // Exponential drift towards the latest reading: the tint flows between polls instead of
     // stepping once a second.
     private bool AdvanceHeat(double target, double dt)
@@ -435,6 +521,11 @@ internal sealed class AuraSunlight : IDisposable
     // following the sun without saying so is worse than one that is plainly off.
     public void Dispose()
     {
+        if (_disposed) return;
+
+        Darken("the program is closing");
+        _disposed = true;
+
         _cts.Cancel();
         try { _loop.Wait(TimeSpan.FromSeconds(2)); } catch { /* did not finish in time */ }
 
@@ -453,5 +544,6 @@ internal sealed class AuraSunlight : IDisposable
         }
 
         _cts.Dispose();
+        _darkened.Dispose();
     }
 }

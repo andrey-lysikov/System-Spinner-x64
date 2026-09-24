@@ -120,9 +120,12 @@ public partial class App : Application
     // in now, or the process is gone before OnExit gets to it.
     protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
     {
-        Finish(e.ReasonSessionEnding == ReasonSessionEnding.Shutdown
+        string reason = e.ReasonSessionEnding == ReasonSessionEnding.Shutdown
             ? "Windows is shutting down"
-            : "the user is logging off");
+            : "the user is logging off";
+
+        Finish(reason);
+        _supervisor?.Darken(reason);
 
         base.OnSessionEnding(e);
     }

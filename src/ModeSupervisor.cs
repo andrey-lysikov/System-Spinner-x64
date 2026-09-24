@@ -532,6 +532,10 @@ public sealed class ModeSupervisor : IDisposable
         });
     }
 
+    // Restart, shutdown or logoff: the lamps fade out before Windows ends the process, which would
+    // leave them on whatever the last frame was.
+    public void Darken(string reason) => _aura?.Darken(reason);
+
     private void SetAura(bool enabled)
     {
         if (_aura is null) return;
@@ -797,9 +801,15 @@ public sealed class ModeSupervisor : IDisposable
         if (e.Mode == PowerModes.Suspend)
         {
             _ = _overlay.Dispatcher.BeginInvoke(() => _skyTimer.Stop());
+
+            // Here on the system events thread and waited for: the machine goes to sleep once the
+            // message has been answered, and the lamps must be dark by then.
+            _aura?.Darken("the machine is going to sleep");
             return;
         }
         if (e.Mode != PowerModes.Resume) return;
+
+        _aura?.Relight("the machine woke up");
 
         _ = _overlay.Dispatcher.BeginInvoke(() => ReloadSpinner());
 
