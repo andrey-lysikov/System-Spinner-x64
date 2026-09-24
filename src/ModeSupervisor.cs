@@ -195,7 +195,6 @@ public sealed class ModeSupervisor : IDisposable
         _modeTimer.Start();
         _updateTimer.Start();
         _displayTimer.Start();
-        _skyTimer.Start();
 
         DetectAura();
 
@@ -396,7 +395,25 @@ public sealed class ModeSupervisor : IDisposable
         string gpu = r.GpuLoad is double gpuLoad ? $"GPU {gpuLoad:0} %" : "";
         string memory = r.MemLoadPercent is double mem ? $"MEM {mem:0} %" : "";
 
-        return string.Join("  ", new[] { cpu, gpu, memory }.Where(part => part.Length > 0));
+        string tip = string.Join("  ", new[] { cpu, gpu, memory }.Where(part => part.Length > 0));
+
+        // With the lighting on, how bright the sky is and what the lamps give, on a line of its own.
+        if (_aura is { IsEnabled: true } aura)
+            tip += $"\n[{SkyBrightness()}, Light: {aura.Light * 100:0}%]";
+
+        return tip;
+    }
+
+    // By day how bright the sun is: full from DimAbove up, where the lighting is off, fading to the
+    // horizon. By night how much of the moon is lit, full at full moon.
+    private static string SkyBrightness()
+    {
+        DateTime utc = DateTime.UtcNow;
+        double elevation = Sky.Elevation(utc);
+
+        return elevation > 0
+            ? $"Sun {(1 - Sun.Factor(elevation, Sky.Config)) * 100:0}%"
+            : $"Moon {Moon.Illumination(Moon.Phase(utc)) * 100:0}%";
     }
 
     private void UpdateFps()
@@ -440,12 +457,17 @@ public sealed class ModeSupervisor : IDisposable
         if (style.Drawn)
         {
             // The place is looked up once; until then the sun is placed by the time zone alone.
+            // The weather is asked for only here, for this spinner: with another one chosen
+            // nothing goes out on its account.
             Sky.EnsureResolved();
+            Sky.EnsureWeather();
             _skyShown = SkyIcon.Now();
+            if (!_skyTimer.IsEnabled) _skyTimer.Start();
         }
         else
         {
             _skyShown = null;
+            _skyTimer.Stop();
         }
 
         _animator.Invert = _cfg.Spinner.InvertRotation;
@@ -462,13 +484,14 @@ public sealed class ModeSupervisor : IDisposable
         if (_inGame || !_cfg.SpinOnDesktop) _animator.Stop();
     }
 
-    // The Sun & Moon spinner follows the sky: a new picture only when the rays, the phase or the
-    // choice between the two would change.
+    // The Sun & Moon spinner follows the sky: new pictures only when the haze, the phase, the
+    // weather or the choice between the sun and the moon would change.
     private void RefreshSky()
     {
         if (_skyShown is null) return;
 
         Sky.EnsureResolved();
+        Sky.EnsureWeather();
         if (SkyIcon.Now() != _skyShown) ReloadSpinner();
     }
 
@@ -769,7 +792,16 @@ public sealed class ModeSupervisor : IDisposable
     // and one that was asked too early answers nothing over DDC — hence the pause.
     private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
     {
+        // Asleep, the sky is not looked at; on waking the spinner is rebuilt, and with it the timer
+        // starts again if Sun & Moon is still the one chosen.
+        if (e.Mode == PowerModes.Suspend)
+        {
+            _ = _overlay.Dispatcher.BeginInvoke(() => _skyTimer.Stop());
+            return;
+        }
         if (e.Mode != PowerModes.Resume) return;
+
+        _ = _overlay.Dispatcher.BeginInvoke(() => ReloadSpinner());
 
         // The graphics driver starts over on a wake, much as it does on a reload.
         _hardware.PauseGpu("the machine woke up");
