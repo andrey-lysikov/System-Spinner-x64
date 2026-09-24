@@ -11,7 +11,7 @@
         ShowActivated="False"
         ResizeMode="NoResize"
         SizeToContent="Height"
-        Width="230"
+        Width="190"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Ideal">
