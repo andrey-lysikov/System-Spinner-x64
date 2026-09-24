@@ -25,6 +25,7 @@ This is the Windows version. If you are looking for macOS, go to [System Spinner
 - Customisable game overlay in full-screen mode
 - Localisation (English, Arabic, Chinese, French, German, Italian, Japanese, Russian)
 - Black list for some apllication in FullScreen mode
+- If motherboard has HID ARGB controll (Asus, Nollye in future), you can enable sunlight flow lighting
 
 *WARNING: the application is not officially signed, so Windows will ask you to allow it to run.*
 
@@ -36,6 +37,7 @@ This application uses **PawnIO** — [pawnio.eu](https://pawnio.eu) — for low-
   <img src="pictures/main_window.jpg" height="380">
   <img src="pictures/spin_menu.jpg" height="380">
   <img src="pictures/main_detail_window.jpg" height="380">
+  <img src="pictures/argb_control.jpg" height="380">
 </p>
 
 ## Tech
