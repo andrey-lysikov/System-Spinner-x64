@@ -230,8 +230,8 @@ public sealed class HardwareMonitor : IDisposable
 
             CpuClockMhz = PerformanceCoreClock(),
 
-            SysMemUsedGb = Find(_memory, SensorType.Data, names.MemoryUsed),
-            SysMemFreeGb = Find(_memory, SensorType.Data, names.MemoryAvailable),
+            SysMemUsedGb = Find(_memory, SensorType.Data, names.RamUsed),
+            SysMemFreeGb = Find(_memory, SensorType.Data, names.RamFree),
 
             GpuLoad = Find(_gpu, SensorType.Load, names.GpuLoad),
             GpuTempC = Find(_gpu, SensorType.Temperature, names.GpuTemp),
@@ -249,8 +249,8 @@ public sealed class HardwareMonitor : IDisposable
         };
 
         // LHM reports video memory in MB — converted to GB.
-        r.GpuMemUsedGb = Find(_gpu, SensorType.SmallData, names.GpuMemory) / 1024.0;
-        r.GpuMemTotalGb = Find(_gpu, SensorType.SmallData, names.GpuMemoryTotal) / 1024.0;
+        r.GpuMemUsedGb = Find(_gpu, SensorType.SmallData, names.VramUsed) / 1024.0;
+        r.GpuMemTotalGb = Find(_gpu, SensorType.SmallData, names.VramTotal) / 1024.0;
 
         LogSensorChoice(names);
         LogMemoryStall(r);
@@ -289,14 +289,14 @@ public sealed class HardwareMonitor : IDisposable
         Report("CpuLoad", _cpu, SensorType.Load, names.CpuLoad);
         Report("CpuTemp", _cpu, SensorType.Temperature, names.CpuTemp);
         Report("CpuPower", _cpu, SensorType.Power, names.CpuPower);
-        Report("MemoryUsed", _memory, SensorType.Data, names.MemoryUsed);
-        Report("MemoryAvailable", _memory, SensorType.Data, names.MemoryAvailable);
+        Report("RamUsed", _memory, SensorType.Data, names.RamUsed);
+        Report("RamFree", _memory, SensorType.Data, names.RamFree);
         Report("GpuLoad", _gpu, SensorType.Load, names.GpuLoad);
         Report("GpuTemp", _gpu, SensorType.Temperature, names.GpuTemp);
         Report("GpuPower", _gpu, SensorType.Power, names.GpuPower);
         Report("GpuClock", _gpu, SensorType.Clock, names.GpuClock);
-        Report("GpuMemory", _gpu, SensorType.SmallData, names.GpuMemory);
-        Report("GpuMemoryTotal", _gpu, SensorType.SmallData, names.GpuMemoryTotal);
+        Report("VramUsed", _gpu, SensorType.SmallData, names.VramUsed);
+        Report("VramTotal", _gpu, SensorType.SmallData, names.VramTotal);
 
         LogVideoMemory();
 

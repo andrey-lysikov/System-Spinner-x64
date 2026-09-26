@@ -22,7 +22,7 @@ public class ConfFormatTests
             ShowOverlayInGames = false,
             SpinOnDesktop = false,
             Debug = true,
-            Sensors = { CpuLoad = { "CPU Core Max" }, GpuMemory = { "D3D Dedicated Memory Used" } },
+            Sensors = { CpuLoad = { "CPU Core Max" }, VramUsed = { "My VRAM" }, CpuClockCores = "Core" },
             Fans = { Cpu = { "CPU Fan" }, Extra = { "System Fan #2", "PSU Fan" }, AverageCpu = true },
             Warn = { Color = "Gold", CpuTemp = 90, GpuTemp = 0, SysMem = 75, GpuMem = 80 },
             Osd = { AdjustmentSteps = 24, ControlExternalBrightness = false },
@@ -40,6 +40,8 @@ public class ConfFormatTests
         Assert.False(read.SpinOnDesktop);
         Assert.True(read.Debug);
         Assert.Contains("CPU Core Max", read.Sensors.CpuLoad);
+        Assert.Contains("My VRAM", read.Sensors.VramUsed);
+        Assert.Equal("Core", read.Sensors.CpuClockCores);
         Assert.Equal(new[] { "System Fan #2", "PSU Fan" }, read.Fans.Extra);
         Assert.True(read.Fans.AverageCpu);
         Assert.Equal("Gold", read.Warn.Color);
@@ -89,10 +91,10 @@ public class ConfFormatTests
     [Fact]
     public void Недостающие_секции_называются_по_имени()
     {
-        // What 1.0.0 wrote has no [FullScreenOverlay]; the startup writes the file back with it.
-        AppConfig old = ConfFormat.Read("[General]\nDebug = false\n[Hardware]\nGpuIndex = 0\n[Spinner]\nStyle = Loader\n");
+        // A file without [Sensors], [FullScreenOverlay] or [Aura]; the startup writes the file back with them.
+        AppConfig old = ConfFormat.Read("[General]\nDebug = false\nGpuIndex = 0\n[Spinner]\nStyle = Loader\n");
 
-        Assert.Equal(new[] { "FullScreenOverlay", "Aura" }, old.MissingSections);
+        Assert.Equal(new[] { "Sensors", "FullScreenOverlay", "Aura" }, old.MissingSections);
         Assert.Empty(ConfFormat.Read(ConfFormat.Write(new AppConfig())).MissingSections);
     }
 
@@ -111,7 +113,7 @@ public class ConfFormatTests
             # пояснение
             ; и такое тоже
 
-            [Hardware]
+            [General]
               GpuIndex = 2
             """);
 
@@ -145,7 +147,7 @@ public class ConfFormatTests
     }
 
     [Theory]
-    [InlineData("[Hardware]\nGpuIndex = не число\n")]
+    [InlineData("[General]\nGpuIndex = не число\n")]
     [InlineData("[FullScreenOverlay]\nEnable = ага\n")]
     [InlineData("[General]\nDebug = ага\n")]
     [InlineData("[General\nGpuIndex = 1\n")]
@@ -163,24 +165,34 @@ public class ConfFormatTests
     }
 
     [Fact]
-    public void Прежний_порядок_датчиков_видеопамяти_заменяется()
+    public void Датчики_читаются_из_своей_секции()
     {
-        // What older versions wrote, word for word. The card's own count of used memory sticks at
-        // the peak on NVIDIA, so a file carrying that order is carrying a fault, not a decision.
         AppConfig read = ConfFormat.Read(
-            "[Hardware]\nGpuMemory = GPU Memory Used, D3D Dedicated Memory Used, GPU Memory Dedicated Used\n");
+            "[Sensors]\nRamUsed = Used Memory\nVramUsed = GPU Memory Used\nCpuClockCores = Core\n");
 
-        Assert.Equal("D3D Dedicated Memory Used", read.Sensors.GpuMemory[0]);
+        Assert.Equal(new[] { "Used Memory" }, read.Sensors.RamUsed);
+        Assert.Equal(new[] { "GPU Memory Used" }, read.Sensors.VramUsed);
+        Assert.Equal("Core", read.Sensors.CpuClockCores);
     }
 
     [Fact]
-    public void Выбранный_вручную_датчик_видеопамяти_остаётся()
+    public void Датчики_в_Hardware_больше_не_читаются()
     {
-        // Anything but that exact list is somebody's own choice and is left alone — including
-        // the very sensor the default moved away from.
-        AppConfig read = ConfFormat.Read("[Hardware]\nGpuMemory = GPU Memory Used\n");
+        // Configs from 1.6 and before are not carried over: [Hardware] and its old keys are ignored.
+        AppConfig read = ConfFormat.Read("[Hardware]\nGpuMemory = GPU Memory Used\nCpuLoad = Something\n");
 
-        Assert.Equal(new[] { "GPU Memory Used" }, read.Sensors.GpuMemory);
+        Assert.Equal(new SensorNamesConfig().VramUsed, read.Sensors.VramUsed);
+        Assert.Equal(new SensorNamesConfig().CpuLoad, read.Sensors.CpuLoad);
+    }
+
+    [Fact]
+    public void Имена_ключей_датчиков_годятся_в_строку_панели()
+    {
+        OverlayRow? row = OverlayRow.Parse("MEM: RamUsed, VramUsed, CpuClockCores", out string? problem);
+
+        Assert.Null(problem);
+        Assert.Equal([OverlayMetric.SysMemory, OverlayMetric.GpuMemory, OverlayMetric.CpuClock], row!.Metrics);
+        Assert.Equal("MEM: SysMemory, GpuMemory, CpuClock", row.ToString());    // written back by panel names
     }
 
     private static string Normalize(string text) => text.Replace("\r\n", "\n").TrimEnd();

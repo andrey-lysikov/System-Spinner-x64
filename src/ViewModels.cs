@@ -139,7 +139,7 @@ public sealed class OverlayViewModel : Observable
     }
 
     // One config name to one cell, except ExtraFans: that is as many cells as there are names in
-    // ExtraFan under [Hardware].
+    // ExtraFan under [Sensors].
     private IEnumerable<Metric> Cells(OverlayRow row)
     {
         foreach (OverlayMetric name in row.Metrics)

@@ -445,10 +445,10 @@ public sealed class SensorNamesConfig
     // When nothing matches, every core but the excluded ones is taken, as AMD and plain Intel need.
     public string CpuClockCores { get; set; } = "P-Core";
 
-    public List<string> MemoryUsed { get; set; } = new() { "Memory Used" };
+    public List<string> RamUsed { get; set; } = new() { "Memory Used" };
 
     // Free memory. With the used part it gives the installed total, which LHM does not report.
-    public List<string> MemoryAvailable { get; set; } = new() { "Memory Available" };
+    public List<string> RamFree { get; set; } = new() { "Memory Available" };
 
     public List<string> GpuLoad { get; set; } = new() { "GPU Core", "D3D 3D" };
 
@@ -460,19 +460,15 @@ public sealed class SensorNamesConfig
 
     // Used video memory, the Direct3D counter first: it is what the Task Manager shows and it
     // follows the memory back down, while the card's own count sticks at the peak on NVIDIA.
-    public List<string> GpuMemory { get; set; } = new() { "D3D Dedicated Memory Used", "GPU Memory Used", "GPU Memory Dedicated Used" };
-
-    // What the list above said before, and what a config file written by an older version still
-    // carries. Replaced on reading: the value it names goes stale, and nobody chose it on purpose.
-    internal static readonly string[] StaleGpuMemory = { "GPU Memory Used", "D3D Dedicated Memory Used", "GPU Memory Dedicated Used" };
+    public List<string> VramUsed { get; set; } = new() { "D3D Dedicated Memory Used", "GPU Memory Used", "GPU Memory Dedicated Used" };
 
     // Total video memory. Only the status window needs it: without a ceiling the megabytes have
     // nothing to be compared against, and a scale without one is meaningless.
-    public List<string> GpuMemoryTotal { get; set; } = new() { "GPU Memory Total", "D3D Dedicated Memory Total" };
+    public List<string> VramTotal { get; set; } = new() { "GPU Memory Total", "D3D Dedicated Memory Total" };
 }
 
 // A value the overlay can show. ExtraFans is not one value but however many names stand in
-// ExtraFan under [Hardware].
+// ExtraFan under [Sensors].
 public enum OverlayMetric
 {
     CpuLoad,
@@ -542,7 +538,8 @@ public sealed class OverlayRow
         var metrics = new List<OverlayMetric>();
         foreach (string name in list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (!Enum.TryParse(name, ignoreCase: true, out OverlayMetric metric))
+            if (!Enum.TryParse(name, ignoreCase: true, out OverlayMetric metric) &&
+                !SensorAliases.TryGetValue(name, out metric))
             {
                 problem = $"\"{name}\" is not a value the panel knows. Available: {Names}";
                 return null;
@@ -567,6 +564,16 @@ public sealed class OverlayRow
             : $"{Title}: {string.Join(", ", Metrics)}";
 
     public static string Names => string.Join(", ", Enum.GetNames<OverlayMetric>());
+
+    // The [Sensors] keys whose names differ from the value they feed, taken in a row as that value:
+    // a name copied from one section works in the other.
+    internal static readonly IReadOnlyDictionary<string, OverlayMetric> SensorAliases =
+        new Dictionary<string, OverlayMetric>(StringComparer.OrdinalIgnoreCase)
+        {
+            [nameof(SensorNamesConfig.CpuClockCores)] = OverlayMetric.CpuClock,
+            [nameof(SensorNamesConfig.RamUsed)] = OverlayMetric.SysMemory,
+            [nameof(SensorNamesConfig.VramUsed)] = OverlayMetric.GpuMemory,
+        };
 }
 
 // One name from BlackListApplications: * stands for any run of characters, ? for one of them.

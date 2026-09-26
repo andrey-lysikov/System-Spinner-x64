@@ -190,12 +190,12 @@ internal sealed class ConfFile
 internal static class ConfFormat
 {
     private const string General = "General";
-    private const string Hardware = "Hardware";
     private const string OverlaySection = "FullScreenOverlay";
     private const string EnableKey = "Enable";
 
     // Every section the file is meant to have; one that is missing is written back with defaults.
-    public static readonly string[] Sections = { General, Hardware, OverlaySection, SpinnerSection, AuraSection };
+    public static readonly string[] Sections = { General, SensorsSection, OverlaySection, SpinnerSection, AuraSection };
+    private const string SensorsSection = "Sensors";
     private const string SpinnerSection = "Spinner";
     private const string AuraSection = "Aura";
 
@@ -235,52 +235,43 @@ internal static class ConfFormat
         stats.HistoryPoints = file.Whole(General, "DetailHistoryPoints") ?? stats.HistoryPoints;
         stats.TopProcesses = file.Whole(General, "DetailTopProcesses") ?? stats.TopProcesses;
 
-        cfg.GpuIndex = file.Whole(Hardware, nameof(cfg.GpuIndex)) ?? cfg.GpuIndex;
+        cfg.GpuIndex = file.Whole(General, nameof(cfg.GpuIndex)) ?? cfg.GpuIndex;
+
+        List<string>? Sensor(string key) => file.List(SensorsSection, key);
 
         SensorNamesConfig s = cfg.Sensors;
-        s.CpuLoad = file.List(Hardware, nameof(s.CpuLoad)) ?? s.CpuLoad;
-        s.CpuTemp = file.List(Hardware, nameof(s.CpuTemp)) ?? s.CpuTemp;
-        s.CpuPower = file.List(Hardware, nameof(s.CpuPower)) ?? s.CpuPower;
-        s.CpuClockCores = file.Text(Hardware, nameof(s.CpuClockCores)) ?? s.CpuClockCores;
-        s.MemoryUsed = file.List(Hardware, nameof(s.MemoryUsed)) ?? s.MemoryUsed;
-        s.MemoryAvailable = file.List(Hardware, nameof(s.MemoryAvailable)) ?? s.MemoryAvailable;
-        s.GpuLoad = file.List(Hardware, nameof(s.GpuLoad)) ?? s.GpuLoad;
-        s.GpuTemp = file.List(Hardware, nameof(s.GpuTemp)) ?? s.GpuTemp;
-        s.GpuPower = file.List(Hardware, nameof(s.GpuPower)) ?? s.GpuPower;
-        s.GpuClock = file.List(Hardware, nameof(s.GpuClock)) ?? s.GpuClock;
-        s.GpuMemory = file.List(Hardware, nameof(s.GpuMemory)) ?? s.GpuMemory;
-
-        // The old default put the card's own count first, which sticks at the peak on NVIDIA. A
-        // file still carrying it word for word is an older version's, not a choice.
-        if (s.GpuMemory.SequenceEqual(SensorNamesConfig.StaleGpuMemory, StringComparer.OrdinalIgnoreCase))
-        {
-            s.GpuMemory = new SensorNamesConfig().GpuMemory;
-            Log.Info($"[{Hardware}] GpuMemory: the old order is replaced by {string.Join(", ", s.GpuMemory)} — " +
-                     "the card's own count of used memory stays at the peak once it gets there");
-        }
-        s.GpuMemoryTotal = file.List(Hardware, nameof(s.GpuMemoryTotal)) ?? s.GpuMemoryTotal;
+        s.CpuLoad = Sensor(nameof(s.CpuLoad)) ?? s.CpuLoad;
+        s.CpuTemp = Sensor(nameof(s.CpuTemp)) ?? s.CpuTemp;
+        s.CpuPower = Sensor(nameof(s.CpuPower)) ?? s.CpuPower;
+        s.CpuClockCores = file.Text(SensorsSection, nameof(s.CpuClockCores)) ?? s.CpuClockCores;
+        s.RamUsed = Sensor(nameof(s.RamUsed)) ?? s.RamUsed;
+        s.RamFree = Sensor(nameof(s.RamFree)) ?? s.RamFree;
+        s.GpuLoad = Sensor(nameof(s.GpuLoad)) ?? s.GpuLoad;
+        s.GpuTemp = Sensor(nameof(s.GpuTemp)) ?? s.GpuTemp;
+        s.GpuPower = Sensor(nameof(s.GpuPower)) ?? s.GpuPower;
+        s.GpuClock = Sensor(nameof(s.GpuClock)) ?? s.GpuClock;
+        s.VramUsed = Sensor(nameof(s.VramUsed)) ?? s.VramUsed;
+        s.VramTotal = Sensor(nameof(s.VramTotal)) ?? s.VramTotal;
 
         FanConfig f = cfg.Fans;
-        f.Cpu = file.List(Hardware, "CpuFan") ?? f.Cpu;
-        f.Aio = file.List(Hardware, "AioFan") ?? f.Aio;
-        f.Gpu = file.List(Hardware, "GpuFan") ?? f.Gpu;
-        f.Extra = file.List(Hardware, "ExtraFan") ?? f.Extra;
-        f.AverageCpu = file.Flag(Hardware, "AverageCpuFan") ?? f.AverageCpu;
-        f.AverageAio = file.Flag(Hardware, "AverageAioFan") ?? f.AverageAio;
-        f.AverageGpu = file.Flag(Hardware, "AverageGpuFan") ?? f.AverageGpu;
+        f.Cpu = file.List(SensorsSection, "CpuFan") ?? f.Cpu;
+        f.Aio = file.List(SensorsSection, "AioFan") ?? f.Aio;
+        f.Gpu = file.List(SensorsSection, "GpuFan") ?? f.Gpu;
+        f.Extra = file.List(SensorsSection, "ExtraFan") ?? f.Extra;
+        f.AverageCpu = file.Flag(SensorsSection, "AverageCpuFan") ?? f.AverageCpu;
+        f.AverageAio = file.Flag(SensorsSection, "AverageAioFan") ?? f.AverageAio;
+        f.AverageGpu = file.Flag(SensorsSection, "AverageGpuFan") ?? f.AverageGpu;
 
         WarnConfig n = cfg.Warn;
-        n.Color = file.Text(Hardware, "WarnColor") ?? n.Color;
-        // A file from before the choice had only the switch: switched off, it still means off.
-        if (file.Flag(Hardware, "EnableWarnColor") == false) n.WarnColorBy = WarnColorMode.Off;
-        n.WarnColorBy = file.Choice<WarnColorMode>(Hardware, nameof(n.WarnColorBy)) ?? n.WarnColorBy;
-        n.CpuTemp = file.Number(Hardware, "WarnCpuTemp") ?? n.CpuTemp;
-        n.GpuTemp = file.Number(Hardware, "WarnGpuTemp") ?? n.GpuTemp;
-        n.SysMem = file.Percent(Hardware, "WarnSysMem") ?? n.SysMem;
-        n.GpuMem = file.Percent(Hardware, "WarnGpuMem") ?? n.GpuMem;
-        n.SwapMem = file.Percent(Hardware, "WarnSwapMem") ?? n.SwapMem;
-        n.CpuUsage = file.Percent(Hardware, "WarnCpuUsage") ?? n.CpuUsage;
-        n.GpuUsage = file.Percent(Hardware, "WarnGpuUsage") ?? n.GpuUsage;
+        n.Color = file.Text(General, "WarnColor") ?? n.Color;
+        n.WarnColorBy = file.Choice<WarnColorMode>(AuraSection, nameof(n.WarnColorBy)) ?? n.WarnColorBy;
+        n.CpuTemp = file.Number(General, "WarnCpuTemp") ?? n.CpuTemp;
+        n.GpuTemp = file.Number(General, "WarnGpuTemp") ?? n.GpuTemp;
+        n.SysMem = file.Percent(General, "WarnSysMem") ?? n.SysMem;
+        n.GpuMem = file.Percent(General, "WarnGpuMem") ?? n.GpuMem;
+        n.SwapMem = file.Percent(General, "WarnSwapMem") ?? n.SwapMem;
+        n.CpuUsage = file.Percent(General, "WarnCpuUsage") ?? n.CpuUsage;
+        n.GpuUsage = file.Percent(General, "WarnGpuUsage") ?? n.GpuUsage;
 
         AppearanceConfig a = cfg.Appearance;
         cfg.ShowOverlayInGames = file.Flag(OverlaySection, EnableKey) ?? cfg.ShowOverlayInGames;
@@ -301,8 +292,6 @@ internal static class ConfFormat
 
         SpinnerConfig sp = cfg.Spinner;
         sp.Style = file.Text(SpinnerSection, nameof(sp.Style)) ?? sp.Style;
-        // Sun became the day of Sun & Moon.
-        if (sp.Style.Equals("Sun", StringComparison.OrdinalIgnoreCase)) sp.Style = "Sun & Moon";
         sp.Effect = file.Choice<SpinnerEffect>(SpinnerSection, nameof(sp.Effect)) ?? sp.Effect;
         sp.InvertRotation = file.Flag(SpinnerSection, nameof(sp.InvertRotation)) ?? sp.InvertRotation;
         sp.DimAbove = file.Number(SpinnerSection, nameof(sp.DimAbove)) ?? sp.DimAbove;
@@ -364,21 +353,32 @@ internal static class ConfFormat
     {
         var w = new ConfFile.Writer();
 
+        // By significance: what a person changes first at the top, the diagnostics at the bottom.
         OsdConfig o = cfg.Osd;
         StatsConfig st = cfg.Stats;
+        SensorNamesConfig s = cfg.Sensors;
+        FanConfig f = cfg.Fans;
+        WarnConfig n = cfg.Warn;
         w.Section(General);
 
         w.Note("Language: Auto, En, Ru, Ar, Zh, Fr, De, It or Ja.")
          .Value(nameof(cfg.Language), cfg.Language.ToString()).Blank();
 
-        w.Note("Sensor poll interval, seconds, at least 1.")
-         .Value("UpdateInterval", cfg.UpdateIntervalMs / Second).Blank();
-
         w.Note("Spin the tray icon outside full-screen apps.")
          .Value(nameof(cfg.SpinOnDesktop), cfg.SpinOnDesktop).Blank();
 
-        w.Note("Verbose log: every step, not only events and errors.")
-         .Value(nameof(cfg.Debug), cfg.Debug ?? false).Blank();
+        w.Note("Warning highlight: its colour and thresholds; 0 turns one off.")
+         .Value("WarnColor", n.Color)
+         .Value("WarnCpuTemp", n.CpuTemp)
+         .Value("WarnGpuTemp", n.GpuTemp)
+         .Value("WarnSysMem", n.SysMem, "%")
+         .Value("WarnGpuMem", n.GpuMem, "%")
+         .Value("WarnSwapMem", n.SwapMem, "%")
+         .Value("WarnCpuUsage", n.CpuUsage, "%")
+         .Value("WarnGpuUsage", n.GpuUsage, "%").Blank();
+
+        w.Note("GPU to watch when there are several; 0 is the discrete one.")
+         .Value(nameof(cfg.GpuIndex), cfg.GpuIndex).Blank();
 
         w.Note("Own OSD for the volume and brightness keys.")
          .Value(nameof(o.AlwaysUseCustomOsd), o.AlwaysUseCustomOsd).Blank();
@@ -386,43 +386,50 @@ internal static class ConfFormat
         w.Note("Key presses from zero to full volume or brightness; with Alt a press moves 1 %.")
          .Value("AdjustmentStepsOsd", o.AdjustmentSteps).Blank();
 
+        w.Note("Brightness keys for a keyboard that has none.")
+         .Value(nameof(o.BrightnessKeys), o.BrightnessKeys).Blank();
+
         w.Note("Brightness and speakers of an external monitor over DDC/CI.")
          .Value(nameof(o.ControlExternalBrightness), o.ControlExternalBrightness)
          .Value(nameof(o.ControlExternalVolume), o.ControlExternalVolume).Blank();
-
-        w.Note("Brightness keys for a keyboard that has none.")
-         .Value(nameof(o.BrightnessKeys), o.BrightnessKeys).Blank();
 
         w.Note("External IP in the status window, asked from checkip.dyndns.org.")
          .Value(nameof(st.ShowExternalAddress), st.ShowExternalAddress).Blank();
 
         w.Note("Status window: chart points and process rows.")
          .Value("DetailHistoryPoints", st.HistoryPoints)
-         .Value("DetailTopProcesses", st.TopProcesses);
+         .Value("DetailTopProcesses", st.TopProcesses).Blank();
 
-        SensorNamesConfig s = cfg.Sensors;
-        FanConfig f = cfg.Fans;
-        WarnConfig n = cfg.Warn;
-        w.Section(Hardware);
+        w.Note("Sensor poll interval, seconds, at least 1.")
+         .Value("UpdateInterval", cfg.UpdateIntervalMs / Second).Blank();
 
-        w.Note("GPU to watch when there are several; 0 is the discrete one.")
-         .Value(nameof(cfg.GpuIndex), cfg.GpuIndex).Blank();
+        w.Note("Verbose log: every step, not only events and errors.")
+         .Value(nameof(cfg.Debug), cfg.Debug ?? false);
 
-        w.Note("Sensor names for each value; the first one found is used.")
+        // Names of LibreHardwareMonitor sensors, not panel values: the log says which one each
+        // key took. Grouped by device, the units said where they differ.
+        w.Section(SensorsSection);
+
+        w.Note("LibreHardwareMonitor sensor names, tried in order: exact match, then part of a name; the log shows which one each key took.")
          .Value(nameof(s.CpuLoad), s.CpuLoad)
          .Value(nameof(s.CpuTemp), s.CpuTemp)
-         .Value(nameof(s.CpuPower), s.CpuPower)
-         .Value(nameof(s.MemoryUsed), s.MemoryUsed)
-         .Value(nameof(s.MemoryAvailable), s.MemoryAvailable)
-         .Value(nameof(s.GpuLoad), s.GpuLoad)
+         .Value(nameof(s.CpuPower), s.CpuPower).Blank();
+
+        w.Note("CPU clock: average of the cores whose name has this word; none match — all but E-cores.")
+         .Value(nameof(s.CpuClockCores), s.CpuClockCores).Blank();
+
+        w.Note("RAM, GB: used and free; together they make the total.")
+         .Value(nameof(s.RamUsed), s.RamUsed)
+         .Value(nameof(s.RamFree), s.RamFree).Blank();
+
+        w.Value(nameof(s.GpuLoad), s.GpuLoad)
          .Value(nameof(s.GpuTemp), s.GpuTemp)
          .Value(nameof(s.GpuPower), s.GpuPower)
-         .Value(nameof(s.GpuClock), s.GpuClock)
-         .Value(nameof(s.GpuMemory), s.GpuMemory)
-         .Value(nameof(s.GpuMemoryTotal), s.GpuMemoryTotal).Blank();
+         .Value(nameof(s.GpuClock), s.GpuClock).Blank();
 
-        w.Note("CPU clock: the average of the cores whose sensor name contains this.")
-         .Value(nameof(s.CpuClockCores), s.CpuClockCores).Blank();
+        w.Note("Video memory, MB: used (the D3D counter matches Task Manager) and total.")
+         .Value(nameof(s.VramUsed), s.VramUsed)
+         .Value(nameof(s.VramTotal), s.VramTotal).Blank();
 
         w.Note("Fan sensors, found on the first run; clear all three to scan again.")
          .Value("CpuFan", f.Cpu)
@@ -435,21 +442,7 @@ internal static class ConfFormat
         w.Note("Average every fan in the list instead of taking the first found.")
          .Value("AverageCpuFan", f.AverageCpu)
          .Value("AverageAioFan", f.AverageAio)
-         .Value("AverageGpuFan", f.AverageGpu).Blank();
-
-        w.Note("Warning highlight thresholds; 0 turns one off.")
-         .Value("WarnColor", n.Color)
-         .Value("WarnCpuTemp", n.CpuTemp)
-         .Value("WarnGpuTemp", n.GpuTemp)
-         .Value("WarnSysMem", n.SysMem, "%")
-         .Value("WarnGpuMem", n.GpuMem, "%")
-         .Value("WarnSwapMem", n.SwapMem, "%")
-         .Value("WarnCpuUsage", n.CpuUsage, "%")
-         .Value("WarnGpuUsage", n.GpuUsage, "%").Blank();
-
-        w.Note("What tints the lighting towards WarnColor: Off, Heat (temperatures),",
-               "Load (usage) or Max (whichever is nearer its threshold).")
-         .Value(nameof(n.WarnColorBy), n.WarnColorBy.ToString());
+         .Value("AverageGpuFan", f.AverageGpu);
 
         AppearanceConfig a = cfg.Appearance;
         w.Section(OverlaySection);
@@ -482,8 +475,8 @@ internal static class ConfFormat
          .Value(nameof(a.ShadowBlur), a.ShadowBlur)
          .Value(nameof(a.ShadowOpacity), a.ShadowOpacity).Blank();
 
-        w.Note("Panel rows as \"Tag: values\"; an empty row is hidden. ExtraFans is a cell per ExtraFan.",
-               "Values: " + string.Join(", ", Enum.GetNames<OverlayMetric>()))
+        w.Note("Panel rows as \"Tag: values\", an empty one hidden; [Sensors] key names work too. Values: " +
+               string.Join(", ", Enum.GetNames<OverlayMetric>()))
          .Values(RowKey, cfg.Appearance.Rows.Select(r => r.ToString())).Blank();
 
         w.Note("Full-screen apps the panel is never shown over.")
@@ -517,6 +510,9 @@ internal static class ConfFormat
 
         w.Note("Brightness after sunset.")
          .Value(nameof(au.Brightness), au.Brightness, "%").Blank();
+
+        w.Note("Tint towards WarnColor: Off, Heat (temperatures), Load (usage) or Max (whichever is nearer).")
+         .Value(nameof(n.WarnColorBy), n.WarnColorBy.ToString()).Blank();
 
         w.Note("Below this brightness the LEDs are off.")
          .Value(nameof(au.VisibleFrom), au.VisibleFrom, "%").Blank();

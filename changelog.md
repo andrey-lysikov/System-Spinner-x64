@@ -1,9 +1,13 @@
 # Changelog
 
+## 1.7
+
+* Add lighting for Gigabyte RGB Fusion 2, MSI Mystic Light (boards from 2020), ASRock Polychrome and Nollie
+* Update Menu for lighting options
+* Reorganase config, please delete the old config.conf for recreate!
+
 ## 1.6
 
-* Add Gigabyte RGB Fusion 2, MSI Mystic Light (boards from 2020), ASRock Polychrome and Nollie lighting
-* Every controller found is lit together; the menu item is named after it: Aura, Mystic Light... Sunlight
 * Add new spinners: Football and Wheel
 * Sun and Moon now is colored
 * Bugfix
@@ -11,7 +15,7 @@
 ## 1.5
 
 * Add Aura argb controll if supported
-* Add Spinner Sun & Moon
+* Add Spinner Sun \& Moon
 * Bugfix
 
 ## 1.4
@@ -26,6 +30,7 @@
 * Redesign code classes
 
 
+
 ## 1.2
 
 * Fix the installer if it found older version
@@ -33,10 +38,12 @@
 * Optimisation
 
 
+
 ## 1.1
 
-* Rename the [AppearanceFullScreen] section to [FullScreenOverlay]
+* Rename the \[AppearanceFullScreen] section to \[FullScreenOverlay]
 * Add BlackListApplications to exclude from FullscreenOverlay
+
 
 
 ## 1.0.0

@@ -91,11 +91,9 @@ public class AuraTests
 
     [Theory]
     [InlineData("", WarnColorMode.Heat)]                                       // the default
-    [InlineData("EnableWarnColor = false\n", WarnColorMode.Off)]               // a file from before the choice
-    [InlineData("EnableWarnColor = true\n", WarnColorMode.Heat)]
-    [InlineData("EnableWarnColor = false\nWarnColorBy = Load\n", WarnColorMode.Load)]   // the new key wins
-    public void Режим_предупреждающего_цвета_читается_и_из_старого_ключа(string lines, WarnColorMode expected) =>
-        Assert.Equal(expected, ConfFormat.Read("[Hardware]\n" + lines).Warn.WarnColorBy);
+    [InlineData("WarnColorBy = Load\n", WarnColorMode.Load)]
+    public void Режим_предупреждающего_цвета_читается(string lines, WarnColorMode expected) =>
+        Assert.Equal(expected, ConfFormat.Read("[Aura]\n" + lines).Warn.WarnColorBy);
 
     [Fact]
     public void Нулевой_порог_нагрузки_выключает_оттенок() =>
@@ -309,14 +307,6 @@ public class AuraTests
         Assert.Null(SpinnerCatalog.Find("Sun"));
         for (int index = 0; index < SkyIcon.FrameCount; index++)
             Assert.NotNull(typeof(SkyIcon).Assembly.GetManifestResourceStream(SpinnerCatalog.ResourceName(SkyIcon.SunFrames, index)));
-    }
-
-    [Fact]
-    public void Выбранное_солнце_становится_солнцем_и_луной()
-    {
-        AppConfig read = ConfFormat.Read("[Spinner]\nStyle = Sun\n");
-
-        Assert.Equal("Sun & Moon", read.Spinner.Style);
     }
 
     [Theory]
