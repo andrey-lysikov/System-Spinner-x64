@@ -523,7 +523,7 @@ public sealed class ModeSupervisor : IDisposable
             {
                 if (device is null)
                 {
-                    Log.Info("lighting: no supported controller — the Aura Sunlight item stays out of the menu");
+                    Log.Info("lighting: no supported controller — the Sunlight item stays out of the menu");
                     return;
                 }
 
@@ -532,7 +532,7 @@ public sealed class ModeSupervisor : IDisposable
                 _aura = new AuraSunlight(_cfg.Aura, device);
                 if (_cfg.Aura.Enable) _aura.Enable();
 
-                _tray.ShowAura(true);
+                _tray.ShowAura(device.Technology);
             });
         });
     }

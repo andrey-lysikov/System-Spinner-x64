@@ -368,35 +368,35 @@ internal static class ConfFormat
         StatsConfig st = cfg.Stats;
         w.Section(General);
 
-        w.Note("Interface language: Auto, En, Ru, Ar, Zh, Fr, De, It or Ja (Auto).")
+        w.Note("Language: Auto, En, Ru, Ar, Zh, Fr, De, It or Ja.")
          .Value(nameof(cfg.Language), cfg.Language.ToString()).Blank();
 
-        w.Note("Poll interval, seconds (1). Less than one is refused.")
+        w.Note("Sensor poll interval, seconds, at least 1.")
          .Value("UpdateInterval", cfg.UpdateIntervalMs / Second).Blank();
 
-        w.Note("Spin the tray icon while no full-screen application is running.")
+        w.Note("Spin the tray icon outside full-screen apps.")
          .Value(nameof(cfg.SpinOnDesktop), cfg.SpinOnDesktop).Blank();
 
-        w.Note("Log the whole course of work, not only events, warnings and errors.")
+        w.Note("Verbose log: every step, not only events and errors.")
          .Value(nameof(cfg.Debug), cfg.Debug ?? false).Blank();
 
-        w.Note("Take the volume and brightness keys and show own OSD.")
+        w.Note("Own OSD for the volume and brightness keys.")
          .Value(nameof(o.AlwaysUseCustomOsd), o.AlwaysUseCustomOsd).Blank();
 
-        w.Note("Steps from zero to full for volume and brightness. With Alt held a key moves one per cent.")
+        w.Note("Key presses from zero to full volume or brightness; with Alt a press moves 1 %.")
          .Value("AdjustmentStepsOsd", o.AdjustmentSteps).Blank();
 
-        w.Note("Drive an external monitor over DDC/CI: its brightness, and its own speakers.")
+        w.Note("Brightness and speakers of an external monitor over DDC/CI.")
          .Value(nameof(o.ControlExternalBrightness), o.ControlExternalBrightness)
          .Value(nameof(o.ControlExternalVolume), o.ControlExternalVolume).Blank();
 
-        w.Note("Keys standing in for the brightness keys a keyboard has not got (Ctrl+F1/F2).")
+        w.Note("Brightness keys for a keyboard that has none.")
          .Value(nameof(o.BrightnessKeys), o.BrightnessKeys).Blank();
 
-        w.Note("Look up the external address through checkip.dyndns.org.")
+        w.Note("External IP in the status window, asked from checkip.dyndns.org.")
          .Value(nameof(st.ShowExternalAddress), st.ShowExternalAddress).Blank();
 
-        w.Note("Chart points and process rows in the status window.")
+        w.Note("Status window: chart points and process rows.")
          .Value("DetailHistoryPoints", st.HistoryPoints)
          .Value("DetailTopProcesses", st.TopProcesses);
 
@@ -405,47 +405,39 @@ internal static class ConfFormat
         WarnConfig n = cfg.Warn;
         w.Section(Hardware);
 
-        w.Note("Which GPU when there are several (0). The discrete one comes first.")
+        w.Note("GPU to watch when there are several; 0 is the discrete one.")
          .Value(nameof(cfg.GpuIndex), cfg.GpuIndex).Blank();
 
-        w.Note("CPU load.")
-         .Value(nameof(s.CpuLoad), s.CpuLoad).Blank();
-
-        w.Note("CPU temperature and power.")
+        w.Note("Sensor names for each value; the first one found is used.")
+         .Value(nameof(s.CpuLoad), s.CpuLoad)
          .Value(nameof(s.CpuTemp), s.CpuTemp)
-         .Value(nameof(s.CpuPower), s.CpuPower).Blank();
-
-        w.Note("The clock is averaged over the cores whose sensor name holds this word.")
-         .Value(nameof(s.CpuClockCores), s.CpuClockCores).Blank();
-
-        w.Note("Memory used and free — together they make the scale in the status window.")
+         .Value(nameof(s.CpuPower), s.CpuPower)
          .Value(nameof(s.MemoryUsed), s.MemoryUsed)
-         .Value(nameof(s.MemoryAvailable), s.MemoryAvailable).Blank();
-
-        w.Note("GPU: load, temperature, power, clock.")
+         .Value(nameof(s.MemoryAvailable), s.MemoryAvailable)
          .Value(nameof(s.GpuLoad), s.GpuLoad)
          .Value(nameof(s.GpuTemp), s.GpuTemp)
          .Value(nameof(s.GpuPower), s.GpuPower)
-         .Value(nameof(s.GpuClock), s.GpuClock).Blank();
-
-        w.Note("Video memory used and total.")
+         .Value(nameof(s.GpuClock), s.GpuClock)
          .Value(nameof(s.GpuMemory), s.GpuMemory)
          .Value(nameof(s.GpuMemoryTotal), s.GpuMemoryTotal).Blank();
 
-        w.Note("Fan sensors, filled in on the first run. Clear all three lists to scan again.")
+        w.Note("CPU clock: the average of the cores whose sensor name contains this.")
+         .Value(nameof(s.CpuClockCores), s.CpuClockCores).Blank();
+
+        w.Note("Fan sensors, found on the first run; clear all three to scan again.")
          .Value("CpuFan", f.Cpu)
          .Value("AioFan", f.Aio)
          .Value("GpuFan", f.Gpu).Blank();
 
-        w.Note("Your own fans — one cell each, wherever ExtraFans stands in a row below.")
+        w.Note("Extra fans: one cell each where ExtraFans stands in a panel row.")
          .Value("ExtraFan", f.Extra).Blank();
 
-        w.Note("Average the whole list instead of taking the first name found.")
+        w.Note("Average every fan in the list instead of taking the first found.")
          .Value("AverageCpuFan", f.AverageCpu)
          .Value("AverageAioFan", f.AverageAio)
          .Value("AverageGpuFan", f.AverageGpu).Blank();
 
-        w.Note("Highlighting past a threshold; zero switches one off.")
+        w.Note("Warning highlight thresholds; 0 turns one off.")
          .Value("WarnColor", n.Color)
          .Value("WarnCpuTemp", n.CpuTemp)
          .Value("WarnGpuTemp", n.GpuTemp)
@@ -455,54 +447,50 @@ internal static class ConfFormat
          .Value("WarnCpuUsage", n.CpuUsage, "%")
          .Value("WarnGpuUsage", n.GpuUsage, "%").Blank();
 
-        w.Note("Tint the Aura lighting towards a warning colour: Off; Heat, as WarnCpuTemp or",
-               "WarnGpuTemp nears; Load, as WarnCpuUsage or WarnGpuUsage nears; Max, by whichever",
-               "of the two is nearer (Heat).")
+        w.Note("What tints the lighting towards WarnColor: Off, Heat (temperatures),",
+               "Load (usage) or Max (whichever is nearer its threshold).")
          .Value(nameof(n.WarnColorBy), n.WarnColorBy.ToString());
 
         AppearanceConfig a = cfg.Appearance;
         w.Section(OverlaySection);
 
-        w.Note("The panel over a game.")
+        w.Note("The panel over full-screen games.")
          .Value(EnableKey, cfg.ShowOverlayInGames).Blank();
 
-        w.Note("Panel font — the first of these names present in the system.")
+        w.Note("Font: the first installed one from the list.")
          .Value(nameof(a.FontFamily), a.FontFamily).Blank();
 
-        w.Note("Font size, per cent of the computed one (100), from 50 to 300.")
+        w.Note("Font size, % of the automatic one, 50 to 300.")
          .Value(nameof(a.FontScalePercent), a.FontScalePercent).Blank();
 
-        w.Note("Unit labels, per cent of the values (55).")
+        w.Note("Unit labels, % of the values.")
          .Value(nameof(a.UnitSizePercent), a.UnitSizePercent).Blank();
 
-        w.Note("Offset from the top-left corner of the screen (10).")
+        w.Note("Offset from the top-left corner of the screen, pixels.")
          .Value(nameof(a.Margin), a.Margin).Blank();
 
-        w.Note("Text colour — #RRGGBB or a name such as White — and its opacity.")
+        w.Note("Text colour, #RRGGBB or a name, and its opacity.")
          .Value(nameof(a.TextColor), a.TextColor)
          .Value(nameof(a.TextOpacity), a.TextOpacity).Blank();
 
-        w.Note("Dark backdrop behind the panel (off).")
+        w.Note("Backdrop behind the panel: on or off, colour, opacity.")
          .Value(nameof(a.ShowPanel), a.ShowPanel)
          .Value(nameof(a.PanelColor), a.PanelColor)
          .Value(nameof(a.PanelOpacity), a.PanelOpacity).Blank();
 
-        w.Note("Shadow under the text (3 and 0.9), from 0 to 20. Zero switches it off.")
+        w.Note("Text shadow: blur 0 to 20, 0 is off, and opacity.")
          .Value(nameof(a.ShadowBlur), a.ShadowBlur)
          .Value(nameof(a.ShadowOpacity), a.ShadowOpacity).Blank();
 
-        w.Note("Rows of the panel, in the order shown: the tag before the colon, the values after.",
-               "An empty parameter removes a row; any value can stand in any row.",
-               "  " + string.Join(", ", Enum.GetNames<OverlayMetric>().Take(8)),
-               "  " + string.Join(", ", Enum.GetNames<OverlayMetric>().Skip(8)),
-               "ExtraFans is one cell per name in ExtraFan above.")
+        w.Note("Panel rows as \"Tag: values\"; an empty row is hidden. ExtraFans is a cell per ExtraFan.",
+               "Values: " + string.Join(", ", Enum.GetNames<OverlayMetric>()))
          .Values(RowKey, cfg.Appearance.Rows.Select(r => r.ToString())).Blank();
 
-        w.Note("Full-screen applications the panel is not shown over.")
+        w.Note("Full-screen apps the panel is never shown over.")
          .Value(nameof(a.BlackListApplications), a.BlackListApplications);
 
         // The first three keys speak for themselves; the sets and the effects are listed in the
-        // menu. The sun keys do not, and they drive the Aura lighting as well.
+        // menu. The sun keys do not, and they drive the lighting as well.
         SpinnerConfig sp = cfg.Spinner;
         w.Section(SpinnerSection);
 
@@ -510,37 +498,33 @@ internal static class ConfFormat
          .Value(nameof(sp.Effect), sp.Effect.ToString())
          .Value(nameof(sp.InvertRotation), sp.InvertRotation).Blank();
 
-        w.Note("Sun elevation in degrees for the Aura lighting: it comes up from DimAbove",
-               "and is full below FullBelow.")
+        w.Note("Sun elevation, degrees: the lighting comes up below DimAbove, full below FullBelow.")
          .Value(nameof(sp.DimAbove), sp.DimAbove)
          .Value(nameof(sp.FullBelow), sp.FullBelow);
 
         AuraConfig au = cfg.Aura;
         w.Section(AuraSection);
 
-        w.Note("Motherboard lighting on a supported controller, dark by day and up after sunset.",
-               "Switched from the Spinners menu, which offers it only when a controller is found.",
-               "The sun span is that of [Spinner]; the place comes from the IP address and the system time zone.")
+        w.Note("ARGB lighting that follows the sun: dark by day, up after sunset. Toggled in the menu.")
          .Value(nameof(au.Enable), au.Enable).Blank();
 
-        w.Note("One colour for every LED — #RRGGBB or a name such as Orange.")
+        w.Note("Colour of every LED, #RRGGBB or a name.")
          .Value(nameof(au.Color), au.Color).Blank();
 
-        w.Note("Solid, Breathing or Rainbow, and the pace of the last two from 1 to 10 (5).")
+        w.Note("Solid, Breathing or Rainbow; Speed of the last two, 1 to 10.")
          .Value(nameof(au.Effect), au.Effect.ToString())
          .Value(nameof(au.Speed), au.Speed).Blank();
 
-        w.Note("Brightness once the sun is below FullBelow (100 %).")
+        w.Note("Brightness after sunset.")
          .Value(nameof(au.Brightness), au.Brightness, "%").Blank();
 
-        w.Note("Lowest brightness the LEDs actually show; lower levels count as zero.")
+        w.Note("Below this brightness the LEDs are off.")
          .Value(nameof(au.VisibleFrom), au.VisibleFrom, "%").Blank();
 
-        w.Note("Cloud cover through Open-Meteo makes an overcast evening go dark earlier.")
+        w.Note("Go dark earlier on cloudy evenings, by Open-Meteo.")
          .Value(nameof(au.WeatherCloud), au.WeatherCloud).Blank();
 
-        w.Note("LEDs on every addressable channel of the controller (300). Longer than a controller",
-               "can address is lit up to its own limit — 120 on an Aura header.")
+        w.Note("LEDs per addressable header, capped by the controller; ASRock keeps its own count.")
          .Value(nameof(au.LedsPerChannel), au.LedsPerChannel);
 
         return w.ToString();

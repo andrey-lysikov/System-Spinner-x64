@@ -231,7 +231,7 @@ public sealed class SpinnerConfig
     }
 }
 
-// The motherboard lighting on a supported controller, driven by the sun as sunlight-flow does it.
+// The ARGB lighting on every supported controller, driven by the sun as sunlight-flow does it.
 // The thresholds of the sun come from SpinnerConfig: the Sun & Moon spinner uses DimAbove with or
 // without the lighting, and there is one sun for both.
 public sealed class AuraConfig

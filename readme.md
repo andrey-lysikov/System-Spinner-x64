@@ -25,7 +25,7 @@ This is the Windows version. If you are looking for macOS, go to [System Spinner
 - Customisable game overlay in full-screen mode
 - Localisation (English, Arabic, Chinese, French, German, Italian, Japanese, Russian)
 - Black list for some apllication in FullScreen mode
-- If motherboard has HID ARGB controll (Asus, Nollye in future), you can enable sunlight flow lighting
+- If the machine has a HID ARGB controller (ASUS Aura, Gigabyte RGB Fusion 2, MSI Mystic Light from 2020, ASRock Polychrome, Nollie), you can enable sunlight flow lighting
 
 *WARNING: the application is not officially signed, so Windows will ask you to allow it to run.*
 

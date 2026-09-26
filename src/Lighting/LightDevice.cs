@@ -2,6 +2,8 @@
 //  SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Lighting;
@@ -11,6 +13,9 @@ namespace SystemSpinnerX64.Lighting;
 // how its channels and packets are laid out stays the driver's own business.
 internal interface ILightDevice : IDisposable
 {
+    // The lighting technology, which names the menu item: Aura, RGB Fusion, Mystic Light.
+    string Technology { get; }
+
     // One line for the log: which controller, which firmware, what it drives.
     string Describe();
 
@@ -22,24 +27,31 @@ internal interface ILightDevice : IDisposable
     void Show(Rgb color);
 }
 
-// The drivers the program knows, tried in turn. A new controller is one more line in the list.
+// The drivers the program knows. Every controller they find is lit, all in the same colour: the
+// board's own headers and a hub beside it are one light. A new controller is one more line in the list.
 internal static class LightDevices
 {
     // ledsPerChannel is how many LEDs each addressable channel is taken to carry: no controller
     // can tell what is plugged into it. A driver clamps it to what its protocol allows.
-    private static readonly (string Name, Func<int, ILightDevice?> Open)[] Drivers =
+    private static readonly (string Name, Func<int, IEnumerable<ILightDevice>> Open)[] Drivers =
     {
-        ("ASUS Aura", leds => AuraDevice.Open(leds))
+        ("ASUS Aura", leds => AuraDevice.Open(leds) is { } aura ? [aura] : []),
+        ("Gigabyte RGB Fusion 2", leds => FusionDevice.Open(leds) is { } fusion ? [fusion] : []),
+        ("MSI Mystic Light", leds => MysticLightDevice.Open(leds) is { } msi ? [msi] : []),
+        ("ASRock Polychrome", _ => PolychromeDevice.Open() is { } asrock ? [asrock] : []),
+        ("Nollie", leds => NollieDevice.OpenAll(leds))
     };
 
-    // The first controller that answers, or null when the machine has none.
+    // Every controller that answers, as one; null when the machine has none.
     public static ILightDevice? Open(int ledsPerChannel)
     {
-        foreach ((string name, Func<int, ILightDevice?> open) in Drivers)
+        var found = new List<ILightDevice>();
+
+        foreach ((string name, Func<int, IEnumerable<ILightDevice>> open) in Drivers)
         {
             try
             {
-                if (open(ledsPerChannel) is { } device) return device;
+                found.AddRange(open(ledsPerChannel));
             }
             catch (Exception ex)
             {
@@ -48,6 +60,40 @@ internal static class LightDevices
             }
         }
 
-        return null;
+        return found.Count switch
+        {
+            0 => null,
+            1 => found[0],
+            _ => new LightGroup(found)
+        };
+    }
+}
+
+// Several controllers driven as one. When any of them goes away the whole group is given up and
+// looked for again, as a single controller would be.
+internal sealed class LightGroup : ILightDevice
+{
+    private readonly IReadOnlyList<ILightDevice> _devices;
+
+    public LightGroup(IReadOnlyList<ILightDevice> devices) => _devices = devices;
+
+    // "Aura + Nollie" when the board and a hub beside it are lit together.
+    public string Technology => string.Join(" + ", _devices.Select(d => d.Technology).Distinct());
+
+    public string Describe() => string.Join("; ", _devices.Select(d => d.Describe()));
+
+    public void TakeOver()
+    {
+        foreach (ILightDevice device in _devices) device.TakeOver();
+    }
+
+    public void Show(Rgb color)
+    {
+        foreach (ILightDevice device in _devices) device.Show(color);
+    }
+
+    public void Dispose()
+    {
+        foreach (ILightDevice device in _devices) device.Dispose();
     }
 }

@@ -2,6 +2,8 @@
 
 ## 1.6
 
+* Add Gigabyte RGB Fusion 2, MSI Mystic Light (boards from 2020), ASRock Polychrome and Nollie lighting
+* Every controller found is lit together; the menu item is named after it: Aura, Mystic Light... Sunlight
 * Add new spinners: Football and Wheel
 * Sun and Moon now is colored
 * Bugfix

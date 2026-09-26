@@ -124,6 +124,9 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _overlayItem;
     private readonly ToolStripMenuItem _auraItem;
 
+    // What the lighting item is named after, once the controller is known.
+    private string _lightName = "Aura";
+
     private readonly Icon _fallbackIcon;
 
     public event Action? StatsRequested;
@@ -146,7 +149,7 @@ public sealed class TrayIcon : IDisposable
         _alwaysOsdItem = Check(Text.MenuAlwaysCustomOsd, _cfg.Osd.AlwaysUseCustomOsd);
         _invertItem = Check(Text.MenuInvertRotation, _cfg.Spinner.InvertRotation);
         _overlayItem = Check(Text.MenuOverlay, _cfg.ShowOverlayInGames);
-        _auraItem = Check(Text.MenuAuraSunlight, _cfg.Aura.Enable);
+        _auraItem = Check(Text.MenuSunlight(_lightName), _cfg.Aura.Enable);
         _auraItem.Visible = false;
 
         // A plain drop-down rather than a menu one: a menu keeps a check-mark strip on the left and
@@ -302,7 +305,7 @@ public sealed class TrayIcon : IDisposable
         _alwaysOsdItem.Text = Text.MenuAlwaysCustomOsd;
         _invertItem.Text = Text.MenuInvertRotation;
         _overlayItem.Text = Text.MenuOverlay;
-        _auraItem.Text = Text.MenuAuraSunlight;
+        _auraItem.Text = Text.MenuSunlight(_lightName);
 
         // The config and the log open in a text editor rather than whatever the shell picks:
         // .conf and .log may have no association, and a click would offer "choose a program".
@@ -455,7 +458,13 @@ public sealed class TrayIcon : IDisposable
 
     // The lighting item is there from the start but hidden: whether the machine has a controller
     // is known only after the startup has looked.
-    public void ShowAura(bool available) => _auraItem.Visible = available;
+    // The technology names the item: Aura, RGB Fusion, Mystic Light, Polychrome, Nollie.
+    public void ShowAura(string technology)
+    {
+        _lightName = technology;
+        _auraItem.Text = Text.MenuSunlight(technology);
+        _auraItem.Visible = true;
+    }
 
     // Under the lighting switch: the palette, and the effect below it. A click on the item itself
     // still ticks it on and off; pointing at it opens this.

@@ -5,10 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Win32.SafeHandles;
 using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Lighting;
@@ -78,15 +76,15 @@ internal sealed class AuraDevice : ILightDevice
     // every addressable header is driven with, up to what the protocol can address.
     public static AuraDevice? Open(int ledsPerChannel)
     {
-        foreach (string path in HidPaths())
+        foreach (string path in Hid.Paths())
         {
-            if (!path.Contains($"vid_{AsusVendor:x4}", StringComparison.OrdinalIgnoreCase)) continue;
-            if (UsagePage(path) != AuraUsagePage) continue;
+            if (!Hid.Is(path, AsusVendor)) continue;
+            if (Hid.Caps(path)?.UsagePage != AuraUsagePage) continue;
 
             FileStream? stream = null;
             try
             {
-                stream = OpenStream(path);
+                stream = Hid.Open(path);
 
                 byte[]? firmware = Query(stream, CmdFirmware);
                 byte[]? table = Query(stream, CmdConfigTable);
@@ -128,6 +126,8 @@ internal sealed class AuraDevice : ILightDevice
 
         return zones;
     }
+
+    public string Technology => "Aura";
 
     public string Describe() =>
         $"{Firmware}: " + string.Join(", ", Zones.Select(z => $"{z.Name} {z.LedCount} LEDs"));
@@ -199,135 +199,4 @@ internal sealed class AuraDevice : ILightDevice
     }
 
     public void Dispose() => _stream.Dispose();
-
-    // --- HID plumbing ---
-
-    [DllImport("hid.dll")]
-    private static extern void HidD_GetHidGuid(out Guid guid);
-
-    [DllImport("hid.dll", SetLastError = true)]
-    private static extern bool HidD_GetPreparsedData(SafeFileHandle device, out IntPtr preparsed);
-
-    [DllImport("hid.dll")]
-    private static extern bool HidD_FreePreparsedData(IntPtr preparsed);
-
-    [DllImport("hid.dll")]
-    private static extern int HidP_GetCaps(IntPtr preparsed, out HidCaps caps);
-
-    [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, IntPtr enumerator, IntPtr parent, int flags);
-
-    [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern bool SetupDiEnumDeviceInterfaces(IntPtr set, IntPtr info, ref Guid classGuid,
-                                                           int index, ref InterfaceData data);
-
-    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr set, ref InterfaceData data, IntPtr detail,
-                                                               int size, out int required, IntPtr info);
-
-    [DllImport("setupapi.dll")]
-    private static extern bool SetupDiDestroyDeviceInfoList(IntPtr set);
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security,
-                                                    uint disposition, uint flags, IntPtr template);
-
-    private const int DigcfPresent = 0x02;
-    private const int DigcfDeviceInterface = 0x10;
-    private const uint GenericRead = 0x80000000;
-    private const uint GenericWrite = 0x40000000;
-    private const uint ShareReadWrite = 0x03;
-    private const uint OpenExisting = 3;
-    private const uint FlagOverlapped = 0x40000000;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct InterfaceData
-    {
-        public int Size;
-        public Guid ClassGuid;
-        public int Flags;
-        public IntPtr Reserved;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct HidCaps
-    {
-        public ushort Usage;
-        public ushort UsagePage;
-        public ushort InputReportByteLength;
-        public ushort OutputReportByteLength;
-        public ushort FeatureReportByteLength;
-
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 27)]
-        public ushort[] Rest;
-    }
-
-    private static List<string> HidPaths()
-    {
-        var paths = new List<string>();
-        HidD_GetHidGuid(out Guid hid);
-
-        IntPtr set = SetupDiGetClassDevs(ref hid, IntPtr.Zero, IntPtr.Zero, DigcfPresent | DigcfDeviceInterface);
-        if (set == new IntPtr(-1)) return paths;
-
-        try
-        {
-            for (int index = 0; ; index++)
-            {
-                var data = new InterfaceData { Size = Marshal.SizeOf<InterfaceData>() };
-                if (!SetupDiEnumDeviceInterfaces(set, IntPtr.Zero, ref hid, index, ref data)) break;
-
-                SetupDiGetDeviceInterfaceDetail(set, ref data, IntPtr.Zero, 0, out int required, IntPtr.Zero);
-                if (required <= 0) continue;
-
-                IntPtr detail = Marshal.AllocHGlobal(required);
-                try
-                {
-                    // cbSize of SP_DEVICE_INTERFACE_DETAIL_DATA_W on x64: the DWORD and one WCHAR, padded.
-                    Marshal.WriteInt32(detail, 8);
-                    if (SetupDiGetDeviceInterfaceDetail(set, ref data, detail, required, out _, IntPtr.Zero))
-                        paths.Add(Marshal.PtrToStringUni(detail + 4) ?? "");
-                }
-                finally
-                {
-                    Marshal.FreeHGlobal(detail);
-                }
-            }
-        }
-        finally
-        {
-            SetupDiDestroyDeviceInfoList(set);
-        }
-
-        return paths;
-    }
-
-    // Asked with no access at all: that works on interfaces somebody else holds open exclusively.
-    private static ushort UsagePage(string path)
-    {
-        using SafeFileHandle handle = CreateFile(path, 0, ShareReadWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
-        if (handle.IsInvalid) return 0;
-
-        if (!HidD_GetPreparsedData(handle, out IntPtr preparsed)) return 0;
-        try
-        {
-            HidP_GetCaps(preparsed, out HidCaps caps);
-            return caps.UsagePage;
-        }
-        finally
-        {
-            HidD_FreePreparsedData(preparsed);
-        }
-    }
-
-    // Overlapped, so a reply that never comes can be waited for with a timeout.
-    private static FileStream OpenStream(string path)
-    {
-        SafeFileHandle handle = CreateFile(path, GenericRead | GenericWrite, ShareReadWrite, IntPtr.Zero,
-                                           OpenExisting, FlagOverlapped, IntPtr.Zero);
-        if (handle.IsInvalid)
-            throw new IOException($"the device would not open (error {Marshal.GetLastWin32Error()})");
-
-        return new FileStream(handle, FileAccess.ReadWrite, bufferSize: 0, isAsync: true);
-    }
 }

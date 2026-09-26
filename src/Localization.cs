@@ -93,7 +93,8 @@ internal static class Text
         "Spinners", "Spinners", "Spinners", "Spinners");
 
     // A name, not a phrase: the tick in front of it says whether it is on, in every language.
-    public static string MenuAuraSunlight => "Aura Sunlight";
+    // Named after the lighting technology of the controller found: Aura Sunlight, Mystic Light Sunlight.
+    public static string MenuSunlight(string technology) => $"{technology} Sunlight";
 
     // Above the palette: the colour picked there is the base one, the warning colours for heat are
     // worked out from it.
@@ -129,7 +130,7 @@ internal static class Text
         "Maximum", "Максимуму", "الأقصى", "最大值",
         "Maximum", "Maximum", "Massimo", "最大値");
 
-    // The lighting effects under Aura Sunlight.
+    // The lighting effects under the Sunlight item.
     public static string AuraSolid => S(
         "Solid", "Постоянный", "ثابت", "常亮",
         "Fixe", "Statisch", "Fisso", "点灯");
