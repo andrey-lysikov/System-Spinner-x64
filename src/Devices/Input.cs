@@ -685,6 +685,75 @@ internal sealed class MediaKeyMonitor : IDisposable
     private const int VkVolumeDown = 0xAE;
     private const int VkVolumeUp = 0xAF;
 
+    private const int VkMenu = 0x12;
+
+    // Unassigned: no application acts on it, which is all that is asked of it.
+    private const ushort VkNone = 0xFF;
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardInput
+    {
+        public uint type;
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+
+        // INPUT is a union over the mouse input, the largest member: padded out to its size.
+        private readonly long _pad1;
+        private readonly long _pad2;
+    }
+
+    private const uint InputKeyboard = 1;
+    private const uint KeyEventFKeyUp = 0x0002;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, KeyboardInput[] inputs, int size);
+
+    // Alt held with a volume or brightness key: the step is the finest there is. Read at the press,
+    // whichever way it came — the hook, the raw input or the stand-in combination.
+    public static bool AltHeld => (GetAsyncKeyState(VkMenu) & 0x8000) != 0;
+
+    // Alt pressed and let go with nothing in between, as far as the window in front can tell,
+    // opens its menu bar — the key we took never reached it. A key no one acts on, sent in
+    // between, makes it an Alt combination like any other.
+    private static void KeepMenuShut()
+    {
+        KeyboardInput[] inputs =
+        {
+            new() { type = InputKeyboard, wVk = VkNone },
+            new() { type = InputKeyboard, wVk = VkNone, dwFlags = KeyEventFKeyUp }
+        };
+
+        if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<KeyboardInput>()) != inputs.Length)
+            Log.Info($"the Alt menu was not kept shut, error {Marshal.GetLastWin32Error()}");
+    }
+
+    // Every way a key comes in ends here. An exception from the handler must not escape: from the
+    // hook it would kill the hook, and the keys would stop working entirely.
+    private MediaKeyResult Dispatch(MediaKey key)
+    {
+        bool alt = AltHeld;
+        MediaKeyResult result;
+
+        try
+        {
+            result = Handler?.Invoke(key) ?? MediaKeyResult.PassThrough;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"handling the {key} key failed", ex);
+            result = MediaKeyResult.PassThrough;
+        }
+
+        if (alt && result == MediaKeyResult.Consumed) KeepMenuShut();
+        return result;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct KbdLlHookStruct
     {
@@ -787,7 +856,13 @@ internal sealed class MediaKeyMonitor : IDisposable
     private const int HotKeyDown = 1;
     private const int HotKeyUp = 2;
 
+    // The same pair with Alt added, for the finest step: a hot key answers only to exactly the
+    // modifiers it was registered with.
+    private const int FineHotKeyDown = 3;
+    private const int FineHotKeyUp = 4;
+
     private bool _hotKeys;
+    private bool _fineHotKeys;
 
     // Told once, when the keyboard turns out to have brightness keys of its own after all.
     public Action? NativeKeysSeen { get; set; }
@@ -815,6 +890,22 @@ internal sealed class MediaKeyMonitor : IDisposable
         }
 
         _hotKeys = true;
+
+        // Only a nicety: taken by something else, the pair still works at the usual step. A pair
+        // that has Alt already has no finer variant.
+        if ((spec.Modifiers & HotKeySpec.ModAlt) == 0)
+        {
+            uint fine = modifiers | HotKeySpec.ModAlt;
+
+            if (RegisterHotKey(window, FineHotKeyDown, fine, (uint)spec.DownKey))
+            {
+                if (RegisterHotKey(window, FineHotKeyUp, fine, (uint)spec.UpKey)) _fineHotKeys = true;
+                else UnregisterHotKey(window, FineHotKeyDown);
+            }
+
+            if (!_fineHotKeys) Log.Info($"Alt+{spec.Describe} is taken by something else — no fine step on it");
+        }
+
         return true;
     }
 
@@ -828,6 +919,13 @@ internal sealed class MediaKeyMonitor : IDisposable
         UnregisterHotKey(window, HotKeyDown);
         UnregisterHotKey(window, HotKeyUp);
         _hotKeys = false;
+
+        if (_fineHotKeys)
+        {
+            UnregisterHotKey(window, FineHotKeyDown);
+            UnregisterHotKey(window, FineHotKeyUp);
+            _fineHotKeys = false;
+        }
     }
 
     private IntPtr OnKey(int code, IntPtr wParam, IntPtr lParam)
@@ -851,17 +949,7 @@ internal sealed class MediaKeyMonitor : IDisposable
 
         // The hook runs on the thread pumping the message queue — ours. The handling happens right
         // here: Windows waits for the return and there is no going to another thread.
-        MediaKeyResult result;
-        try
-        {
-            result = Handler?.Invoke(key) ?? MediaKeyResult.PassThrough;
-        }
-        catch (Exception ex)
-        {
-            // An exception from here would kill the hook and the keys would stop working entirely.
-            Log.Error($"handling the {key} key failed", ex);
-            result = MediaKeyResult.PassThrough;
-        }
+        MediaKeyResult result = Dispatch(key);
 
         // A non-zero answer is what "do not pass it on" means — without it the system panel appears.
         return result == MediaKeyResult.PassThrough
@@ -897,8 +985,7 @@ internal sealed class MediaKeyMonitor : IDisposable
                 NativeKeysSeen?.Invoke();
             }
 
-            try { Handler?.Invoke(key.Value); }
-            catch (Exception ex) { Log.Error($"handling the {key} key failed", ex); }
+            Dispatch(key.Value);
         }
     }
 
@@ -906,12 +993,11 @@ internal sealed class MediaKeyMonitor : IDisposable
     {
         if (msg == WmInput) OnRawInput(lParam);
 
-        if (msg == WmHotKey && (int)wParam is HotKeyDown or HotKeyUp)
+        if (msg == WmHotKey && (int)wParam is HotKeyDown or HotKeyUp or FineHotKeyDown or FineHotKeyUp)
         {
-            MediaKey key = (int)wParam == HotKeyUp ? MediaKey.BrightnessUp : MediaKey.BrightnessDown;
+            MediaKey key = (int)wParam is HotKeyUp or FineHotKeyUp ? MediaKey.BrightnessUp : MediaKey.BrightnessDown;
 
-            try { Handler?.Invoke(key); }
-            catch (Exception ex) { Log.Error($"handling the {key} key failed", ex); }
+            Dispatch(key);
         }
 
         // Never marked as handled: raw input is a copy of the press, and stopping the message here

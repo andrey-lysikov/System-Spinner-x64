@@ -271,7 +271,9 @@ internal static class ConfFormat
 
         WarnConfig n = cfg.Warn;
         n.Color = file.Text(Hardware, "WarnColor") ?? n.Color;
-        n.EnableWarnColor = file.Flag(Hardware, nameof(n.EnableWarnColor)) ?? n.EnableWarnColor;
+        // A file from before the choice had only the switch: switched off, it still means off.
+        if (file.Flag(Hardware, "EnableWarnColor") == false) n.WarnColorBy = WarnColorMode.Off;
+        n.WarnColorBy = file.Choice<WarnColorMode>(Hardware, nameof(n.WarnColorBy)) ?? n.WarnColorBy;
         n.CpuTemp = file.Number(Hardware, "WarnCpuTemp") ?? n.CpuTemp;
         n.GpuTemp = file.Number(Hardware, "WarnGpuTemp") ?? n.GpuTemp;
         n.SysMem = file.Percent(Hardware, "WarnSysMem") ?? n.SysMem;
@@ -381,7 +383,7 @@ internal static class ConfFormat
         w.Note("Take the volume and brightness keys and show own OSD.")
          .Value(nameof(o.AlwaysUseCustomOsd), o.AlwaysUseCustomOsd).Blank();
 
-        w.Note("Steps from zero to full for volume and brightness.")
+        w.Note("Steps from zero to full for volume and brightness. With Alt held a key moves one per cent.")
          .Value("AdjustmentStepsOsd", o.AdjustmentSteps).Blank();
 
         w.Note("Drive an external monitor over DDC/CI: its brightness, and its own speakers.")
@@ -453,8 +455,10 @@ internal static class ConfFormat
          .Value("WarnCpuUsage", n.CpuUsage, "%")
          .Value("WarnGpuUsage", n.GpuUsage, "%").Blank();
 
-        w.Note("Tint the Aura lighting towards a warning colour as WarnCpuTemp or WarnGpuTemp nears.")
-         .Value(nameof(n.EnableWarnColor), n.EnableWarnColor);
+        w.Note("Tint the Aura lighting towards a warning colour: Off; Heat, as WarnCpuTemp or",
+               "WarnGpuTemp nears; Load, as WarnCpuUsage or WarnGpuUsage nears; Max, by whichever",
+               "of the two is nearer (Heat).")
+         .Value(nameof(n.WarnColorBy), n.WarnColorBy.ToString());
 
         AppearanceConfig a = cfg.Appearance;
         w.Section(OverlaySection);

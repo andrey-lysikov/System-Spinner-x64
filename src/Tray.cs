@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -121,8 +120,6 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _autoStartItem;
     private readonly ToolStripMenuItem _displaysItem;
     private readonly ToolStripMenuItem _alwaysOsdItem;
-    private readonly ToolStripMenuItem _languageItem;
-    private readonly ToolStripMenuItem _externalAddressItem;
     private readonly ToolStripMenuItem _invertItem;
     private readonly ToolStripMenuItem _overlayItem;
     private readonly ToolStripMenuItem _auraItem;
@@ -132,9 +129,7 @@ public sealed class TrayIcon : IDisposable
     public event Action? StatsRequested;
     public event Action<bool>? AutoStartToggled;
     public event Action? SpinnerChanged;
-    public event Action? IntervalChanged;
     public event Action? OsdChanged;
-    public event Action? LanguageChanged;
     public event Action? OverlayChanged;
     public event Action<bool>? AuraToggled;
     public event Action? AuraLookChanged;
@@ -149,8 +144,6 @@ public sealed class TrayIcon : IDisposable
 
         _autoStartItem = Check(Text.MenuAutoStart, false);
         _alwaysOsdItem = Check(Text.MenuAlwaysCustomOsd, _cfg.Osd.AlwaysUseCustomOsd);
-        _languageItem = Check(Text.MenuSystemLanguage, _cfg.Language == Language.Auto);
-        _externalAddressItem = Check(Text.MenuExternalAddress, _cfg.Stats.ShowExternalAddress);
         _invertItem = Check(Text.MenuInvertRotation, _cfg.Spinner.InvertRotation);
         _overlayItem = Check(Text.MenuOverlay, _cfg.ShowOverlayInGames);
         _auraItem = Check(Text.MenuAuraSunlight, _cfg.Aura.Enable);
@@ -278,22 +271,6 @@ public sealed class TrayIcon : IDisposable
             OsdChanged?.Invoke();
         };
 
-        _languageItem.CheckedChanged += (_, _) =>
-        {
-            // Unticked means English, as in the macOS version: that switch chooses between the
-            // system language and English rather than between every language at once.
-            _cfg.Language = _languageItem.Checked ? Language.Auto : Language.En;
-            Text.Use(_cfg.Language);
-            Save();
-            LanguageChanged?.Invoke();
-        };
-
-        _externalAddressItem.CheckedChanged += (_, _) =>
-        {
-            _cfg.Stats.ShowExternalAddress = _externalAddressItem.Checked;
-            Save();
-        };
-
         _invertItem.CheckedChanged += (_, _) =>
         {
             _cfg.Spinner.InvertRotation = _invertItem.Checked;
@@ -323,8 +300,6 @@ public sealed class TrayIcon : IDisposable
         _autoStartItem.Text = Text.MenuAutoStart;
         _displaysItem.Text = Text.MenuDisplays;
         _alwaysOsdItem.Text = Text.MenuAlwaysCustomOsd;
-        _languageItem.Text = Text.MenuSystemLanguage;
-        _externalAddressItem.Text = Text.MenuExternalAddress;
         _invertItem.Text = Text.MenuInvertRotation;
         _overlayItem.Text = Text.MenuOverlay;
         _auraItem.Text = Text.MenuAuraSunlight;
@@ -357,16 +332,12 @@ public sealed class TrayIcon : IDisposable
         {
             _overlayItem,
             _autoStartItem,
-            _languageItem,
-            _externalAddressItem,
             _auraItem,
             new ToolStripSeparator(),
             _displaysItem,
-            StepsMenu(),
             _alwaysOsdItem,
             new ToolStripSeparator(),
             SpinnersMenu(),
-            IntervalsMenu(),
             EffectsMenu(),
             _invertItem,
             new ToolStripSeparator(),
@@ -493,9 +464,9 @@ public sealed class TrayIcon : IDisposable
         foreach (ToolStripItem old in _auraItem.DropDownItems.Cast<ToolStripItem>().ToList()) old.Dispose();
         _auraItem.DropDownItems.Clear();
 
-        // The caption goes in before the host is made: it decides the palette's size. The font is
-        // the menu's own, taken once the palette is in it.
-        var palette = new PaletteControl { Title = Text.AuraBaseColor };
+        // The captions are labels of the menu's own rather than text the palette and the slider
+        // draw: the menu draws them in its font at its scale, as it draws every other item.
+        var palette = new PaletteControl();
         if (Rgb.TryParse(_cfg.Aura.Color, out Rgb current)) palette.Selected = current;
 
         palette.Picked += color =>
@@ -508,70 +479,103 @@ public sealed class TrayIcon : IDisposable
             _menu.Close();
         };
 
+        _auraItem.DropDownItems.Add(Caption(Text.AuraBaseColor));
         _auraItem.DropDownItems.Add(new MenuHost(palette));
         _auraItem.DropDownItems.Add(new ToolStripSeparator());
 
-        (AuraEffect Effect, string Title)[] effects =
+        AddChoices(new[]
         {
             (AuraEffect.Solid, Text.AuraSolid),
             (AuraEffect.Breathing, Text.AuraBreathing),
             (AuraEffect.Rainbow, Text.AuraRainbow)
-        };
-
-        var items = new List<(ToolStripMenuItem Item, AuraEffect Effect, string Title)>();
-
-        void Mark()
+        }, () => _cfg.Aura.Effect, effect =>
         {
-            foreach ((ToolStripMenuItem item, AuraEffect effect, string title) in items)
-                item.Text = (_cfg.Aura.Effect == effect ? "●  " : "○  ") + title;
-        }
-
-        foreach ((AuraEffect effect, string title) in effects)
-        {
-            // A menu drop-down lines its items up on the left by itself; a plain one centres them.
-            var item = new ToolStripMenuItem(title) { TextAlign = ContentAlignment.MiddleLeft };
-
-            item.Click += (_, _) =>
-            {
-                _cfg.Aura.Effect = effect;
-                Mark();
-                Save();
-                AuraLookChanged?.Invoke();
-            };
-
-            items.Add((item, effect, title));
-            _auraItem.DropDownItems.Add(item);
-        }
-
-        Mark();
+            _cfg.Aura.Effect = effect;
+            Save();
+            AuraLookChanged?.Invoke();
+        });
 
         // The ceiling the sun brings the light up to. The light follows the thumb as it moves; the
         // file is written once, when it is let go.
-        var slider = new BrightnessSlider
-        {
-            Title = Text.AuraMaxBrightness,
-            Value = (int)Math.Round(_cfg.Aura.Brightness)
-        };
+        var slider = new BrightnessSlider { Value = (int)Math.Round(_cfg.Aura.Brightness) };
 
-        // As wide as the palette, now and after the palette refits for a new font or scale.
+        // The value rides in the caption, and follows the thumb.
+        ToolStripLabel brightness = Caption("");
+        void ShowBrightness(int value) => brightness.Text = $"{Text.AuraMaxBrightness}: {value} %";
+        ShowBrightness(slider.Value);
+
+        // As wide as the palette, now and after the palette refits for a new scale.
         slider.FitWidth(palette.Width);
         palette.SizeChanged += (_, _) => slider.FitWidth(palette.Width);
 
         slider.ValueChanging += value =>
         {
             _cfg.Aura.Brightness = value;
+            ShowBrightness(value);
             AuraBrightnessChanged?.Invoke();
         };
 
         slider.ValueCommitted += value =>
         {
             _cfg.Aura.Brightness = value;
+            ShowBrightness(value);
             Save();
             AuraBrightnessChanged?.Invoke();
         };
 
         _auraItem.DropDownItems.Add(new ToolStripSeparator());
+        _auraItem.DropDownItems.Add(brightness);
         _auraItem.DropDownItems.Add(new MenuHost(slider));
+
+        // What drifts the colour towards the warning one. Read with the next sensor poll; nothing
+        // else has to be told.
+        _auraItem.DropDownItems.Add(new ToolStripSeparator());
+        _auraItem.DropDownItems.Add(Caption(Text.AuraWarnColorBy));
+
+        AddChoices(new[]
+        {
+            (WarnColorMode.Off, Text.AuraWarnOff),
+            (WarnColorMode.Heat, Text.AuraWarnHeat),
+            (WarnColorMode.Load, Text.AuraWarnLoad),
+            (WarnColorMode.Max, Text.AuraWarnMax)
+        }, () => _cfg.Warn.WarnColorBy, mode =>
+        {
+            _cfg.Warn.WarnColorBy = mode;
+            Save();
+        });
+    }
+
+    // A heading under the lighting switch. Lined up on the left, as the items under it are.
+    private static ToolStripLabel Caption(string text) => new(text) { TextAlign = ContentAlignment.MiddleLeft };
+
+    // One of several, under the lighting switch. The drop-down there has no check-mark strip, so
+    // the choice made carries its mark in its text.
+    private void AddChoices<T>((T Value, string Title)[] choices, Func<T> current, Action<T> pick)
+    {
+        var items = new List<(ToolStripMenuItem Item, T Value, string Title)>();
+
+        void Mark()
+        {
+            foreach ((ToolStripMenuItem item, T value, string title) in items)
+                item.Text = (EqualityComparer<T>.Default.Equals(current(), value) ? "●  " : "○  ") + title;
+        }
+
+        foreach ((T value, string title) in choices)
+        {
+            // A menu drop-down lines its items up on the left by itself; a plain one centres them.
+            var item = new ToolStripMenuItem(title) { TextAlign = ContentAlignment.MiddleLeft };
+
+            item.Click += (_, _) =>
+            {
+                pick(value);
+                Mark();
+            };
+
+            items.Add((item, value, title));
+            _auraItem.DropDownItems.Add(item);
+        }
+
+        Mark();
     }
 
     // The first frame of a set next to its name: "Delay" does not tell you what it looks like.
@@ -642,64 +646,6 @@ public sealed class TrayIcon : IDisposable
 
         if (_effectsItem is not null) _effectsItem.Enabled = style.SupportsEffect;
         _invertItem.Enabled = style.FrameCount > 1;
-    }
-
-    private ToolStripMenuItem IntervalsMenu()
-    {
-        var root = new ToolStripMenuItem(Text.MenuUpdateInterval);
-
-        foreach (int milliseconds in AppParameters.Menu.Intervals)
-        {
-            var item = new ToolStripMenuItem(Text.Seconds(milliseconds / 1000.0))
-            {
-                Checked = _cfg.UpdateIntervalMs == milliseconds
-            };
-
-            item.Click += (_, _) =>
-            {
-                SelectOne(root, item);
-                _cfg.UpdateIntervalMs = milliseconds;
-                Save();
-                IntervalChanged?.Invoke();
-            };
-
-            root.DropDownItems.Add(item);
-        }
-
-        return root;
-    }
-
-    private ToolStripMenuItem StepsMenu()
-    {
-        var root = new ToolStripMenuItem(Text.MenuAdjustmentSteps);
-
-        foreach (int steps in AppParameters.Menu.Steps)
-        {
-            var item = new ToolStripMenuItem(steps.ToString(CultureInfo.InvariantCulture))
-            {
-                Checked = _cfg.Osd.AdjustmentSteps == steps
-            };
-
-            item.Click += (_, _) =>
-            {
-                SelectOne(root, item);
-                _cfg.Osd.AdjustmentSteps = steps;
-                Save();
-                OsdChanged?.Invoke();
-            };
-
-            root.DropDownItems.Add(item);
-        }
-
-        return root;
-    }
-
-    // Rebuilds the menu in another language.
-    public void Rebuild()
-    {
-        BuildMenu();
-        ApplyTheme();
-        ShowAutoStart(Startup.AutoStart.IsEnabled());
     }
 
     // The renderer the menu was last painted with. The submenu of screens is filled
@@ -824,7 +770,7 @@ public sealed class TrayIcon : IDisposable
     {
         var permanent = new HashSet<ToolStripItem>
         {
-            _overlayItem, _autoStartItem, _languageItem, _externalAddressItem, _auraItem,
+            _overlayItem, _autoStartItem, _auraItem,
             _displaysItem, _alwaysOsdItem, _invertItem
         };
 

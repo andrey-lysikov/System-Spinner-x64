@@ -80,6 +80,28 @@ public class AuraTests
         Assert.Equal(0.0, WarnHeat.Of(120, 0, 120, 0));
 
     [Theory]
+    [InlineData(null, null, 0.0)]
+    [InlineData(50.0, 60.0, 0.0)]    // an ordinary desktop load leaves the colour alone
+    [InlineData(75.0, null, 0.0)]    // where the colour starts to move: 95 - 20
+    [InlineData(85.0, 10.0, 0.5)]
+    [InlineData(10.0, 85.0, 0.5)]    // the busier of the two, whichever it is
+    [InlineData(20.0, 99.0, 1.0)]
+    public void Оттенок_по_нагрузке_берётся_по_самому_загруженному(double? cpu, double? gpu, double expected) =>
+        Assert.Equal(expected, WarnHeat.OfLoad(cpu, 95, gpu, 95), 3);
+
+    [Theory]
+    [InlineData("", WarnColorMode.Heat)]                                       // the default
+    [InlineData("EnableWarnColor = false\n", WarnColorMode.Off)]               // a file from before the choice
+    [InlineData("EnableWarnColor = true\n", WarnColorMode.Heat)]
+    [InlineData("EnableWarnColor = false\nWarnColorBy = Load\n", WarnColorMode.Load)]   // the new key wins
+    public void Режим_предупреждающего_цвета_читается_и_из_старого_ключа(string lines, WarnColorMode expected) =>
+        Assert.Equal(expected, ConfFormat.Read("[Hardware]\n" + lines).Warn.WarnColorBy);
+
+    [Fact]
+    public void Нулевой_порог_нагрузки_выключает_оттенок() =>
+        Assert.Equal(0.0, WarnHeat.OfLoad(100, 0, 100, 0));
+
+    [Theory]
     [InlineData(0x0078FF, 0xFF3000)]   // blue       -> red
     [InlineData(0x00FF00, 0xFF8000)]   // green      -> orange
     [InlineData(0xFF0000, 0xFFD000)]   // red        -> yellow
@@ -122,13 +144,13 @@ public class AuraTests
     }
 
     [Theory]
-    [InlineData("Основной цвет", "●  Постоянный")]
-    [InlineData("Couleur principale", "○  Arc-en-ciel")]     // the longest caption and label there are
-    public void Палитра_стоит_в_подменю_с_равными_полями(string title, string effect)
+    [InlineData("Основной цвет", "●  Постоянный", "Максимальная яркость: 100 %")]
+    [InlineData("Couleur principale", "○  Arc-en-ciel", "Luminosité maximale: 100 %")]   // the longest there are
+    public void Палитра_стоит_в_подменю_с_равными_полями(string title, string effect, string brightness)
     {
         // Built as the tray builds it. A menu drop-down would keep a check-mark strip on the left
         // and an arrow strip on the right, empty round the palette; a plain one frames it evenly.
-        var palette = new Lighting.PaletteControl { Title = title };
+        var palette = new Lighting.PaletteControl();
 
         using var drop = new System.Windows.Forms.ToolStripDropDown
         {
@@ -136,15 +158,18 @@ public class AuraTests
             Padding = new System.Windows.Forms.Padding(8, 4, 8, 4)
         };
 
-        var slider = new Lighting.BrightnessSlider { Title = "Luminosité maximale", Value = 80 };
+        var slider = new Lighting.BrightnessSlider { Value = 100 };
         slider.FitWidth(palette.Width);
 
+        // The captions are the menu's own labels, and none of them may be wider than the palette.
         var host = new Lighting.MenuHost(palette);
         var sliderHost = new Lighting.MenuHost(slider);
+        drop.Items.Add(new System.Windows.Forms.ToolStripLabel(title));
         drop.Items.Add(host);
         drop.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         drop.Items.Add(new System.Windows.Forms.ToolStripMenuItem(effect));
         drop.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        drop.Items.Add(new System.Windows.Forms.ToolStripLabel(brightness));
         drop.Items.Add(sliderHost);
 
         drop.PerformLayout();
@@ -215,7 +240,7 @@ public class AuraTests
     {
         var written = new AppConfig
         {
-            Warn = { EnableWarnColor = false },
+            Warn = { WarnColorBy = WarnColorMode.Max },
             Spinner = { Style = "Sun & Moon", DimAbove = 6, FullBelow = -3 },
             Aura =
             {
@@ -226,7 +251,7 @@ public class AuraTests
 
         AppConfig read = ConfFormat.Read(ConfFormat.Write(written));
 
-        Assert.False(read.Warn.EnableWarnColor);
+        Assert.Equal(WarnColorMode.Max, read.Warn.WarnColorBy);
         Assert.Equal("Sun & Moon", read.Spinner.Style);   // "&" in the name survives
         Assert.Equal(6, read.Spinner.DimAbove);
         Assert.Equal(-3, read.Spinner.FullBelow);

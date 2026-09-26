@@ -143,16 +143,6 @@ internal static class AppParameters
         public const double MaxShownFps = 999;
     }
 
-    // What the tray menu offers.
-    internal static class Menu
-    {
-        // Poll periods in the menu, milliseconds. The shortest is the floor the poll allows.
-        public static readonly int[] Intervals = { Polling.MinIntervalMs, 1500, 2000, 3000 };
-
-        // Adjustment step counts — the same four as the macOS version.
-        public static readonly int[] Steps = { 8, 16, 24, 32 };
-    }
-
     // The tray animation and the frames it is built from.
     internal static class Spinning
     {
@@ -210,6 +200,10 @@ internal static class AppParameters
 
         // How far below WarnCpuTemp and WarnGpuTemp the colour starts to move, degrees.
         public const double WarnRampDegrees = 15;
+
+        // How far below WarnCpuUsage and WarnGpuUsage the colour starts to move, per cent: at the
+        // default 95 from three quarters load up, so a light desktop load leaves it alone.
+        public const double WarnRampLoad = 20;
 
         // How far a blood-moon pulse dips at its lowest. A third reads as breathing.
         public const double PulseDepth = 1.0 / 3.0;

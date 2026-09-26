@@ -9,6 +9,16 @@ namespace SystemSpinnerX64.Tests;
 public class MediaKeyRulesTests
 {
     [Theory]
+    [InlineData(50.0, true, 6.25, 56.25)]    // 16 steps, from the grid
+    [InlineData(53.0, true, 6.25, 56.25)]    // off the grid: the press puts it back on first
+    [InlineData(50.0, true, 1.0, 51.0)]      // Alt held: one per cent
+    [InlineData(53.4, false, 1.0, 52.0)]
+    [InlineData(99.6, true, 1.0, 100.0)]     // never past full
+    [InlineData(0.4, false, 1.0, 0.0)]       // nor below nothing
+    public void Шаг_громкости_и_яркости(double current, bool up, double step, double expected) =>
+        Assert.Equal(expected, DisplayManager.Next(current, up, step), 3);
+
+    [Theory]
     [InlineData(true, false, true)]    // a monitor over DDC: ours
     [InlineData(false, false, false)]  // nothing over DDC: Windows does it and says so
     [InlineData(false, true, true)]    // asked for in every case

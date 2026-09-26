@@ -45,7 +45,7 @@ internal sealed class MenuHost : ToolStripControlHost
         Size = control.Size;
     }
 
-    // The control refits itself when the font or the scale changes, and the item keeps up with it:
+    // The control refits itself when the scale changes, and the item keeps up with it:
     // a size taken once would clip it, or leave a gap, after a move to another monitor.
     protected override void OnSubscribeControlEvents(Control? control)
     {
@@ -65,13 +65,13 @@ internal sealed class MenuHost : ToolStripControlHost
     }
 }
 
-// The palette as a menu item: a caption, then a grid of swatches with the current colour framed.
-// A click picks the colour and closes the menu, as picking any other item would.
+// The palette as a menu item: a grid of swatches with the current colour framed. Its caption is a
+// label of the menu's own, drawn as the menu draws every item. A click picks the colour and closes
+// the menu, as picking any other item would.
 internal sealed class PaletteControl : Control
 {
     private Rgb? _selected;
     private (int Row, int Column)? _hover;
-    private string _title = "";
 
     public event Action<Rgb>? Picked;
 
@@ -80,9 +80,6 @@ internal sealed class PaletteControl : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
 
-        // No font of its own: it takes the menu's, which is already right for the monitor. A font
-        // set here would be scaled once more on a change of scale, and come out larger than the
-        // menu items next to it.
         Fit();
     }
 
@@ -93,39 +90,11 @@ internal sealed class PaletteControl : Control
     private int Inset => LogicalToDeviceUnits(4);
     private int Step => Swatch + Gap;
 
-    // Where the grid starts: below the caption, when there is one.
-    private int GridTop => Inset + (_title.Length == 0 ? 0 : TextRenderer.MeasureText(_title, Font).Height + Gap);
-
-    // Centred, for a caption wider than the grid.
-    private int GridLeft => Math.Max(0, (Width - GridSide) / 2);
-
+    private int GridTop => Inset;
+    private int GridLeft => 0;
     private int GridSide => Palette.Size * Step - Gap;
 
-    // The caption above the grid, in the menu's own font.
-    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public string Title
-    {
-        get => _title;
-        set
-        {
-            _title = value ?? "";
-            Fit();
-            Invalidate();
-        }
-    }
-
-    // Wide enough for the grid or the caption, whichever is wider.
-    private void Fit()
-    {
-        int width = Math.Max(GridSide, _title.Length == 0 ? 0 : TextRenderer.MeasureText(_title, Font).Width);
-        Size = new Size(width, GridTop + GridSide + Inset);
-    }
-
-    protected override void OnFontChanged(EventArgs e)
-    {
-        base.OnFontChanged(e);
-        Fit();
-    }
+    private void Fit() => Size = new Size(GridSide, GridTop + GridSide + Inset);
 
     // Framed in the grid, when it is one of the palette's colours.
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -139,6 +108,7 @@ internal sealed class PaletteControl : Control
         }
     }
 
+    // The swatches are in device pixels, and so is the size they add up to.
     protected override void OnDpiChangedAfterParent(EventArgs e)
     {
         base.OnDpiChangedAfterParent(e);
@@ -199,9 +169,6 @@ internal sealed class PaletteControl : Control
         using var hoverPen = new Pen(Color.FromArgb(160, ForeColor), frame);
 
         int top = GridTop, left = GridLeft;
-
-        if (_title.Length > 0)
-            TextRenderer.DrawText(g, _title, Font, new Point(left, Inset), ForeColor, TextFormatFlags.NoPrefix);
 
         for (int row = 0; row < Palette.Size; row++)
         {

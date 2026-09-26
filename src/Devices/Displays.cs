@@ -876,20 +876,23 @@ public sealed class DisplayManager : IDisposable
     // What Refresh() reported last time, to tell a change from the hourly look.
     private string? _lastSummary;
 
-    private double Step => 100.0 / Math.Clamp(_cfg.AdjustmentSteps,
-                                              AppParameters.Limits.MinAdjustmentSteps,
-                                              AppParameters.Limits.MaxAdjustmentSteps);
+    // With Alt held the scale is split into as many steps as it can be: the finest adjustment.
+    private double Step(bool fine) => 100.0 / (fine
+        ? AppParameters.Limits.MaxAdjustmentSteps
+        : Math.Clamp(_cfg.AdjustmentSteps,
+                     AppParameters.Limits.MinAdjustmentSteps,
+                     AppParameters.Limits.MaxAdjustmentSteps));
 
     // Rounding to the step grid is the whole point of the "adjustment steps" setting: without it
     // the first press after someone else moved the value would land on a fractional tick.
-    private double Next(double current, bool up)
+    internal static double Next(double current, bool up, double step)
     {
-        double stepped = Math.Round(current / Step) * Step + (up ? Step : -Step);
+        double stepped = Math.Round(current / step) * step + (up ? step : -step);
         return Math.Clamp(stepped, 0, 100);
     }
 
     // Moves the brightness of one screen: the one the pointer is on.
-    public MediaKeyResult AdjustBrightness(bool up, out double shown)
+    public MediaKeyResult AdjustBrightness(bool up, bool fine, out double shown)
     {
         shown = 0;
 
@@ -907,7 +910,7 @@ public sealed class DisplayManager : IDisposable
 
         if (result != MediaKeyResult.Consumed || screen is null) return result;
 
-        shown = Next(screen.Brightness, up);
+        shown = Next(screen.Brightness, up, Step(fine));
         screen.SetBrightness(shown);
 
         return result;
@@ -927,7 +930,7 @@ public sealed class DisplayManager : IDisposable
 
     // The sound passes through two attenuators, the Windows mixer and the monitor's own volume,
     // moved together to the same number: one alone leaves a second nothing on screen shows.
-    public MediaKeyResult AdjustVolume(bool up, out double shown)
+    public MediaKeyResult AdjustVolume(bool up, bool fine, out double shown)
     {
         shown = 0;
 
@@ -942,7 +945,7 @@ public sealed class DisplayManager : IDisposable
         // with. Found apart, the two are brought together by the first press.
         double current = mixer ?? speakers?.SpeakerVolume ?? 0;
 
-        shown = Next(current, up);
+        shown = Next(current, up, Step(fine));
 
         bool moved = mixer is not null && AudioEndpoint.SetVolume(shown);
 

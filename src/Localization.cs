@@ -83,24 +83,10 @@ internal static class Text
         "HDMI/DVI DDC enabled", "HDMI/DVI DDC включён", "تمكين HDMI/DVI DDC", "已启用 HDMI/DVI DDC",
         "HDMI/DVI DDC activé", "HDMI/DVI DDC aktiv", "HDMI/DVI DDC attivo", "HDMI/DVI DDC 有効");
 
-    public static string MenuAdjustmentSteps => S(
-        "Adjustment steps", "Шагов регулировки", "خطوات الضبط", "调节步数",
-        "Pas de réglage", "Einstellschritte", "Passi di regolazione", "調整ステップ数");
-
     public static string MenuAlwaysCustomOsd => S(
         "Always use custom OSD", "Всегда кастомный OSD", "استخدام العرض المخصص دائمًا",
         "始终使用自定义提示", "Toujours l'affichage personnalisé", "Immer eigene Anzeige",
         "Usa sempre l'OSD personalizzato", "常にカスタム OSD を使う");
-
-    public static string MenuSystemLanguage => S(
-        "Use system language", "Язык системы", "استخدام لغة النظام", "使用系统语言",
-        "Langue du système", "Systemsprache verwenden", "Usa la lingua di sistema",
-        "システムの言語を使う");
-
-    public static string MenuExternalAddress => S(
-        "Show external IP address", "Показывать внешний IP-адрес", "إظهار عنوان IP الخارجي",
-        "显示外部 IP 地址", "Afficher l'adresse IP externe", "Externe IP-Adresse anzeigen",
-        "Mostra l'indirizzo IP esterno", "外部 IP アドレスを表示");
 
     public static string MenuSpinners => S(
         "Spinners", "Спиннеры", "Spinners", "Spinners",
@@ -120,6 +106,29 @@ internal static class Text
         "Maximum brightness", "Максимальная яркость", "أقصى سطوع", "最大亮度",
         "Luminosité maximale", "Maximale Helligkeit", "Luminosità massima", "最大輝度");
 
+    // Under the slider: what drifts the colour towards the warning one. A caption over three choices.
+    public static string AuraWarnColorBy => S(
+        "Change colour on:", "Менять цвет при:", "تغيير اللون عند:", "变色依据：",
+        "Changer la couleur selon :", "Farbe ändern bei:", "Cambia colore in base a:", "色を変える条件:");
+
+    public static string AuraWarnOff => S(
+        "Off", "Отключено", "معطّل", "关闭",
+        "Désactivé", "Aus", "Disattivato", "オフ");
+
+    // The three below read on from the caption: "Change colour on: heat".
+    public static string AuraWarnHeat => S(
+        "Heat", "Нагреву", "الحرارة", "温度",
+        "Chauffe", "Temperatur", "Temperatura", "温度");
+
+    public static string AuraWarnLoad => S(
+        "Load", "Нагрузке", "الحمل", "负载",
+        "Charge", "Last", "Carico", "負荷");
+
+    // Whichever of the heat and the load is nearer its threshold.
+    public static string AuraWarnMax => S(
+        "Maximum", "Максимуму", "الأقصى", "最大值",
+        "Maximum", "Maximum", "Massimo", "最大値");
+
     // The lighting effects under Aura Sunlight.
     public static string AuraSolid => S(
         "Solid", "Постоянный", "ثابت", "常亮",
@@ -132,11 +141,6 @@ internal static class Text
     public static string AuraRainbow => S(
         "Rainbow", "Радуга", "قوس قزح", "彩虹",
         "Arc-en-ciel", "Regenbogen", "Arcobaleno", "虹");
-
-    public static string MenuUpdateInterval => S(
-        "Data update every", "Обновлять данные каждые", "تحديث البيانات كل", "数据更新间隔",
-        "Mise à jour toutes les", "Daten aktualisieren alle", "Aggiorna i dati ogni",
-        "データ更新間隔");
 
     public static string MenuEffects => S(
         "Spinner effects", "Эффекты спиннеров", "تأثيرات Spinners", "Spinners 效果",
@@ -152,9 +156,10 @@ internal static class Text
         "Superposition plein écran", "Vollbild-Overlay", "Overlay a schermo intero",
         "全画面オーバーレイ");
 
+    // Opens config.conf: everything the menu does not offer is set there.
     public static string MenuOpenConfig => S(
-        "Open config.conf", "Открыть config.conf", "فتح config.conf", "打开 config.conf",
-        "Ouvrir config.conf", "config.conf öffnen", "Apri config.conf", "config.conf を開く");
+        "More settings…", "Дополнительные настройки…", "إعدادات إضافية…", "更多设置…",
+        "Paramètres supplémentaires…", "Weitere Einstellungen…", "Altre impostazioni…", "その他の設定…");
 
     public static string MenuOpenLog => S(
         "Open the log", "Открыть журнал", "فتح السجل", "打开日志",
@@ -276,11 +281,6 @@ internal static class Text
 
         "パソコンのリソース使用状況を表示するプログラムです。全画面でも同じように使えます。" +
         "小さく、軽く、実用的。\n\n作者: @Andrey.Lysikov");
-
-    // Poll periods in the menu. The unit is short: it stands right after a number.
-    public static string Seconds(double value) =>
-        value.ToString("0.#", CultureInfo.InvariantCulture) + " " +
-        S("s", "с", "ث", "秒", "s", "s", "s", "秒");
 
     public static string EffectOriginal => S(
         "Original", "Как нарисовано", "الأصلي", "原样",

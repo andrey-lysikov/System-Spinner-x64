@@ -9,17 +9,17 @@ using System.Windows.Forms;
 
 namespace SystemSpinnerX64.Lighting;
 
-// A slider for the menu, drawn to match the palette above it: a caption with the value on the
-// right, and a track with a round thumb below. The system TrackBar would stay light in a dark menu.
-// The value moves while the thumb is dragged and is committed once the button is let go, so the
-// light can follow the drag while the config is written only once.
+// A slider for the menu, drawn to match the palette above it: a track with a round thumb. The
+// system TrackBar would stay light in a dark menu. Its caption and value are a label of the menu's
+// own, above it, drawn as the menu draws every item. The value moves while the thumb is dragged
+// and is committed once the button is let go, so the light can follow the drag while the config is
+// written only once.
 internal sealed class BrightnessSlider : Control
 {
     public const int Min = 5;
     public const int Max = 100;
     public const int Step = 5;
 
-    private string _title = "";
     private int _value = Max;
     private bool _dragging;
 
@@ -34,31 +34,17 @@ internal sealed class BrightnessSlider : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
 
-        // No font of its own, as with the palette: the menu's, which follows the monitor's scale.
         FitWidth(LogicalToDeviceUnits(190));
     }
 
     private int Inset => LogicalToDeviceUnits(4);
-    private int Gap => LogicalToDeviceUnits(4);
     private int Thumb => LogicalToDeviceUnits(12);
     private int Track => LogicalToDeviceUnits(4);
-    private int LineHeight => TextRenderer.MeasureText("Ag", Font).Height;
 
     // The thumb's centre runs between these, so it never pokes past either end.
     private int TrackLeft => Thumb / 2;
     private int TrackRight => Width - Thumb / 2;
-    private int TrackY => Inset + LineHeight + Gap + Thumb / 2;
-
-    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public string Title
-    {
-        get => _title;
-        set
-        {
-            _title = value ?? "";
-            Invalidate();
-        }
-    }
+    private int TrackY => Inset + Thumb / 2;
 
     // Per cent, on the step.
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -76,14 +62,7 @@ internal sealed class BrightnessSlider : Control
         Math.Clamp((int)Math.Round(value / Step) * Step, Min, Max);
 
     // Takes the width it is given — the palette's, so the two line up.
-    public void FitWidth(int width) =>
-        Size = new Size(width, Inset + LineHeight + Gap + Thumb + Inset);
-
-    protected override void OnFontChanged(EventArgs e)
-    {
-        base.OnFontChanged(e);
-        FitWidth(Width);
-    }
+    public void FitWidth(int width) => Size = new Size(width, Inset + Thumb + Inset);
 
     // The insets, the track and the thumb are in device pixels, and so is the height they add up to.
     protected override void OnDpiChangedAfterParent(EventArgs e)
@@ -141,21 +120,11 @@ internal sealed class BrightnessSlider : Control
         if (_value != before) ValueCommitted?.Invoke(_value);
     }
 
+
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics;
         g.Clear(BackColor);
-
-        // The value keeps its place on the right; a caption too long for what is left is cut with
-        // an ellipsis rather than run under it.
-        string value = $"{_value} %";
-        int valueWidth = TextRenderer.MeasureText(g, value, Font, Size.Empty, TextFormatFlags.NoPrefix).Width;
-
-        TextRenderer.DrawText(g, _title, Font, new Rectangle(0, Inset, Math.Max(0, Width - valueWidth - Gap), LineHeight),
-                              ForeColor, TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(g, value, Font, new Rectangle(0, Inset, Width, LineHeight), ForeColor,
-                              TextFormatFlags.Right | TextFormatFlags.NoPrefix);
-
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
         int y = TrackY;

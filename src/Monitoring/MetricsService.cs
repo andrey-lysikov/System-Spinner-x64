@@ -591,13 +591,6 @@ public sealed class MetricsService : IDisposable
 
     public void Stop() => _timer.Stop();
 
-    // Changes the poll period on the fly — from the tray menu.
-    public void SetInterval(int milliseconds)
-    {
-        _cfg.UpdateIntervalMs = Math.Max(AppParameters.Polling.MinIntervalMs, milliseconds);
-        _timer.Interval = TimeSpan.FromMilliseconds(_cfg.UpdateIntervalMs);
-    }
-
     private void Poll()
     {
         // The poll did not finish within the period — the tick is skipped rather than queued:

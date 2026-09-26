@@ -50,19 +50,24 @@ internal static class Effects
     private static double Wave(double t) => 0.5 - 0.5 * Math.Cos(2 * Math.PI * t);
 }
 
-// How far the machine has gone towards its temperature limits: 0 is cool, 1 is at a threshold.
+// How far the machine has gone towards its limits: 0 is cool, 1 is at a threshold.
 internal static class WarnHeat
 {
     // Zero switches a threshold off, as it does for the overlay highlighting.
     public static double Of(double? cpuTemp, double cpuLimit, double? gpuTemp, double gpuLimit) =>
-        Math.Max(Ramp(cpuTemp, cpuLimit), Ramp(gpuTemp, gpuLimit));
+        Math.Max(Ramp(cpuTemp, cpuLimit, AppParameters.Aura.WarnRampDegrees),
+                 Ramp(gpuTemp, gpuLimit, AppParameters.Aura.WarnRampDegrees));
+
+    // The same for the load, per cent against WarnCpuUsage and WarnGpuUsage: the busier of the two.
+    public static double OfLoad(double? cpuLoad, double cpuLimit, double? gpuLoad, double gpuLimit) =>
+        Math.Max(Ramp(cpuLoad, cpuLimit, AppParameters.Aura.WarnRampLoad),
+                 Ramp(gpuLoad, gpuLimit, AppParameters.Aura.WarnRampLoad));
 
     // The colour starts to move this far below the threshold and has gone all the way at it.
-    private static double Ramp(double? temp, double limit)
+    private static double Ramp(double? value, double limit, double span)
     {
-        if (temp is not double t || limit <= 0) return 0;
+        if (value is not double v || limit <= 0) return 0;
 
-        double span = AppParameters.Aura.WarnRampDegrees;
-        return Math.Clamp((t - (limit - span)) / span, 0, 1);
+        return Math.Clamp((v - (limit - span)) / span, 0, 1);
     }
 }

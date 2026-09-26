@@ -306,14 +306,31 @@ public sealed class OsdConfig
     public const string NativeKeys = "native";
 }
 
+// What drifts the Aura colour towards the warning one.
+public enum WarnColorMode
+{
+    // The colour stays as picked.
+    Off,
+
+    // CpuTemp or GpuTemp nearing its threshold.
+    Heat,
+
+    // The CPU or GPU load nearing CpuUsage or GpuUsage.
+    Load,
+
+    // Both: whichever of the heat and the load is nearer its threshold sets how far the colour
+    // goes. A machine hot at a light load warns, and so does a busy one that keeps cool.
+    Max
+}
+
 // Highlighting for values past a threshold; zero disables one.
 public sealed class WarnConfig
 {
     public string Color { get; set; } = "#FF6A52";
 
-    // Tint the Aura lighting towards a warning colour as CpuTemp or GpuTemp nears its threshold.
-    // The colour moves, never the brightness: the sun alone decides how bright it is.
-    public bool EnableWarnColor { get; set; } = true;
+    // What tints the Aura lighting towards a warning colour. The colour moves, never the
+    // brightness: the sun alone decides how bright it is.
+    public WarnColorMode WarnColorBy { get; set; } = WarnColorMode.Heat;
 
     public double CpuTemp { get; set; } = 85;
     public double GpuTemp { get; set; } = 83;

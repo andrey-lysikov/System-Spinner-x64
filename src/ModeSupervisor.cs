@@ -380,7 +380,12 @@ public sealed class ModeSupervisor : IDisposable
         if (_aura is not null)
         {
             WarnConfig w = _cfg.Warn;
-            double heat = w.EnableWarnColor ? WarnHeat.Of(r.CpuTempC, w.CpuTemp, r.GpuTempC, w.GpuTemp) : 0;
+            double byHeat = w.WarnColorBy is WarnColorMode.Heat or WarnColorMode.Max
+                ? WarnHeat.Of(r.CpuTempC, w.CpuTemp, r.GpuTempC, w.GpuTemp) : 0;
+            double byLoad = w.WarnColorBy is WarnColorMode.Load or WarnColorMode.Max
+                ? WarnHeat.OfLoad(r.CpuLoad, w.CpuUsage, r.GpuLoad, w.GpuUsage) : 0;
+            double heat = Math.Max(byHeat, byLoad);
+
             _aura.Feed(heat, r.BusiestLoad / 100.0);
         }
 
@@ -645,11 +650,14 @@ public sealed class ModeSupervisor : IDisposable
         double value;
         OsdKind kind;
 
+        // Alt held: the finest step, whatever AdjustmentStepsOsd says.
+        bool fine = MediaKeyMonitor.AltHeld;
+
         switch (key)
         {
             case MediaKey.VolumeUp:
             case MediaKey.VolumeDown:
-                result = _displays.AdjustVolume(key == MediaKey.VolumeUp, out value);
+                result = _displays.AdjustVolume(key == MediaKey.VolumeUp, fine, out value);
                 kind = OsdKind.Volume;
                 break;
 
@@ -660,7 +668,7 @@ public sealed class ModeSupervisor : IDisposable
 
             case MediaKey.BrightnessUp:
             case MediaKey.BrightnessDown:
-                result = _displays.AdjustBrightness(key == MediaKey.BrightnessUp, out value);
+                result = _displays.AdjustBrightness(key == MediaKey.BrightnessUp, fine, out value);
                 kind = OsdKind.Brightness;
                 break;
 
@@ -686,12 +694,6 @@ public sealed class ModeSupervisor : IDisposable
         _tray.AuraLookChanged += () => _aura?.Restyle();
         _tray.AuraBrightnessChanged += () => _aura?.Rescale();
 
-        _tray.IntervalChanged += () =>
-        {
-            _metrics.SetInterval(_cfg.UpdateIntervalMs);
-            _fpsTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1000, _cfg.UpdateIntervalMs));
-        };
-
         // The switch takes effect at once, even mid-game: the panel appears or goes, and the
         // frame counter with it. Whether the tray animation runs does not depend on it.
         _tray.OverlayChanged += () =>
@@ -703,14 +705,6 @@ public sealed class ModeSupervisor : IDisposable
         };
 
         _tray.OsdChanged += () => RescanDisplays("the OSD settings changed");
-
-        // The language changes the titles of everything already built — the menu is rebuilt, and
-        // the status window re-reads its captions the next time it is shown.
-        _tray.LanguageChanged += () =>
-        {
-            _tray.Rebuild();
-            _tray.ShowDisplays(_displays.DisplayNames);
-        };
 
         _tray.ExitRequested += () => System.Windows.Application.Current.Shutdown();
     }
