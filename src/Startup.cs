@@ -427,7 +427,6 @@ internal static class AutoStart
     {
         var start = new ProcessStartInfo("schtasks.exe")
         {
-            UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true

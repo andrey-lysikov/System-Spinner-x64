@@ -429,7 +429,7 @@ public sealed class SparklineControl : FrameworkElement
         double[] values = Reduce(Points, (int)Math.Max(2, Math.Round(width)));
         if (values.Length < 2) return;
 
-        var figure = new PathFigure { StartPoint = new Point(0, height), IsClosed = true, IsFilled = true };
+        var figure = new PathFigure { StartPoint = new Point(0, height), IsClosed = true };
         var line = new PathFigure { StartPoint = new Point(0, Y(values[0], height)) };
 
         for (int i = 0; i < values.Length; i++)

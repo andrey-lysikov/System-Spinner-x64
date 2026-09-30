@@ -112,9 +112,7 @@ public sealed class HardwareMonitor : IDisposable
             IsGpuEnabled = true,
             IsMemoryEnabled = true,
             IsMotherboardEnabled = true,   // SuperIO sensors: case and CPU fan speeds
-            IsControllerEnabled = true,    // Aquacomputer / Corsair / NZXT — the AIO pump speed
-            IsStorageEnabled = false,
-            IsNetworkEnabled = false
+            IsControllerEnabled = true     // Aquacomputer / Corsair / NZXT — the AIO pump speed
         };
     }
 
