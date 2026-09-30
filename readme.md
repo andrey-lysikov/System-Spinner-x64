@@ -31,6 +31,8 @@ This is the Windows version. If you are looking for macOS, go to [System Spinner
 
 This application uses **PawnIO** — [pawnio.eu](https://pawnio.eu) — for low-level access to the hardware. The installer carries it and puts it in silently, so a fresh install always ends on the newest release there was when that installer was built; if you run the exe on its own, install it yourself.
 
+The Sun & Moon spinner and the sunlight lighting take the position of the sun and the weather (Open-Meteo) from **Windows location**. Turn on *Settings → Privacy & security → Location → Let desktop apps access your location*. Without a location there is no weather, and the sun simply follows the clock.
+
 ## Screenshots
 
 <p align="center">

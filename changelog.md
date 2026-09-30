@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0
+
+* Rewrite location for the sun and weather comes from Windows location (or the default location set in Windows) instead of the IP address
+* Stats window marks values past a threshold with the Windows accent colour
+* Add accent color for aura lighting in submenu
+* Optimise spinner frames downscaled to 96 px
+
 ## 1.7
 
 * Add lighting for Gigabyte RGB Fusion 2, MSI Mystic Light (boards from 2020), ASRock Polychrome and Nollie
