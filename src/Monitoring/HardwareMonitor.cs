@@ -172,10 +172,8 @@ public sealed class HardwareMonitor : IDisposable
     // The card's sensors were opened before a driver reload and have to be opened again.
     private volatile bool _gpuStale;
 
-    // The graphics driver may be reloading — an update, a recovery from a hang. The handle NVML
-    // keeps then points into a driver that is gone, and reading the power through it kills the
-    // process outright: an access violation in native code, which no catch can stop. So the card
-    // is not touched until the driver has settled, and then its sensors are opened afresh.
+    // During a driver reload NVML's handle is stale and reading power crashes natively.
+    // Don't touch the card until the driver settles, then reopen its sensors.
     public void PauseGpu(string reason)
     {
         Interlocked.Exchange(ref _gpuPausedUntil, (DateTime.UtcNow + AppParameters.Displays.Settle).Ticks);
@@ -362,9 +360,8 @@ public sealed class HardwareMonitor : IDisposable
     private static double? ReadFan(IEnumerable<IHardware> sources, IReadOnlyList<string> names, bool average) =>
         average ? AverageFans(sources, names) : FindFan(sources, names);
 
-    // A card stopping its fans reads one wild value on the way down — 320 000 to 980 000 rpm were
-    // logged, between a thousand and zero — the tachometer's near-zero period turned into a speed.
-    // No fan, pump or blower goes anywhere near this, so such a reading is no reading.
+    // A stopping fan reads one absurd value (320k-980k rpm logged); no fan or pump
+    // comes close, so such a reading is dropped.
     internal static bool IsPlausibleFan(float rpm) => rpm >= 0 && rpm <= AppParameters.Sensors.MaxFanRpm;
 
     private static double? FindFan(IEnumerable<IHardware> sources, IReadOnlyList<string> names)

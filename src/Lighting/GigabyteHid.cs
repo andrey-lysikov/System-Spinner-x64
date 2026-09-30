@@ -12,10 +12,8 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Lighting;
 
-// The Gigabyte RGB Fusion 2 USB controller on the motherboard (ITE IT8297, IT5702, IT5711), spoken
-// to the way OpenRGB does: 64-byte feature reports with id 0xCC. The board LEDs and the 12 V
-// headers take one static colour through the effect registers; the addressable headers take their
-// LEDs directly. Which of them a board wires up does not matter when all show the same colour.
+// Gigabyte RGB Fusion 2 USB controller (IT8297/IT5702/IT5711), OpenRGB-style: 64-byte
+// feature reports id 0xCC. Board LEDs/12 V headers via effect registers, ARGB directly.
 internal sealed class FusionDevice : ILightDevice
 {
     private const ushort IteVendor = 0x048D;
@@ -148,9 +146,8 @@ internal sealed class FusionDevice : ILightDevice
         $"Gigabyte RGB Fusion 2 {(Name.Length > 0 ? Name : $"0x{Product:X4}")} {Firmware}: " +
         $"board LEDs, {Strips.Count} addressable headers × {LedCount} LEDs";
 
-    // Sets the controller up as OpenRGB does before direct colours: Windows Dynamic Lighting and the
-    // music effect off, the effect registers cleared, the addressable headers sized and taken off
-    // their own effects. Nothing is written to the controller's flash.
+    // OpenRGB's direct-mode setup: Dynamic Lighting and music effect off, effects cleared,
+    // ARGB headers sized. Nothing is written to flash.
     public void TakeOver()
     {
         if (_lampArray) SendCommand(CmdLampArray, 0);

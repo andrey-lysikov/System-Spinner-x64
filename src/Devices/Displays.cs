@@ -307,11 +307,8 @@ internal sealed class DisplayDevice : IDisposable
                  $"brightness {Show(brightness)}, monitor speakers {Show(volume)}" +
                  $"{(carriesAudio ? ", carries audio" : "")}");
 
-        // The handle was given out and the monitor still answered nothing worth having: on most
-        // panels a switch in their own menu, off from the factory, that nothing here can turn on.
-        // Once per output: screens are rescanned many times a day, and the answer does not change.
-        // Keyed by the output rather than the name — a switch or a KVM in the way hands the same
-        // monitor over as "SAMSUNG", "Generic PnP Monitor" or its own model in turn.
+        // Monitor answers nothing: usually DDC/CI is off in its own menu. Advise once per output,
+        // keyed by output since a KVM may report the same monitor under different names.
         if (!isInternal && physical.Length > 0 && brightness is null && volume is null && FirstAdvice(gdiName))
             Log.Info($"\"{name}\" is on a wire that carries DDC/CI but answers none of it: look " +
                      "for DDC/CI (HP calls it \"DDC/CI\", LG \"DDC/CI\" or \"Auto\", Dell \"DDC/CI\") " +

@@ -8,10 +8,8 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Monitoring;
 
-// Tells when a display adapter comes or goes — which is what a graphics driver being installed,
-// updated or reset looks like from here. It arrives the moment the device restarts, well before
-// Windows gets round to saying the screen configuration changed: on the machine this was written
-// for, the driver came back 1.8 s before that message, and the process died in between.
+// Detects a display adapter coming or going (driver install/update/reset),
+// well before Windows reports a display change, in time to stop GPU reads.
 internal sealed class GpuDriverWatch : NativeWindow, IDisposable
 {
     // GUID_DEVINTERFACE_DISPLAY_ADAPTER

@@ -73,6 +73,9 @@ internal static class AppParameters
 
         // Where the program lives: the button in the About window opens this.
         public const string Project = "https://github.com/andrey-lysikov/System-Spinner-x64";
+
+        // Windows location settings, opened from the missing-location notification.
+        public const string LocationSettings = "ms-settings:privacy-location";
     }
 
     // Keeping up with the screens and the sound device.
@@ -86,10 +89,8 @@ internal static class AppParameters
         // plugging in headphones changes where the volume goes.
         public static readonly TimeSpan AudioCheckPeriod = TimeSpan.FromMinutes(5);
 
-        // How long the hardware is given to come round after a wake, a mode change or a graphics
-        // driver reload. Windows says "resumed" before the screens have come back, and asked
-        // straight away a monitor answers nothing over DDC; the driver takes a second or two, and
-        // until then its sensors must not be read.
+        // Time for hardware to settle after wake, mode change or GPU driver reload:
+        // monitors ignore DDC and GPU sensors must not be read until then.
         public static readonly TimeSpan Settle = TimeSpan.FromSeconds(5);
 
         // How many times a screen that answers nothing over DDC is asked again after a mode change.
@@ -224,9 +225,17 @@ internal static class AppParameters
     // Where the sun is and what the weather does: read by the lighting and the Sun & Moon spinner.
     internal static class Sky
     {
-        // How often a failed IP lookup is tried again, and how soon the lighting looks at its
-        // level again while the latitude is only a guess.
-        public static readonly TimeSpan LocationRetry = TimeSpan.FromMinutes(1);
+        // Windows location retries, as for the external address; then unknown until restart.
+        public static readonly TimeSpan LocationFirstDelay = TimeSpan.FromSeconds(15);
+        public static readonly TimeSpan LocationRetryDelay = TimeSpan.FromMinutes(15);
+        public const int LocationMaxRetries = 2;
+
+        // One ask's timeout and the oldest cached position accepted.
+        public static readonly TimeSpan LocationTimeout = TimeSpan.FromSeconds(10);
+        public static readonly TimeSpan LocationMaximumAge = TimeSpan.FromMinutes(30);
+
+        // Lighting rechecks its level this often while the place is still being looked for.
+        public static readonly TimeSpan LocatingRecheck = TimeSpan.FromMinutes(1);
 
         // The weather is asked for no more often than this, by the lighting and the Sun & Moon
         // spinner together; a failed request waits it out as well.

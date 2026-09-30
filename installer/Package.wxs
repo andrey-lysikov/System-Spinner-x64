@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!-- The installer: for the person installing (in their profile, offered first) or for everyone
-     (Program Files), which shortcuts to make, whether to start it. Each Windows user may have a
-     copy of their own, of any version; a copy for everyone is one per machine. An update touches
-     only the installer's own copy or the one for everyone, never another user's: one UAC prompt
-     first, the Update page, the running app closed, the files replaced and the app started again.
-     A first install asks for rights only at its Install button.
-     Built by installer/installer.ps1. -->
+<!-- Per-user (default) or per-machine install; per-user copies are independent per Windows user.
+     Updates touch only our own or the per-machine copy. Built by installer/installer.ps1. -->
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
@@ -85,9 +80,8 @@
                       Type="raw" />
     </Property>
 
-    <!-- The exe as Windows Installer has it registered: this user's own per-user copy if there is
-         one, otherwise a per-machine copy. Per-machine means for everyone now, but up to 1.3 every
-         install was per-machine, including those put in somebody's profile. -->
+    <!-- Registered exe: this user's per-user copy, else a per-machine one
+         (up to 1.3 every install was per-machine, even in a profile). -->
     <!-- Type="file", which gives the folder the file is in: the key path is a file, and "directory"
          looks for a folder of that name and finds nothing, as it did up to 1.3. -->
     <Property Id="INSTALLEDFOLDER" Secure="yes">
@@ -95,19 +89,16 @@
                        Guid="0F8D272E-1348-400B-A2CF-93B2527E70DF" Type="file" />
     </Property>
 
-    <!-- An exe in this user's profile that nothing registered: put there by hand, or left by an
-         install that went wrong. Program Files is not searched the same way: a file found there
-         could belong to another user's per-user install, which is not ours to replace. -->
+    <!-- Unregistered exe in this user's profile (manual or broken install).
+         Program Files is not searched: it may hold another user's copy. -->
     <Property Id="PERUSERCOPY" Secure="yes">
       <DirectorySearch Id="PerUserFolderSearch" Path="[LocalAppDataFolder]System-Spinner">
         <FileSearch Id="PerUserExeSearch" Name="System-Spinner.exe" />
       </DirectorySearch>
     </Property>
 
-    <!-- A per-machine copy of 1.3 or earlier records nowhere who installed it: not in its
-         registration, not in the uninstall entry, and the marks it left in HKCU are in a hive no
-         other user can read. What can be told exactly is where it lies: in this user's profile,
-         in the folder that holds the profiles, or elsewhere. -->
+    <!-- A per-machine copy of 1.3 or earlier records no owner;
+         only its location tells: this profile, another profile, or elsewhere. -->
 
     <!-- This user's profile, as the logon wrote it: HKCU\Volatile Environment is filled in for the
          account that signed in, whatever folder its profile ended up in. -->
@@ -156,9 +147,8 @@
                  Sequence="both"
                  Condition="NOT Installed AND USERCOPYFOLDER" />
 
-    <!-- 2. A per-machine copy in the profiles folder but not in this user's profile: another
-         user's copy from 1.3 or earlier. Left alone, and the install becomes a per-user one beside
-         it. LocalAppData is asked as well, for the rare account with no Volatile Environment. -->
+    <!-- 2. Old per-machine copy in another user's profile: left alone, install per-user beside it.
+         LocalAppData is checked too, for accounts without Volatile Environment. -->
     <SetProperty Action="SetOtherUserCopy"
                  Id="OTHERUSERCOPY"
                  Value="1"
@@ -198,10 +188,8 @@
                  Sequence="both"
                  Condition="NOT Installed AND COPYFOLDER" />
 
-    <!-- The context, set before FindRelatedProducts, which looks only in the context it is given:
-         per-user finds this user's own installs alone, per-machine the ones for everyone. An update
-         keeps the context of its copy. Beside another user's old copy only per-user is allowed,
-         or FindRelatedProducts would find that copy and RemoveExistingProducts take it away. -->
+    <!-- Context set before FindRelatedProducts, which searches only that context. Updates keep
+         their copy's context; next to another user's old copy only per-user, so it isn't removed. -->
     <SetProperty Action="SetPerUserScope"
                  Id="ALLUSERS"
                  Value="{}"
@@ -271,9 +259,8 @@
       </Component>
     </ComponentGroup>
 
-    <!-- Directly in the menu: one entry deserves no folder. Not advertised, which would show no
-         icon unless one is named in the msi and drag the repair machinery in behind it. The menu
-         and the desktop are the user's own for a per-user install, the shared ones otherwise. -->
+    <!-- Shortcuts directly in the menu, not advertised (no icon, no repair machinery).
+         User's own menu/desktop for per-user, shared ones otherwise. -->
     <ComponentGroup Id="StartMenuShortcutFiles" Directory="ProgramMenuFolder">
       <Component Id="StartMenuShortcut" Guid="C0D8CE73-8C33-4E5C-9A24-7C5A03FFB1CE">
         <Shortcut Id="StartMenuShortcutEntry"
@@ -312,10 +299,8 @@
       </Component>
     </ComponentGroup>
 
-    <!-- On by default, and a feature each rather than a condition on the component: a feature
-         left out is remembered as left out, a condition would be asked again at removal.
-         An update does not ask these: what the old version had is carried over by
-         MigrateFeatureStates, and only the update options page changes it. -->
+    <!-- On by default; a feature each, so an omitted one is remembered at removal.
+         Updates carry them over via MigrateFeatureStates. -->
     <Property Id="INSTALLSTARTMENUSHORTCUT" Value="1" />
     <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" />
 
@@ -345,10 +330,8 @@
          The app will say what is missing at its first start. -->
     <Property Id="INSTALLPAWNIO" Value="1" Secure="yes" />
 
-    <!-- Deferred and not impersonated, so it runs as SYSTEM, silent. That holds for a per-user
-         install too, as long as the installer itself runs elevated, which is why a per-user install
-         asks for rights at its Install button (RelaunchAtExecute). FileRef because a deferred
-         action reads no properties. -->
+    <!-- Deferred, not impersonated: runs silently as SYSTEM, so per-user installs elevate at Install
+         (RelaunchAtExecute). FileRef because deferred actions read no properties. -->
     <CustomAction Id="InstallPawnIo"
                   FileRef="PawnIoSetupExe"
                   ExeCommand="-install -silent"
@@ -358,14 +341,8 @@
 
     <!-- ===== The running app and its autostart: only what belongs to this copy ===== -->
 
-    <!-- Only processes whose exe is in this copy's folder: the same app of another user, running in
-         a session left open, belongs to that user. WM_CLOSE first, through taskkill without /f,
-         then the end. No brackets or braces in the commands: the installer would read them as
-         properties and conditional blocks.
-         On an update, before anything is checked or removed: Restart Manager looks for files in
-         use in InstallValidate, and the old version goes in RemoveExistingProducts straight after
-         it. Immediate, since a deferred action there fails with error 2613; the elevated copy of
-         the installer runs it with administrator rights, which the app has too. -->
+    <!-- Closes only this copy's processes (WM_CLOSE via taskkill, then force); no brackets/braces.
+         Immediate, before InstallValidate: deferred fails with 2613. -->
     <SetProperty Action="SetStopRunningApp"
                  Id="WixQuietExecCmdLine"
                  Sequence="execute"
@@ -378,9 +355,8 @@
                   Execute="immediate"
                   Return="ignore" />
 
-    <!-- On an uninstall, deferred as SYSTEM, which can end an elevated process where the user
-         cannot. A per-user copy removed from Settings runs without elevation, and there the app
-         stays running until the restart Windows asks for. -->
+    <!-- Uninstall: deferred as SYSTEM to end the elevated app. A per-user removal from Settings
+         runs unelevated, so the app stays until the requested restart. -->
     <SetProperty Id="StopAppForRemoval"
                  Sequence="execute"
                  Before="StopAppForRemoval"
@@ -393,13 +369,8 @@
                   Impersonate="no"
                   Return="ignore" />
 
-    <!-- Autostart is a scheduled task the app makes for itself, one per user ("System-Spinner
-         (user@domain)", or plain "System-Spinner" from 1.3 and earlier), so the installer knows
-         nothing about them. Every one of them that starts this copy's exe goes, whoever made it:
-         the copy is gone for all of them. Tasks of other copies stay. The filter works on the
-         task XML and takes the names from its URI, since a script block would need braces; -and
-         runs the removal only when something matched. A failure is not worth stopping an
-         uninstall over. -->
+    <!-- Removes every autostart task (per-user, or legacy plain name) that starts this copy's exe.
+         Filtered on task XML without braces; failures don't stop the uninstall. -->
     <SetProperty Id="RemoveAutostartTask"
                  Sequence="execute"
                  Before="RemoveAutostartTask"
@@ -431,19 +402,11 @@
 
     <!-- ===== Administrator rights: when they are asked for ===== -->
 
-    <!-- The trick both prompts below use. The page without rights starts this same msi elevated
-         and closes without a word. ELEVATED keeps the elevated copy from doing it again; Privileged
-         cannot, being set for an administrator in the unelevated copy too. UILevel 5 leaves /qn
-         and /qb alone.
-         The exit code is turned over on purpose. 1 means the elevated copy started: the action
-         fails, and the run ends through FatalError, whose page is not shown. 0 means UAC was
-         refused, and the refusal is said. The installer cannot read what a process returned into
-         a property, and without a DLL of our own this is the only way to tell the two apart. -->
+    <!-- Relaunch this msi elevated; ELEVATED stops recursion, UILevel 5 skips /qn and /qb.
+         Exit code inverted: 1 = elevated copy started (FatalError, hidden), 0 = UAC refused. -->
 
-    <!-- An update: once, before its first page.
-         An update of a copy for everyone passes ALLUSERS=1 on: Installed is settled when the
-         package opens, before any action, so without it running the same msi again would not
-         find itself installed and would not open the maintenance pages. -->
+    <!-- Update: once, before its first page. Per-machine updates pass ALLUSERS=1,
+         or the msi won't find itself installed and skip the maintenance pages. -->
     <SetProperty Id="RELAUNCHSCOPE"
                  Value="ALLUSERS=1"
                  Sequence="ui"
@@ -466,21 +429,16 @@
                   Execute="immediate"
                   Return="check" />
 
-    <!-- An install or a removal from these pages: at the button that starts it, as the pages were
-         filled in by the person installing. For everyone, Windows Installer asks by itself and
-         keeps that person as the installing user. For one user it never asks: a per-user install
-         needs no rights of its own, but PawnIO does, and so does closing the app on removal.
-         So the elevated copy is started then, with every choice the pages made, and goes straight
-         to the progress page. -->
+    <!-- Install/removal from these pages: per-user needs rights for PawnIO and closing the app,
+         so the elevated copy is started with all choices, straight to progress. -->
     <SetProperty Id="INSTALLRELAUNCH"
                  Value="1"
                  Sequence="ui"
                  After="UpdateDlg"
                  Condition="NOT ELEVATED AND UILevel = 5 AND NOT UPDATEMODE AND (NOT ALLUSERS OR (ALLUSERS = 2 AND MSIINSTALLPERUSER = 1)) AND ((NOT Installed AND &amp;Main = 3) OR (Installed AND &amp;Main = 2))" />
 
-    <!-- The folder is handed over without its closing backslash, which would escape the quote
-         after it; the | before the quote keeps that backslash from doing so here. Double quotes
-         throughout, since a profile folder may hold an apostrophe. -->
+    <!-- Folder passed without its trailing backslash (it would escape the quote; | guards it).
+         Double quotes throughout: a profile path may contain an apostrophe. -->
     <SetProperty Action="SetRelaunchInstall"
                  Id="WixQuietExecCmdLine"
                  Sequence="ui"
@@ -527,12 +485,8 @@
                  After="SetUPDSTARTMENU"
                  Condition="UPDATEMODE AND &amp;Desktop = 3" />
 
-    <!-- The stock first pages cannot be overridden, not being virtual, so an update walks round
-         them: Installed hides AdvancedWelcomeEulaDlg, PATCH then hides MaintenanceWelcomeDlg,
-         and both are cleared straight after, PATCH being public and bound for the install itself.
-         So does an install whose pages were already filled in by the copy without rights
-         (PRESETINSTALL): it has nothing left to ask and goes straight to the progress page.
-         Nothing here may point at WelcomeDlg: that drags WixUI_Minimal into the build. -->
+    <!-- Stock first pages can't be overridden: Installed and PATCH hide them, then PATCH is cleared.
+         PRESETINSTALL goes straight to progress. Never reference WelcomeDlg (pulls WixUI_Minimal). -->
     <SetProperty Action="HideWelcomeForUpdate"
                  Id="Installed"
                  Value="1"
@@ -558,9 +512,8 @@
                  After="ClearInstalledForUpdate"
                  Condition="(UPDATEMODE OR PRESETINSTALL) AND NOT ELEVATIONREQUESTED" />
 
-    <!-- Started from the elevated copy, the app gets its rights with no second prompt. After
-         ExecuteAction, so only once the update has gone through. A property of its own, the
-         installer allowing a check box property one page only. -->
+    <!-- Started from the elevated copy, the app needs no second prompt. After ExecuteAction.
+         Own property: a checkbox property may be used on one page only. -->
     <Property Id="UPDLAUNCH" Value="1" />
 
     <SetProperty Action="SetUpdatedAppTarget"
@@ -591,10 +544,8 @@
     <ui:WixUI Id="WixUI_Advanced" />
     <WixVariable Id="WixUILicenseRtf" Value="$(License)" />
 
-    <!-- Through the shell, not started directly: the app demands administrator rights, and a
-         program started by the installer never gets the prompt for them (error 1631). Started
-         from the elevated copy, as after a per-user install, it needs no prompt; after an install
-         for everyone the pages have no rights, and the app asks for its own. -->
+    <!-- Via the shell: an installer-started process never gets the UAC prompt (error 1631).
+         Elevated copy: no prompt; per-machine pages are unelevated, so the app asks itself. -->
     <Property Id="LAUNCHAFTERINSTALL" Value="1" />
 
     <CustomAction Id="SetAppTarget" Property="WixShellExecTarget" Value="[#SystemSpinnerExe]" />
@@ -623,9 +574,8 @@
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ShortcutsDlg"
                Condition="NOT Installed" Order="10" />
 
-      <!-- Only after a fresh install: the same page ends a repair and an uninstall too, and an
-           update has started the app already. The stock event that closes it sits at 999, so
-           both of these run before it. -->
+      <!-- Only after a fresh install: this page also ends repair/uninstall, and updates start the app.
+           The stock closing event is at 999, so these run first. -->
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="SetAppTarget"
                Condition="LAUNCHAFTERINSTALL = 1 AND NOT Installed AND NOT UPDATEMODE" Order="1" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"

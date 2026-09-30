@@ -13,9 +13,8 @@ namespace SystemSpinnerX64.Lighting;
 // One header or group of board LEDs on a Polychrome controller, as its config table gives it.
 internal sealed record PolychromeZone(int Index, int LedCount, bool Addressable, bool RgSwap);
 
-// The ASRock Polychrome USB controller on the motherboard, spoken to the way OpenRGB does: 65-byte
-// reports, each one answered. The LED count of each header lives in the controller itself, set by
-// ASRock's own software, and the colours are streamed to all of them at once.
+// ASRock Polychrome USB controller, OpenRGB-style: 65-byte acknowledged reports.
+// Header LED counts are stored in the controller; colours stream to all at once.
 internal sealed class PolychromeDevice : ILightDevice
 {
     private const ushort AsrockVendor = 0x26CE;

@@ -156,7 +156,6 @@ try {
 
     if ($Version -notmatch '^\d+\.\d+$') { throw "The version must be two numbers, like 1.4, not $Version" }
 
-    # An msi wants three numbers; the third is always zero and is never shown to the user.
     $msiVersion = "$Version.0"
 
     Write-Step 'Fetching the PawnIO driver setup'

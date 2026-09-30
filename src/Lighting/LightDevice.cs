@@ -8,9 +8,8 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Lighting;
 
-// A lighting controller the sun can drive. Every LED shows the same colour at the same
-// brightness, so all a driver has to do is take the controller over and fill it with one colour;
-// how its channels and packets are laid out stays the driver's own business.
+// A controller the sun can drive: every LED gets one colour and brightness;
+// channel and packet layout stay inside the driver.
 internal interface ILightDevice : IDisposable
 {
     // The lighting technology, which names the menu item: Aura, RGB Fusion, Mystic Light.

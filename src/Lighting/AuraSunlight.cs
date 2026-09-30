@@ -10,10 +10,8 @@ using SystemSpinnerX64.Spinner;
 
 namespace SystemSpinnerX64.Lighting;
 
-// The lighting driven by the sun, as sunlight-flow does it: dark by day, coming up as the sun
-// sets, red and breathing through a total lunar eclipse. On top of that the colour — never the
-// brightness — drifts towards a warning as the CPU or the GPU nears its threshold. Which
-// controller carries it out is the driver's business: this only works out one colour a frame.
+// Sun-driven lighting: dark by day, up at sunset, red breathing in a lunar eclipse.
+// Colour (never brightness) drifts to warning as CPU/GPU near thresholds.
 internal sealed class AuraSunlight : IDisposable
 {
     private readonly AuraConfig _cfg;
@@ -44,9 +42,8 @@ internal sealed class AuraSunlight : IDisposable
     // The first look after a switch-on answers at once rather than waiting for the weather.
     private volatile bool _quickLevel;
 
-    // Until then a new goal is reached in the short fade of a slider being dragged. A moment rather
-    // than a flag: a drag that changes nothing — by day the goal stays at zero — must not leave the
-    // next daily drift snapping over in a fraction of a second.
+    // Until then goals are reached with the short drag fade. A time, not a flag,
+    // so a no-op drag doesn't make the next daily drift snap.
     private DateTime _adjustUntil = DateTime.MinValue;
     private double _targetLevel;
     private double _displayLevel;
@@ -95,9 +92,8 @@ internal sealed class AuraSunlight : IDisposable
     // the loop thread; a value a frame old is fine.
     public double Light => Output();
 
-    // What the lamps give: the level, raised toward the Brightness ceiling as the machine heats up,
-    // so the warning colour shows at full strength even on a dim evening. Never lowered, and the
-    // heat is let go of with dark lamps, so by day nothing comes on.
+    // Level raised toward Brightness as the machine heats, so the warning shows at full strength.
+    // Never lowered; heat is released only with dark lamps, so nothing lights by day.
     private double Output()
     {
         double level = Volatile.Read(ref _displayLevel);
@@ -181,9 +177,8 @@ internal sealed class AuraSunlight : IDisposable
         Wake();
     }
 
-    // Sleep, restart, shutdown or exit: the light fades out instead of being cut off, or of being
-    // left on for the controller to keep. The same fade as a switch-off from the menu; blocks until
-    // it is done and the black frame after it has gone out.
+    // Sleep, restart, shutdown or exit: fade out like a menu switch-off.
+    // Blocks until the fade and the final black frame are done.
     public void Darken(string reason)
     {
         if (_disposed) return;
@@ -393,8 +388,8 @@ internal sealed class AuraSunlight : IDisposable
         return true;
     }
 
-    // Off the loop thread: the IP lookup and the weather can take seconds, and the lamps must not
-    // freeze mid-ramp meanwhile.
+    // Off the loop thread: the weather can take seconds, and the lamps must not freeze mid-ramp
+    // meanwhile.
     private async Task RefreshLevelAsync(CancellationToken ct)
     {
         try
@@ -405,10 +400,10 @@ internal sealed class AuraSunlight : IDisposable
             _quickLevel = false;
             _targetLevel = await _level.TargetAsync(_cfg, waitForWeather: !quick, ct).ConfigureAwait(false);
 
-            // While the latitude is still a guess, or the cloud cover is still on its way, the next
-            // look comes sooner: the answer may well be in by then.
-            if (!Sky.Location.ByIp || _level.CloudStale)
-                _levelStamp = DateTime.UtcNow - AppParameters.Aura.LevelRefresh + AppParameters.Sky.LocationRetry;
+            // While the place is still being looked for, or the cloud cover is still on its way, the
+            // next look comes sooner: the answer may well be in by then.
+            if (Sky.Locating || _level.CloudStale)
+                _levelStamp = DateTime.UtcNow - AppParameters.Aura.LevelRefresh + AppParameters.Sky.LocatingRecheck;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

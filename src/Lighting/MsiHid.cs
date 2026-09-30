@@ -8,9 +8,8 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Lighting;
 
-// How a Mystic Light controller takes its colours. Boards from Z490 and B550 up to Z790 and B650
-// keep all their zones in one 185-byte feature report; X870, B850 and Z890 take each addressable
-// header in a report of its own.
+// Mystic Light wire format: Z490/B550..Z790/B650 use one 185-byte report for all zones;
+// X870/B850/Z890 use one report per ARGB header.
 internal enum MysticWire { Zones185, Headers761 }
 
 // The MSI Mystic Light controller on the motherboard, spoken to the way OpenRGB does. Only boards
@@ -21,9 +20,7 @@ internal sealed class MysticLightDevice : ILightDevice
     private const ushort CommonVendor = 0x0DB0;
     private const ushort CommonProduct = 0x0076;
 
-    // Z490, B460, B550, A520 (2020); Z590, B560, X570S, Z690 (2021); B660, H610, X670, B650, Z790
-    // (2022); B760 (2023); Z890, X870, B850 (2024-2025). The same list OpenRGB detects, less the
-    // boards from before 2020.
+    // Boards from 2020 on: Z490 through B850. OpenRGB's list minus pre-2020 boards.
     internal static readonly ushort[] Products =
     [
         0x7C56, 0x7C71, 0x7C73, 0x7C75, 0x7C76, 0x7C77, 0x7C79, 0x7C80, 0x7C81, 0x7C82, 0x7C83, 0x7C86,

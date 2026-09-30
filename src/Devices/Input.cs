@@ -718,9 +718,8 @@ internal sealed class MediaKeyMonitor : IDisposable
     // whichever way it came — the hook, the raw input or the stand-in combination.
     public static bool AltHeld => (GetAsyncKeyState(VkMenu) & 0x8000) != 0;
 
-    // Alt pressed and let go with nothing in between, as far as the window in front can tell,
-    // opens its menu bar — the key we took never reached it. A key no one acts on, sent in
-    // between, makes it an Alt combination like any other.
+    // A lone Alt press opens the foreground window's menu bar; an inert key in between
+    // turns it into an ordinary Alt combination.
     private static void KeepMenuShut()
     {
         KeyboardInput[] inputs =

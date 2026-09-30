@@ -18,10 +18,8 @@
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType">
 
-    <!-- The same shape as the status window rather than a pill: two popups of one program should
-         not look like they came from different ones. The background is set in code — when the
-         system grants an acrylic backdrop this stays a near-transparent film and Windows does the
-         blurring; when it does not, a solid colour goes here or the bar drowns in the wallpaper. -->
+    <!-- Same shape as the status window. Background set in code: a thin film over acrylic,
+         or a solid colour when the system grants no backdrop. -->
     <Border x:Name="Pill"
             CornerRadius="12"
             BorderThickness="1">

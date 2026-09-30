@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.Devices.Geolocation;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
 
@@ -48,6 +49,11 @@ internal static class Sun
 
         return Math.Asin(Math.Clamp(sinAlt, -1.0, 1.0)) * 180.0 / Math.PI;
     }
+
+    // The sun when the place is not known: the local clock alone, up at 7, highest at 13 and down
+    // at 19, forty degrees at noon. No season and no latitude, and nothing to look up.
+    public static double ClockElevation(DateTime local) =>
+        40.0 * Math.Cos(2 * Math.PI * (local.TimeOfDay.TotalHours - 13.0) / 24.0);
 
     // Where the sun sits between the two thresholds: 0 at the dimming point, 1 once it is low
     // enough for full brightness.
@@ -266,130 +272,108 @@ internal static class ProjectEol
     }
 }
 
-// ByIp is false while the IP lookup has not succeeded yet, so the latitude is a guess.
-internal sealed record Location(double Latitude, double Longitude, string Source, bool ByIp);
+// A place Windows location gave: where the machine is, or the default location set in Windows.
+internal sealed record Location(double Latitude, double Longitude, string Source);
 
-// Latitude comes from the IP address, longitude from the system time zone: a person sets the
-// zone, while an IP may point at a VPN exit. If both agree, longitude uses IP too.
+// Windows location via the CsWinRT projection: Wi-Fi, else the default location from settings.
+// Needs "Let desktop apps access your location"; an unpackaged app cannot prompt for it.
 internal static class Geo
 {
-    // Moscow, when nothing else works.
-    private const double FallbackLatitude = 55.76;
-
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(12) };
-
-    // Where the sun is taken to be before the network has answered: the zone gives the
-    // longitude, and the latitude is either the last one found or a guess.
-    public static Location Guess(Location? previous = null)
+    public static async Task<Location?> FindAsync(CancellationToken ct)
     {
-        (string zoneName, double lonFromTz) = Zone();
+        // Always true past PlatformGuard; here for the platform analyzer, as the projection is
+        // marked for Windows 10 and the TFM names no version.
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 10240)) return null;
 
-        return previous is { ByIp: true }
-            ? new Location(previous.Latitude, lonFromTz, $"{zoneName}, earlier IP", ByIp: true)
-            : new Location(FallbackLatitude, lonFromTz, $"{zoneName}, default latitude", ByIp: false);
-    }
+        try
+        {
+            Geoposition position = await new Geolocator()
+                .GetGeopositionAsync(AppParameters.Sky.LocationMaximumAge, AppParameters.Sky.LocationTimeout)
+                .AsTask(ct).ConfigureAwait(false);
 
-    public static async Task<Location> ResolveAsync(Location? previous, CancellationToken ct)
-    {
-        (string zoneName, double lonFromTz) = Zone();
-
-        (double Latitude, double Longitude)? byIp = await FromIpAsync(ct).ConfigureAwait(false);
-        if (byIp is null) return Guess(previous);
-
-        // Half a zone: beyond that the gap can no longer be explained by sitting near one edge
-        // of the time zone.
-        bool agree = Math.Abs(byIp.Value.Longitude - lonFromTz) <= 15.0;
-
-        if (!agree)
-            Log.Info($"sky: IP gives longitude {byIp.Value.Longitude:F2}, time zone \"{zoneName}\" " +
-                     $"gives {lonFromTz:F2}; the time zone wins");
-
-        return new Location(
-            byIp.Value.Latitude,
-            agree ? byIp.Value.Longitude : lonFromTz,
-            agree ? "IP" : $"latitude by IP, longitude by {zoneName}",
-            ByIp: true);
+            BasicGeoposition point = position.Coordinate.Point.Position;
+            return new Location(point.Latitude, point.Longitude, string.Create(CultureInfo.InvariantCulture,
+                $"Windows location, ±{position.Coordinate.Accuracy:0} m"));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Log.Info("sky: Windows location is off for desktop apps");
+            return null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            Log.Info($"sky: Windows location unavailable — {ex.Message}");
+            return null;
+        }
     }
 
     public static string Describe(Location l) => string.Create(CultureInfo.InvariantCulture,
         $"{l.Latitude:F2}, {l.Longitude:F2} ({l.Source})");
-
-    // The system zone, by its IANA name, and the longitude its offset stands for.
-    private static (string Name, double Longitude) Zone()
-    {
-        TimeZoneInfo local = TimeZoneInfo.Local;
-        string name = TimeZoneInfo.TryConvertWindowsIdToIanaId(local.Id, out string? iana) ? iana : local.Id;
-        return (name, Math.Clamp(local.GetUtcOffset(DateTime.UtcNow).TotalHours * 15.0, -180, 180));
-    }
-
-    private static async Task<(double Latitude, double Longitude)?> FromIpAsync(CancellationToken ct)
-    {
-        try
-        {
-            const string url = "http://ip-api.com/json/?fields=status,lat,lon";
-            using JsonDocument doc = JsonDocument.Parse(await Http.GetStringAsync(url, ct).ConfigureAwait(false));
-            JsonElement root = doc.RootElement;
-
-            if (root.GetProperty("status").GetString() != "success") return null;
-
-            double lat = root.GetProperty("lat").GetDouble();
-            double lon = root.GetProperty("lon").GetDouble();
-            if (Math.Abs(lat) > 90 || Math.Abs(lon) > 180) return null;
-
-            return (lat, lon);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            Log.Info($"sky: IP geolocation unavailable — {ex.Message}");
-            return null;
-        }
-    }
 }
 
-// Where the sun and the moon stand for this machine. Set up by the spinner settings and shared
-// with the lighting: both need the same place, and it is looked up over the network only once.
+// Sun, moon and weather shared by the spinner and the lighting. Without a place: no weather,
+// the sun follows the clock, and after the last retry the user is told once per run.
 internal static class Sky
 {
     private static readonly object Gate = new();
 
     private static SpinnerConfig _cfg = new();
-    private static Location? _location;
-    private static Task? _resolving;
-    private static DateTime _lastAttempt = DateTime.MinValue;
 
-    // Whether an IP lookup has finished at all, found or not. Only the first one is waited for.
-    private static bool _lookedUp;
+    private static Location? _location;
+    private static Task? _locating;
+    private static bool _lookupStarted;
+    private static DateTime _nextLookup = DateTime.MinValue;
+    private static int _retriesLeft = AppParameters.Sky.LocationMaxRetries;
+    private static bool _gaveUp;
+
+    // Whether anyone has asked for the weather, and whether the user has heard there will be none.
+    private static bool _weatherWanted;
+    private static bool _missingAnnounced;
 
     private static WeatherReport? _report;
     private static DateTime _reportStamp = DateTime.MinValue;
     private static DateTime _weatherAttempt = DateTime.MinValue;
     private static Task<WeatherReport?>? _weatherFetch;
 
-    // The thresholds and the time zone, from [Spinner].
+    // Raised once per run, off the UI thread: the place is not known and the weather was wanted.
+    public static event Action? LocationMissing;
+
+    // The thresholds, from [Spinner].
     public static SpinnerConfig Config => _cfg;
 
     public static void Configure(SpinnerConfig cfg) => _cfg = cfg;
 
-    public static Location Location
+    // Null while the place is not known, and for the rest of the run once the tries are over.
+    public static Location? Location
     {
         get
         {
-            lock (Gate) return _location ??= Geo.Guess();
+            lock (Gate) return _location;
         }
     }
 
-    // The weather is kept here for whoever needs it, and asked for by nobody else: the lighting
-    // when it is on and the evening is near, the Sun & Moon spinner while it is the spinner. Both
-    // share one answer, and together they ask no more often than WeatherRefresh.
+    // Still looking: an answer may yet come.
+    public static bool Locating
+    {
+        get
+        {
+            lock (Gate) return _location is null && !_gaveUp;
+        }
+    }
+
+    // Weather is fetched only for the lighting (evenings) and the Sun & Moon spinner,
+    // one shared answer, no more often than WeatherRefresh.
 
     // Whether an answer, or a failed try, is recent enough that asking again would be too soon.
+    // Without a place nothing is on its way, so there is nothing to wait for either.
     public static bool WeatherChecked
     {
         get
         {
             lock (Gate)
-                return _weatherFetch is not { IsCompleted: false } &&
-                       DateTime.UtcNow - _weatherAttempt < AppParameters.Sky.WeatherRefresh;
+                return _location is null ||
+                       (_weatherFetch is not { IsCompleted: false } &&
+                        DateTime.UtcNow - _weatherAttempt < AppParameters.Sky.WeatherRefresh);
         }
     }
 
@@ -415,79 +399,116 @@ internal static class Sky
         }
     }
 
-    // The weather: the one known while it is fresh, the request already on its way, or a new one.
-    // A failed request is not repeated sooner either, and leaves the last answer in place.
+    // Fresh cached answer, the pending request, or a new one; failures also wait WeatherRefresh.
+    // Without a place, none.
     public static Task<WeatherReport?> WeatherAsync()
     {
+        bool announce;
+
         lock (Gate)
         {
-            if (_weatherFetch is { IsCompleted: false }) return _weatherFetch;
-            if (DateTime.UtcNow - _weatherAttempt < AppParameters.Sky.WeatherRefresh) return Task.FromResult(_report);
+            _weatherWanted = true;
 
-            _weatherAttempt = DateTime.UtcNow;
-            Location place = _location ??= Geo.Guess();
-
-            return _weatherFetch = Task.Run(async () =>
+            if (_location is { } place)
             {
-                WeatherReport? found = await WeatherSources.FetchAsync(place, CancellationToken.None).ConfigureAwait(false);
+                if (_weatherFetch is { IsCompleted: false }) return _weatherFetch;
+                if (DateTime.UtcNow - _weatherAttempt < AppParameters.Sky.WeatherRefresh) return Task.FromResult(_report);
 
-                lock (Gate)
-                {
-                    if (found is null) return _report;
+                _weatherAttempt = DateTime.UtcNow;
+                return _weatherFetch = Task.Run(() => FetchWeatherAsync(place));
+            }
 
-                    _report = found;
-                    _reportStamp = DateTime.UtcNow;
-                }
-
-                Log.Info($"sky: weather {found.Weather}, cloud cover {found.CloudCover:P0} ({found.Source}) " +
-                         $"at {Geo.Describe(place)}");
-                return found;
-            });
+            announce = TakeAnnouncement();
         }
+
+        if (announce) LocationMissing?.Invoke();
+        return Task.FromResult<WeatherReport?>(null);
     }
 
-    // For the Sun & Moon spinner. The first IP lookup is waited for — a few seconds more than the
-    // weather for the time zone's guess. Later ones are not: while the IP service fails, a new
-    // lookup starts every minute, and waiting on each would mean no weather at all.
-    public static void EnsureWeather()
+    private static async Task<WeatherReport?> FetchWeatherAsync(Location place)
     {
+        WeatherReport? found = await WeatherSources.FetchAsync(place, CancellationToken.None).ConfigureAwait(false);
+
         lock (Gate)
         {
-            if (!_lookedUp && _resolving is { IsCompleted: false }) return;
+            if (found is null) return _report;
+
+            _report = found;
+            _reportStamp = DateTime.UtcNow;
         }
 
-        _ = WeatherAsync();
+        Log.Info($"sky: weather {found.Weather}, cloud cover {found.CloudCover:P0} ({found.Source}) " +
+                 $"at {Geo.Describe(place)}");
+        return found;
     }
 
+    // For the Sun & Moon spinner. Until the place is known this only marks the weather as wanted:
+    // it is fetched the moment the place comes.
+    public static void EnsureWeather() => _ = WeatherAsync();
+
+    // By the place when it is known, by the local clock when it is not.
     public static double Elevation(DateTime utc)
     {
-        Location l = Location;
-        return Sun.Elevation(utc, l.Latitude, l.Longitude);
+        Location? l = Location;
+        return l is null
+            ? Sun.ClockElevation(TimeZoneInfo.ConvertTimeFromUtc(utc, TimeZoneInfo.Local))
+            : Sun.Elevation(utc, l.Latitude, l.Longitude);
     }
 
-    // Starts the IP lookup when the latitude is still a guess. At boot the network is often not
-    // up yet, so a failed attempt is retried, though not more often than the refresh period.
+    // Asks Windows location, by the same rule as the external address: the first try after a
+    // short delay, then MaxRetries more, RetryDelay apart. Called often; does nothing in between.
     public static void EnsureResolved()
     {
         lock (Gate)
         {
-            if (_location is { ByIp: true }) return;
-            if (_resolving is { IsCompleted: false }) return;
-            if (DateTime.UtcNow - _lastAttempt < AppParameters.Sky.LocationRetry) return;
+            if (_location is not null || _gaveUp) return;
+            if (_locating is { IsCompleted: false }) return;
+            if (DateTime.UtcNow < _nextLookup) return;
 
-            _lastAttempt = DateTime.UtcNow;
-            Location? previous = _location;
+            bool first = !_lookupStarted;
+            _lookupStarted = true;
 
-            _resolving = Task.Run(async () =>
+            _locating = Task.Run(async () =>
             {
-                Location found = await Geo.ResolveAsync(previous, CancellationToken.None).ConfigureAwait(false);
+                if (first) await Task.Delay(AppParameters.Sky.LocationFirstDelay).ConfigureAwait(false);
+
+                Location? found = await Geo.FindAsync(CancellationToken.None).ConfigureAwait(false);
+
+                bool fetch = false, announce = false, gaveUp = false;
                 lock (Gate)
                 {
-                    _location = found;
-                    _lookedUp = true;
+                    if (found is not null)
+                    {
+                        _location = found;
+                        fetch = _weatherWanted;
+                    }
+                    else if (_retriesLeft-- > 0)
+                    {
+                        _nextLookup = DateTime.UtcNow + AppParameters.Sky.LocationRetryDelay;
+                    }
+                    else
+                    {
+                        _gaveUp = gaveUp = true;
+                        announce = TakeAnnouncement();
+                    }
                 }
-                Log.Info($"sky: location {Geo.Describe(found)}");
+
+                if (found is not null)
+                    Log.Info($"sky: location {Geo.Describe(found)}");
+                else if (gaveUp)
+                    Log.Warn("sky: no location — no weather until restart, the sun follows the clock");
+
+                if (fetch) _ = WeatherAsync();
+                if (announce) LocationMissing?.Invoke();
             });
         }
+    }
+
+    // Under the lock: whether now is the one time to tell the user there is no place.
+    private static bool TakeAnnouncement()
+    {
+        if (!_gaveUp || !_weatherWanted || _missingAnnounced) return false;
+        _missingAnnounced = true;
+        return true;
     }
 }

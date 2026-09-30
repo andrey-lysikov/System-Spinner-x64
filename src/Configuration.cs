@@ -231,9 +231,8 @@ public sealed class SpinnerConfig
     }
 }
 
-// The ARGB lighting on every supported controller, driven by the sun as sunlight-flow does it.
-// The thresholds of the sun come from SpinnerConfig: the Sun & Moon spinner uses DimAbove with or
-// without the lighting, and there is one sun for both.
+// ARGB lighting on every supported controller, driven by the sun like sunlight-flow.
+// Sun thresholds come from SpinnerConfig: one sun for the lighting and the spinner.
 public sealed class AuraConfig
 {
     // Switched from the Spinners menu, which only offers it when a controller is found.

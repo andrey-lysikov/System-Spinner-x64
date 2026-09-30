@@ -9,11 +9,8 @@ using System.Windows.Forms;
 
 namespace SystemSpinnerX64.Lighting;
 
-// A slider for the menu, drawn to match the palette above it: a track with a round thumb. The
-// system TrackBar would stay light in a dark menu. Its caption and value are a label of the menu's
-// own, above it, drawn as the menu draws every item. The value moves while the thumb is dragged
-// and is committed once the button is let go, so the light can follow the drag while the config is
-// written only once.
+// Menu slider matching the palette (system TrackBar stays light in a dark menu).
+// Moves while dragging, commits on release so the config is written once.
 internal sealed class BrightnessSlider : Control
 {
     public const int Min = 5;

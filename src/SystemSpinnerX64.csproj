@@ -64,7 +64,17 @@
     <!-- WMI: brightness of the built-in laptop panel, which DDC/CI does not reach. Declared even
          though LibreHardwareMonitor brings it, so the version must match the one it pulls. -->
     <PackageReference Include="System.Management" Version="10.0.2" />
+    <!-- Windows location: a minimal projection instead of the ~20 MB Microsoft.Windows.SDK.NET -->
+    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.3.1" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Metadata from the build machine's System32\WinMetadata, no Windows SDK needed.
+         Foundation.Diagnostics needs Windows.Storage; Windows;Microsoft are the package defaults. -->
+    <CsWinRTWindowsMetadata>local</CsWinRTWindowsMetadata>
+    <CsWinRTIncludes>Windows.Devices.Geolocation;Windows.Foundation</CsWinRTIncludes>
+    <CsWinRTExcludes>Windows;Microsoft;Windows.Foundation.Diagnostics</CsWinRTExcludes>
+  </PropertyGroup>
 
   <ItemGroup>
     <!-- The same icon inside the assembly: NotifyIcon reads it from the resources, and it must

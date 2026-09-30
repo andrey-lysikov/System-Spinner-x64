@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!-- The pages of an update, which replaces the stock first pages when a copy is already here:
-     one page that says what will happen, one with the shortcuts behind "Advanced", and the one
-     shown when administrator rights for the update were refused. Same geometry as ShortcutsDlg. -->
+<!-- Update pages replacing the stock first pages: summary, Advanced shortcuts, rights refused.
+     Same geometry as ShortcutsDlg. -->
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>

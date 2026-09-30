@@ -152,9 +152,8 @@ public sealed class TrayIcon : IDisposable
         _auraItem = Check(Text.MenuSunlight(_lightName), _cfg.Aura.Enable);
         _auraItem.Visible = false;
 
-        // A plain drop-down rather than a menu one: a menu keeps a check-mark strip on the left and
-        // an arrow strip on the right of every item, and round the palette both would stand empty.
-        // The chosen effect carries its mark in its text instead.
+        // Plain drop-down: a menu one adds empty check and arrow strips around the palette.
+        // The chosen effect is marked in its text.
         _auraItem.DropDown = new ToolStripDropDown
         {
             LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow,
@@ -359,14 +358,8 @@ public sealed class TrayIcon : IDisposable
     // Where the pointer was when the menu was asked for: the menu is put against it.
     private System.Drawing.Point _menuAnchor;
 
-    // Opens the menu at the pointer, away from the edge the taskbar is on.
-    //
-    // Placed by hand rather than by a direction handed to Show: that direction works from the size
-    // the menu had when it was last laid out, and the menu is laid out at the scale the app started
-    // with. Started over a remote session at 100 % and opened on a 150 % monitor, the menu came up
-    // far too high, then shifted sideways — it grew after it had been placed. So it is shown
-    // transparent, put in place by the size it has once it is on its monitor, and only then shown;
-    // should it still grow afterwards, it is put in place again.
+    // Opens at the pointer, away from the taskbar. Placed by hand while transparent: Show's
+    // direction uses the startup-DPI size, so on another monitor the menu landed wrong.
     private void ShowMenu()
     {
         _menuAnchor = Control.MousePosition;
@@ -456,9 +449,8 @@ public sealed class TrayIcon : IDisposable
         return root;
     }
 
-    // The lighting item is there from the start but hidden: whether the machine has a controller
-    // is known only after the startup has looked.
-    // The technology names the item: Aura, RGB Fusion, Mystic Light, Polychrome, Nollie.
+    // Hidden until startup finds a controller; the technology (Aura, RGB Fusion, ...)
+    // names the item.
     public void ShowAura(string technology)
     {
         _lightName = technology;

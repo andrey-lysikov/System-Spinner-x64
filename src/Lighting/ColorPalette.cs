@@ -9,9 +9,8 @@ using System.Windows.Forms;
 
 namespace SystemSpinnerX64.Lighting;
 
-// The colours the lighting can be given from the menu: a 12 by 12 grid. The top row runs from
-// white to black; below it every column is one hue, 30° apart from red round to rose, going from
-// pastel through the full colour to dark.
+// Lighting colours as a 12x12 grid: top row white to black, each column
+// one hue 30° apart, pastel to dark.
 internal static class Palette
 {
     public const int Size = 12;
@@ -30,11 +29,8 @@ internal static class Palette
     }
 }
 
-// A control of ours in a menu — the palette, the brightness slider — at the size the control has.
-// The palette is the widest thing in its menu, which then frames it evenly, as long as that menu
-// shows no check-mark strip to stay empty down its left side. Stretching a control to a menu made
-// wide by something else is not done: the menu sizes itself from its items, and an item that grows
-// with the menu makes it grow again. The menu's colours reach the control as BackColor and ForeColor.
+// Hosts our control in a menu at its own size; never stretched to the menu,
+// which sizes itself from its items. Menu colours arrive as Back/ForeColor.
 internal sealed class MenuHost : ToolStripControlHost
 {
     public MenuHost(Control control) : base(control)
@@ -65,9 +61,8 @@ internal sealed class MenuHost : ToolStripControlHost
     }
 }
 
-// The palette as a menu item: a grid of swatches with the current colour framed. Its caption is a
-// label of the menu's own, drawn as the menu draws every item. A click picks the colour and closes
-// the menu, as picking any other item would.
+// Palette menu item: swatch grid with the current colour framed.
+// A click picks the colour and closes the menu.
 internal sealed class PaletteControl : Control
 {
     private Rgb? _selected;
@@ -115,10 +110,8 @@ internal sealed class PaletteControl : Control
         Fit();
     }
 
-    // Built without a window, the palette is sized at the scale the app started with; the window
-    // brings the scale of the monitor it is on, and no DPI event comes with it. Started at 150 %
-    // and opened after the monitor went to 100 %, the swatches were drawn small in a palette
-    // still sized for 150 %.
+    // Built without a window, the palette is sized at startup DPI and no DPI event follows;
+    // resize for the monitor the window actually lands on.
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);

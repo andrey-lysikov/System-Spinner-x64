@@ -225,6 +225,25 @@ public class AuraTests
         Assert.True(night < -20);
     }
 
+    [Theory]
+    [InlineData(7, 0.0)]
+    [InlineData(13, 40.0)]
+    [InlineData(19, 0.0)]
+    [InlineData(1, -40.0)]
+    public void Без_места_солнце_идёт_по_часам(int hour, double expected) =>
+        Assert.Equal(expected, Sun.ClockElevation(new DateTime(2026, 9, 30, hour, 0, 0)), 6);
+
+    [Fact]
+    public void По_часам_свет_приходит_вечером_и_уходит_утром()
+    {
+        // With the default band of 10 to -6 degrees: dark lamps at noon, full at midnight, and the
+        // ramp between 18 and 20 o'clock.
+        var sky = new SpinnerConfig();
+        Assert.Equal(0.0, Sun.Factor(Sun.ClockElevation(new DateTime(2026, 9, 30, 13, 0, 0)), sky), 6);
+        Assert.Equal(1.0, Sun.Factor(Sun.ClockElevation(new DateTime(2026, 9, 30, 0, 0, 0)), sky), 6);
+        Assert.InRange(Sun.Factor(Sun.ClockElevation(new DateTime(2026, 9, 30, 19, 0, 0)), sky), 0.1, 0.9);
+    }
+
     [Fact]
     public void Фаза_луны_полнолуние_и_новолуние()
     {
@@ -380,7 +399,7 @@ public class AuraTests
 
         Assert.Null(OpenMeteo.Parse("""{"error":true,"reason":"bad"}"""));
         Assert.Equal("https://api.open-meteo.com/v1/forecast?latitude=55.76&longitude=37.62&current=cloud_cover,weather_code",
-                     OpenMeteo.Url(new Location(55.7558, 37.6176, "test", ByIp: true)));
+                     OpenMeteo.Url(new Location(55.7558, 37.6176, "test")));
     }
 
     [Theory]
@@ -413,7 +432,7 @@ public class AuraTests
     [Fact]
     public void Запрос_к_ProjectEOL_на_текущий_час()
     {
-        string request = ProjectEol.Request(new Location(55.7558, 37.6176, "test", ByIp: true),
+        string request = ProjectEol.Request(new Location(55.7558, 37.6176, "test"),
                                             new DateTime(2026, 9, 24, 12, 41, 5, DateTimeKind.Utc));
 
         Assert.Contains("\"method\":\"tools/call\"", request);

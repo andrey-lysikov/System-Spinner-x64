@@ -15,9 +15,8 @@ namespace SystemSpinnerX64.Lighting;
 // one addressable header. The effect channel switches the mode, the direct one takes colours.
 internal sealed record AuraZone(string Name, byte EffectChannel, byte DirectChannel, int LedCount);
 
-// The ASUS Aura USB controller on the motherboard, spoken to the way Armoury Crate and OpenRGB
-// do: 65-byte reports starting 0xEC on a vendor HID interface. Windows Dynamic Lighting never
-// sees this controller on most boards, which is why it is driven directly.
+// ASUS Aura USB controller, as Armoury Crate/OpenRGB: 65-byte reports starting 0xEC.
+// Driven directly since Windows Dynamic Lighting misses it on most boards.
 internal sealed class AuraDevice : ILightDevice
 {
     private const ushort AsusVendor = 0x0B05;

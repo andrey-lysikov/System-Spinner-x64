@@ -151,6 +151,7 @@ public sealed class ModeSupervisor : IDisposable
         _themeTimer.Tick += (_, _) => ApplyTheme();
 
         Sky.Configure(cfg.Spinner);
+        Sky.LocationMissing += OnLocationMissing;
 
         SystemEvents.DisplaySettingsChanging += OnDisplaySettingsChanging;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -461,9 +462,8 @@ public sealed class ModeSupervisor : IDisposable
 
         if (style.Drawn)
         {
-            // The place is looked up once; until then the sun is placed by the time zone alone.
-            // The weather is asked for only here, for this spinner: with another one chosen
-            // nothing goes out on its account.
+            // Place looked up once, the sun follows the clock until then.
+            // Weather is requested only for this spinner.
             Sky.EnsureResolved();
             Sky.EnsureWeather();
             _skyShown = SkyIcon.Now();
@@ -502,9 +502,8 @@ public sealed class ModeSupervisor : IDisposable
 
     // --- The Aura lighting ---
 
-    // Looked for off the UI thread: asking a HID device that is not the controller a driver
-    // expects waits out a timeout, and the tray must not freeze meanwhile. The menu item appears
-    // for any controller a driver knows.
+    // Off the UI thread: probing a non-matching HID device waits out a timeout.
+    // The menu item appears for any controller a driver knows.
     private void DetectAura()
     {
         int ledsPerChannel = _cfg.Aura.LedsPerChannel;
@@ -784,6 +783,18 @@ public sealed class ModeSupervisor : IDisposable
         });
     }
 
+    // --- The sky ---
+
+    // Once a run, and only when the weather was wanted: the Sun & Moon spinner or the lighting
+    // asked for it and Windows location never answered. A click opens the location settings.
+    private void OnLocationMissing()
+    {
+        if (_overlay.Dispatcher.HasShutdownStarted) return;
+
+        _ = _overlay.Dispatcher.BeginInvoke(() =>
+            _tray.Notify(Text.LocationMissing, AppParameters.Links.LocationSettings));
+    }
+
     // --- System changes ---
 
     // Waking from sleep or hibernation. The monitors come back a moment later than the message,
@@ -864,9 +875,8 @@ public sealed class ModeSupervisor : IDisposable
         // General arrives on a theme change too: there is no separate event for it.
         if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color)) return;
 
-        // It also arrives in bursts — four in a second when a remote session connects — and each
-        // would rebuild every frame of the spinner. The timer starts over with every one of them,
-        // so the rebuild happens once, after the last.
+        // Arrives in bursts (four a second on remote connect); the restarted timer
+        // rebuilds the spinner once, after the last.
         _overlay.Dispatcher.BeginInvoke(() =>
         {
             _themeTimer.Stop();
@@ -890,6 +900,7 @@ public sealed class ModeSupervisor : IDisposable
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        Sky.LocationMissing -= OnLocationMissing;
 
         _modeTimer.Stop();
         _fpsTimer.Stop();

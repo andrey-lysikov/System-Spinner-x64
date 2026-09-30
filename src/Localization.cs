@@ -210,6 +210,16 @@ internal static class Text
         "GitHub non raggiungibile: il controllo aggiornamenti non è riuscito.",
         "GitHub に接続できず、更新を確認できませんでした。");
 
+    public static string LocationMissing => S(
+        "Location is unknown: no weather until restart, the sun follows the clock. Click to allow location for desktop apps or set a default location.",
+        "Местоположение неизвестно: погоды не будет до перезапуска, солнце идёт по часам. Нажмите, чтобы разрешить доступ к расположению или задать его по умолчанию.",
+        "الموقع غير معروف: لا طقس حتى إعادة التشغيل، والشمس تتبع الساعة. انقر للسماح بالوصول إلى الموقع أو لتعيين موقع افتراضي.",
+        "位置未知：重启前不显示天气，太阳按时钟显示。点击以允许访问位置或设置默认位置。",
+        "Position inconnue : pas de météo jusqu'au redémarrage, le soleil suit l'horloge. Cliquez pour autoriser la localisation ou définir une position par défaut.",
+        "Standort unbekannt: kein Wetter bis zum Neustart, die Sonne folgt der Uhr. Klicken, um den Standortzugriff zu erlauben oder einen Standardstandort festzulegen.",
+        "Posizione sconosciuta: niente meteo fino al riavvio, il sole segue l'orologio. Fai clic per consentire la posizione o impostarne una predefinita.",
+        "位置情報が不明です。再起動まで天気は表示されず、太陽は時計に従います。クリックして位置情報を許可するか、既定の場所を設定してください。");
+
     // Why the app refused to start, in the words the notification uses.
     public static string ReasonNoRights => S(
         "administrator rights are required", "нужны права администратора",

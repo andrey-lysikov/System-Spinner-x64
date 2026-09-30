@@ -10,9 +10,8 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Lighting;
 
-// How a Nollie model takes its colours. The 16 and 32 channel ones are high-speed USB and take a
-// whole channel in one 1025-byte report; the rest are full-speed and take 21 LEDs per 65-byte
-// report, shown only when the frame is committed.
+// Nollie wire format: 16/32-channel models are high-speed (a channel per 1025-byte report);
+// others are full-speed, 21 LEDs per 65-byte report, shown on commit.
 internal enum NollieWire { HighSpeed, FullSpeed }
 
 // One Nollie model: where it sits on USB and what its channels hold. Channels are the numbers the

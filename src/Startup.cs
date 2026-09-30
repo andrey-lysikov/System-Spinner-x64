@@ -321,11 +321,8 @@ internal static class Elevation
     private const int ErrorCancelled = 1223;
 }
 
-// Autostart through a Task Scheduler task, not a Startup folder shortcut: the app needs
-// administrator rights, and a task with highest privileges is asked about once, at creation.
-// A task of its own for every Windows user: each may have a copy of their own, of another version
-// and in another folder, and a task named the same for all of them would be overwritten by
-// whoever turned autostart on last.
+// Autostart via Task Scheduler with highest privileges (admin needed, asked once).
+// One task per Windows user, so users' copies don't overwrite each other's.
 internal static class AutoStart
 {
     private static readonly XNamespace TaskXml = "http://schemas.microsoft.com/windows/2004/02/mit/task";

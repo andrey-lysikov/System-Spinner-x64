@@ -44,9 +44,8 @@
     <Border x:Name="Shell" CornerRadius="12" BorderThickness="1" Padding="15,13,15,13">
         <StackPanel x:Name="Body">
 
-            <!-- Processor load. The chart icon on the left opens the second window, with the
-                 history and the process list; neither lives in this window on purpose — it is
-                 opened for a second, to see the numbers. -->
+            <!-- Processor load. The chart icon opens the history/process window;
+                 this one stays a quick glance at the numbers. -->
             <StackPanel x:Name="CpuHeader" Orientation="Horizontal" Cursor="Hand"
                         Background="Transparent" MouseLeftButtonUp="OnCpuChartClicked">
                 <Path x:Name="CpuChartGlyph"
@@ -101,9 +100,8 @@
             <TextBlock x:Name="GpuMemTitle" Style="{StaticResource RowTitle}" Margin="0,12,0,4" />
             <views:SegmentedLevelControl x:Name="GpuMemLevel" Style="{StaticResource Bar}" />
 
-            <!-- The page file. Always shown, at zero until the first reading arrives: the figure
-                 comes a poll later than the rest, and a row appearing then would make the window
-                 jump as it opens. -->
+            <!-- Page file: always shown, zero until the first (later) reading,
+                 so the window doesn't jump when it opens. -->
             <TextBlock x:Name="SwapTitle" Style="{StaticResource RowTitle}" Margin="0,12,0,4" />
             <views:SegmentedLevelControl x:Name="SwapLevel" Style="{StaticResource Bar}" />
 

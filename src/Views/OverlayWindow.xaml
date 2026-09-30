@@ -17,9 +17,8 @@
         TextOptions.TextRenderingMode="ClearType">
 
     <Window.Resources>
-        <!-- The values below only matter if the markup renders before the code does: the font,
-             colours, shadow and sizes come from config.conf through ApplyAppearance(). That is why
-             the references are DynamicResource — StaticResource would bind once, at load. -->
+        <!-- Placeholders until ApplyAppearance() applies config.conf;
+             DynamicResource so later changes still bind. -->
         <FontFamily x:Key="Face">Impact, Haettenschweiler, Arial Narrow, Arial</FontFamily>
 
         <sys:Double x:Key="SmallFontSize">10</sys:Double>

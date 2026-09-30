@@ -11,11 +11,8 @@ using SystemSpinnerX64.Diagnostics;
 
 namespace SystemSpinnerX64.Spinner;
 
-// The Sun & Moon spinner: the turning Sun frames by day, reddening toward the horizon, the moon in
-// its current phase by night, and a cloud in front of either when the sky is overcast. Everything
-// moves over the same frames: the moon's face turns, the cloud sways and the rain falls. It reads
-// the same sky as the Aura lighting: the haze starts at DimAbove, where the lamps start to come
-// up, and the moon goes red on the nights they do.
+// Sun & Moon spinner: sun by day, moon phase by night, cloud and rain over either.
+// Reads the same sky as the lighting: haze from DimAbove, red moon on eclipse nights.
 internal static class SkyIcon
 {
     // What the picture shows, coarse enough that a slow drift does not redraw it every minute.
@@ -114,9 +111,8 @@ internal static class SkyIcon
         return null;
     }
 
-    // Under a cloud the sun or the moon moves up and left and shrinks a little; the cloud sits in
-    // front, low and right, and higher when it rains to leave room for the drops. Progress runs
-    // from 0 to 1 over one loop of frames.
+    // Under a cloud the sun/moon shifts up-left and shrinks; the cloud sits low-right,
+    // higher when raining. Progress is 0..1 over one frame loop.
     private static void Draw(Graphics g, State state, Bitmap? sun, double progress, float size, Color? tint)
     {
         bool rainy = state.Weather == SkyWeather.Rainy;
@@ -149,9 +145,8 @@ internal static class SkyIcon
         var cloud = new RectangleF(size - width - size * 0.02f + sway,
                                    size - size * (rainy ? 0.24f : 0.08f) - height, width, height);
 
-        // In colour the drops go first, to start behind the cloud and fall out from under it. In one
-        // colour they go last: the cloud clears a margin around itself, and inside it, filled the
-        // same colour, they do not show anyway.
+        // In colour, drops go first so they fall from behind the cloud;
+        // in monochrome last, as the cloud's cleared margin hides them otherwise.
         if (tint is { } color)
         {
             DrawCloudGlyph(g, cloud, rainy, color);

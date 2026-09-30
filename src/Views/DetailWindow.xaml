@@ -66,9 +66,7 @@
                 <TextBlock x:Name="HeadUsage" Grid.Column="2" FontWeight="SemiBold" FontSize="12" />
             </Grid>
 
-            <!-- No scrollbar but scrolling still works: the list is short, and the bar would eat
-                 a dozen pixels of width and be visible longer than it is needed. The wheel is
-                 enough here. -->
+            <!-- No scrollbar, wheel scrolling only: the list is short and a bar would eat width. -->
             <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl x:Name="Processes">
                     <ItemsControl.ItemTemplate>

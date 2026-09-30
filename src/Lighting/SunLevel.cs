@@ -28,14 +28,12 @@ internal sealed class SunLevel
         return report?.CloudCover ?? 0.0;
     }
 
-    // The ceiling is Brightness from [Aura]; the span the sun ramps over comes from [Spinner].
-    // Without waitForWeather the level comes at once, from the cloud cover already known, and
-    // a fresh reading is fetched behind it: a click must not wait out a slow weather service.
+    // Ceiling from [Aura], sun span from [Spinner]. Without waitForWeather, uses the known
+    // cloud cover now and refreshes behind it, so a click never waits on the network.
     public async Task<double> TargetAsync(AuraConfig cfg, bool waitForWeather, CancellationToken ct)
     {
         SpinnerConfig sky = Sky.Config;
-        Location loc = Sky.Location;
-        double elevation = Sun.Elevation(DateTime.UtcNow, loc.Latitude, loc.Longitude);
+        double elevation = Sky.Elevation(DateTime.UtcNow);
         LastElevation = elevation;
 
         double sun = Sun.Factor(elevation, sky);
