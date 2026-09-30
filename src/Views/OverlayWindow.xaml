@@ -28,7 +28,6 @@
         <SolidColorBrush x:Key="Value" Color="#FFFFFF" Opacity="0.92" />
         <SolidColorBrush x:Key="Unit"  Color="#FFFFFF" Opacity="0.55" />
         <SolidColorBrush x:Key="Tag"   Color="#FFFFFF" Opacity="0.70" />
-        <SolidColorBrush x:Key="Warn"  Color="#FF6A52" Opacity="0.95" />
 
         <!-- Right-aligned in a fixed-width column: Impact is not monospaced, and without this
              "1696" and "562" would drift against each other. -->
@@ -38,11 +37,6 @@
             <Setter Property="TextAlignment" Value="Right" />
             <Setter Property="MinWidth" Value="{Binding ValueWidth}" />
             <Setter Property="VerticalAlignment" Value="Bottom" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Warning}" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
-                </DataTrigger>
-            </Style.Triggers>
         </Style>
 
         <!-- The bottom margin is computed by ApplyFontSize(): different sizes do not share a baseline. -->

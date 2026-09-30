@@ -132,7 +132,7 @@ public class OverlayRowTests
             new OverlayRow("CPU", new[] { OverlayMetric.CpuTemp, OverlayMetric.CpuLoad })
         };
 
-        var vm = new OverlayViewModel(new WarnConfig(), rows);
+        var vm = new OverlayViewModel(rows);
 
         Assert.Equal(new[] { "FPS", "CPU" }, vm.Groups.Select(g => g.Title));
         Assert.Single(vm.Groups[0].Metrics);
@@ -144,7 +144,7 @@ public class OverlayRowTests
     {
         var rows = new[] { new OverlayRow("FAN", new[] { OverlayMetric.CpuFan, OverlayMetric.ExtraFans }) };
 
-        var vm = new OverlayViewModel(new WarnConfig(), rows, extraFans: 3);
+        var vm = new OverlayViewModel(rows, extraFans: 3);
 
         Assert.Equal(4, vm.Groups[0].Metrics.Count);
     }
@@ -181,7 +181,7 @@ public class OverlayRowTests
             new OverlayRow("B", new[] { OverlayMetric.CpuTemp, OverlayMetric.CpuLoad })
         };
 
-        var vm = new OverlayViewModel(new WarnConfig(), rows);
+        var vm = new OverlayViewModel(rows);
         vm.Layout(slots => slots * 10, unit => unit.Length * 5, unitGap: 2, columnGap: 6);
 
         Metric first = vm.Groups[0].Metrics[0];
@@ -200,7 +200,7 @@ public class OverlayRowTests
             new OverlayRow("B", new[] { OverlayMetric.CpuLoad })
         };
 
-        var vm = new OverlayViewModel(new WarnConfig(), rows);
+        var vm = new OverlayViewModel(rows);
         vm.Apply(new SystemSpinnerX64.Monitoring.Readings { CpuLoad = 42 });
 
         Assert.Equal("42", vm.Groups[0].Metrics[0].Value);
@@ -216,7 +216,7 @@ public class OverlayRowTests
             new OverlayRow("FAN", new[] { OverlayMetric.ExtraFans })   // no extra fans configured
         };
 
-        var vm = new OverlayViewModel(new WarnConfig(), rows);
+        var vm = new OverlayViewModel(rows);
 
         Assert.Single(vm.Groups);
     }

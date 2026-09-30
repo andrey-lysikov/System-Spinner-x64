@@ -31,7 +31,6 @@ public sealed class Metric : Observable
 {
     private string _value = "—";
     private bool _visible = true;
-    private bool _warning;
     private double _valueWidth;
     private double _cellWidth;
 
@@ -73,23 +72,10 @@ public sealed class Metric : Observable
         private set => Set(ref _visible, value);
     }
 
-    public bool Warning
-    {
-        get => _warning;
-        private set => Set(ref _warning, value);
-    }
-
     public void Update(double? raw, int decimals = 0) =>
         Value = raw is null
             ? "—"
             : raw.Value.ToString("F" + decimals, CultureInfo.InvariantCulture);
-
-    // Highlights a value that reached the threshold.
-    public void Update(double? raw, double threshold, int decimals = 0)
-    {
-        Update(raw, decimals);
-        Warning = threshold > 0 && raw is not null && raw.Value >= threshold;
-    }
 
     // Drops the cell when there is no value.
     public void UpdateOrHide(double? raw, int decimals = 0)
@@ -118,7 +104,6 @@ public sealed class OverlayViewModel : Observable
 {
     private string? _notice;
 
-    private readonly WarnConfig _warn;
     private readonly int _extraFanCount;
 
     // Every cell built for a value, each its own object even where a value stands in two rows:
@@ -128,9 +113,8 @@ public sealed class OverlayViewModel : Observable
     // Cells for ExtraFan names, one list per place ExtraFans stands in the rows.
     private readonly List<List<Metric>> _extraFans = new();
 
-    public OverlayViewModel(WarnConfig warn, IReadOnlyList<OverlayRow> rows, int extraFans = 0)
+    public OverlayViewModel(IReadOnlyList<OverlayRow> rows, int extraFans = 0)
     {
-        _warn = warn;
         _extraFanCount = extraFans;
 
         Groups = new ObservableCollection<MetricGroup>(
@@ -223,8 +207,8 @@ public sealed class OverlayViewModel : Observable
 
     public void Apply(Readings r)
     {
-        Show(OverlayMetric.CpuLoad, r.CpuLoad, threshold: _warn.CpuUsage);
-        Show(OverlayMetric.CpuTemp, r.CpuTempC, threshold: _warn.CpuTemp);
+        Show(OverlayMetric.CpuLoad, r.CpuLoad);
+        Show(OverlayMetric.CpuTemp, r.CpuTempC);
         Show(OverlayMetric.CpuPower, r.CpuPowerW);
         Show(OverlayMetric.CpuClock, r.CpuClockMhz);
         Show(OverlayMetric.SysMemory, r.SysMemUsedGb, decimals: 1);
@@ -237,8 +221,8 @@ public sealed class OverlayViewModel : Observable
             for (int i = 0; i < fans.Count; i++)
                 fans[i].UpdateOrHide(i < r.ExtraFanRpm.Count ? r.ExtraFanRpm[i] : null);
 
-        Show(OverlayMetric.GpuLoad, r.GpuLoad, threshold: _warn.GpuUsage);
-        Show(OverlayMetric.GpuTemp, r.GpuTempC, threshold: _warn.GpuTemp);
+        Show(OverlayMetric.GpuLoad, r.GpuLoad);
+        Show(OverlayMetric.GpuTemp, r.GpuTempC);
         Show(OverlayMetric.GpuPower, r.GpuPowerW);
         Show(OverlayMetric.GpuClock, r.GpuClockMhz);
         Show(OverlayMetric.GpuMemory, r.GpuMemUsedGb, decimals: 1);
@@ -254,11 +238,11 @@ public sealed class OverlayViewModel : Observable
         Show(OverlayMetric.FrameTime, frameTimeMs);
     }
 
-    private void Show(OverlayMetric name, double? value, int decimals = 0, double threshold = 0)
+    private void Show(OverlayMetric name, double? value, int decimals = 0)
     {
         if (!_cells.TryGetValue(name, out List<Metric>? cells)) return;
 
-        foreach (Metric cell in cells) cell.Update(value, threshold, decimals);
+        foreach (Metric cell in cells) cell.Update(value, decimals);
     }
 
     private void ShowOrHide(OverlayMetric name, double? value)

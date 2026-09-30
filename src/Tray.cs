@@ -25,10 +25,6 @@ internal sealed class MenuColors : ProfessionalColorTable
     public MenuColors(bool dark)
     {
         _dark = dark;
-
-        // A flat menu, no gradients: that is how Windows 11 draws it, and an Office 2007 gradient
-        // would give away a foreign program at a glance.
-        UseSystemColors = false;
     }
 
     internal Color Surface => _dark ? Color.FromArgb(0x2B, 0x2B, 0x2B) : Color.FromArgb(0xF9, 0xF9, 0xF9);

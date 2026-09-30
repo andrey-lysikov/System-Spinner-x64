@@ -24,7 +24,7 @@ public class ConfFormatTests
             Debug = true,
             Sensors = { CpuLoad = { "CPU Core Max" }, VramUsed = { "My VRAM" }, CpuClockCores = "Core" },
             Fans = { Cpu = { "CPU Fan" }, Extra = { "System Fan #2", "PSU Fan" }, AverageCpu = true },
-            Warn = { Color = "Gold", CpuTemp = 90, GpuTemp = 0, SysMem = 75, GpuMem = 80 },
+            Warn = { CpuTemp = 90, GpuTemp = 0, SysMem = 75, GpuMem = 80 },
             Osd = { AdjustmentSteps = 24, ControlExternalBrightness = false },
             Stats = { HistoryPoints = 300, TopProcesses = 5, ShowExternalAddress = false },
             Appearance = { FontFamily = "Consolas", TextColor = "#00FF00", Margin = 24,
@@ -44,7 +44,6 @@ public class ConfFormatTests
         Assert.Equal("Core", read.Sensors.CpuClockCores);
         Assert.Equal(new[] { "System Fan #2", "PSU Fan" }, read.Fans.Extra);
         Assert.True(read.Fans.AverageCpu);
-        Assert.Equal("Gold", read.Warn.Color);
         Assert.Equal(90, read.Warn.CpuTemp);
         Assert.Equal(0, read.Warn.GpuTemp);      // zero has to survive a write and a read
         Assert.Equal(75, read.Warn.SysMem);      // written as "75 %", read back as a number

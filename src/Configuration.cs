@@ -322,11 +322,9 @@ public enum WarnColorMode
     Max
 }
 
-// Highlighting for values past a threshold; zero disables one.
+// Thresholds for the stats window bars and the lighting tint; zero disables one.
 public sealed class WarnConfig
 {
-    public string Color { get; set; } = "#FF6A52";
-
     // What tints the Aura lighting towards a warning colour. The colour moves, never the
     // brightness: the sun alone decides how bright it is.
     public WarnColorMode WarnColorBy { get; set; } = WarnColorMode.Heat;

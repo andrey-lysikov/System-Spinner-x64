@@ -263,7 +263,6 @@ internal static class ConfFormat
         f.AverageGpu = file.Flag(SensorsSection, "AverageGpuFan") ?? f.AverageGpu;
 
         WarnConfig n = cfg.Warn;
-        n.Color = file.Text(General, "WarnColor") ?? n.Color;
         n.WarnColorBy = file.Choice<WarnColorMode>(AuraSection, nameof(n.WarnColorBy)) ?? n.WarnColorBy;
         n.CpuTemp = file.Number(General, "WarnCpuTemp") ?? n.CpuTemp;
         n.GpuTemp = file.Number(General, "WarnGpuTemp") ?? n.GpuTemp;
@@ -367,8 +366,7 @@ internal static class ConfFormat
         w.Note("Spin the tray icon outside full-screen apps.")
          .Value(nameof(cfg.SpinOnDesktop), cfg.SpinOnDesktop).Blank();
 
-        w.Note("Warning highlight: its colour and thresholds; 0 turns one off.")
-         .Value("WarnColor", n.Color)
+        w.Note("Warning thresholds for the stats window and the lighting; 0 turns one off.")
          .Value("WarnCpuTemp", n.CpuTemp)
          .Value("WarnGpuTemp", n.GpuTemp)
          .Value("WarnSysMem", n.SysMem, "%")
@@ -511,7 +509,7 @@ internal static class ConfFormat
         w.Note("Brightness after sunset.")
          .Value(nameof(au.Brightness), au.Brightness, "%").Blank();
 
-        w.Note("Tint towards WarnColor: Off, Heat (temperatures), Load (usage) or Max (whichever is nearer).")
+        w.Note("Tint towards a warning colour: Off, Heat (temperatures), Load (usage) or Max (whichever is nearer).")
          .Value(nameof(n.WarnColorBy), n.WarnColorBy.ToString()).Blank();
 
         w.Note("Below this brightness the LEDs are off.")

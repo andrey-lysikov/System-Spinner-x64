@@ -96,7 +96,7 @@ public sealed class ModeSupervisor : IDisposable
         _metrics = new MetricsService(cfg, hardware);
         _fps = new FpsCounter();
 
-        _overlayModel = new OverlayViewModel(cfg.Warn, cfg.Appearance.Rows, cfg.Fans.Extra.Count);
+        _overlayModel = new OverlayViewModel(cfg.Appearance.Rows, cfg.Fans.Extra.Count);
         _overlay = new OverlayWindow(cfg, _overlayModel);
 
         _tray = new TrayIcon(cfg);

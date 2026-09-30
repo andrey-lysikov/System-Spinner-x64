@@ -138,7 +138,6 @@ internal static class AppParameters
         public const double ValueDensity = 0.92;
         public const double TagDensity = 0.70;
         public const double UnitDensity = 0.55;
-        public const double WarnDensity = 0.95;
 
         // Above this the frame rate is shown as is rather than counted in thousands.
         public const double MaxShownFps = 999;

@@ -174,9 +174,6 @@ public partial class OverlayWindow : Window
         Resources["Tag"] = Paint(text, AppParameters.Overlay.TagDensity);
         Resources["Unit"] = Paint(text, AppParameters.Overlay.UnitDensity);
 
-        Color warn = ParseColor(_cfg.Warn.Color, Color.FromRgb(0xFF, 0x6A, 0x52), nameof(_cfg.Warn.Color));
-        Resources["Warn"] = Paint(warn, AppParameters.Overlay.WarnDensity);
-
         Readout.Opacity = Math.Clamp(look.TextOpacity,
                                         AppParameters.Limits.MinTextOpacity,
                                         AppParameters.Limits.MaxTextOpacity);

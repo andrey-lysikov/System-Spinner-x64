@@ -79,7 +79,7 @@ public partial class StatsWindow : Window
 
         var fill = new SolidColorBrush(foreground) { Opacity = 0.85 };
         var empty = new SolidColorBrush(foreground) { Opacity = 0.14 };
-        var critical = new SolidColorBrush(Color.FromRgb(0xFF, 0x6A, 0x52));
+        var critical = new SolidColorBrush(dark ? SystemColors.AccentColorLight2 : SystemColors.AccentColorDark1);
         var glyph = new SolidColorBrush(foreground) { Opacity = 0.55 };
         var line = new SolidColorBrush(foreground) { Opacity = 0.12 };
 
@@ -101,8 +101,7 @@ public partial class StatsWindow : Window
 
     private void ApplyLabels()
     {
-        // The same thresholds as the in-game panel. Temperatures become a share of the scale,
-        // which runs to a hundred degrees; the memory ones are already percentages.
+        // Warn* thresholds; temperatures as a share of the 100 °C scale, memory already in per cent.
         CpuTempLevel.CriticalLevel = _cfg.Warn.CpuTemp > 0 ? _cfg.Warn.CpuTemp / AppParameters.Layout.TemperatureScale * 100 : 0;
         GpuTempLevel.CriticalLevel = _cfg.Warn.GpuTemp > 0 ? _cfg.Warn.GpuTemp / AppParameters.Layout.TemperatureScale * 100 : 0;
 
@@ -110,7 +109,6 @@ public partial class StatsWindow : Window
         GpuMemLevel.CriticalLevel = _cfg.Warn.GpuMem;
         SwapLevel.CriticalLevel = _cfg.Warn.SwapMem;
 
-        // Load has no threshold in the config: a highlight that is on all the time says nothing.
         CpuLevel.CriticalLevel = _cfg.Warn.CpuUsage;
         GpuLevel.CriticalLevel = _cfg.Warn.GpuUsage;
     }

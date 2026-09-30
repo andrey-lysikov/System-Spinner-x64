@@ -42,43 +42,6 @@ public class MetricTests
     }
 
     [Fact]
-    public void Значение_подсвечивается_с_порога_и_выше()
-    {
-        var metric = new Metric("°C", 3);
-
-        metric.Update(84.0, threshold: 85);
-        Assert.False(metric.Warning);
-
-        metric.Update(85.0, threshold: 85);
-        Assert.True(metric.Warning);   // exactly at the threshold is already an alarm
-
-        metric.Update(90.0, threshold: 85);
-        Assert.True(metric.Warning);
-
-        metric.Update(70.0, threshold: 85);
-        Assert.False(metric.Warning);  // cooled down — the highlight goes away
-    }
-
-    [Fact]
-    public void Нулевой_порог_отключает_подсветку()
-    {
-        // This is how the load highlight is off by default: 99 % in a game is normal, not alarming.
-        var metric = new Metric("%", 3);
-
-        metric.Update(100.0, threshold: 0);
-        Assert.False(metric.Warning);
-    }
-
-    [Fact]
-    public void Отсутствие_значения_не_считается_превышением()
-    {
-        var metric = new Metric("°C", 3);
-
-        metric.Update(null, threshold: 85);
-        Assert.False(metric.Warning);
-    }
-
-    [Fact]
     public void Ячейка_исчезает_когда_железа_нет()
     {
         // A dash would mean "the sensor is silent", while the truth here is "no such hardware".
