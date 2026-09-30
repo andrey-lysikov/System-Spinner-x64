@@ -71,6 +71,17 @@ internal sealed class BrightnessSlider : Control
         FitWidth(Width);
     }
 
+    // The window brings the monitor's scale with no DPI event, as with the palette.
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        FitWidth(Width);
+    }
+
+    // The height follows from the scale, the width from the palette: neither is scaled by a factor.
+    protected override void ScaleControl(SizeF factor, BoundsSpecified specified) =>
+        base.ScaleControl(factor, specified & ~BoundsSpecified.Size);
+
     private int ValueAt(int x)
     {
         double t = (x - TrackLeft) / (double)Math.Max(1, TrackRight - TrackLeft);

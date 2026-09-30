@@ -115,6 +115,21 @@ internal sealed class PaletteControl : Control
         Fit();
     }
 
+    // Built without a window, the palette is sized at the scale the app started with; the window
+    // brings the scale of the monitor it is on, and no DPI event comes with it. Started at 150 %
+    // and opened after the monitor went to 100 %, the swatches were drawn small in a palette
+    // still sized for 150 %.
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        Fit();
+    }
+
+    // The size follows from the scale alone: the menu scaling it by a factor on top of that would
+    // leave it out of step with the swatches.
+    protected override void ScaleControl(SizeF factor, BoundsSpecified specified) =>
+        base.ScaleControl(factor, specified & ~BoundsSpecified.Size);
+
     private (int Row, int Column)? CellAt(Point p)
     {
         int top = GridTop, left = GridLeft;
