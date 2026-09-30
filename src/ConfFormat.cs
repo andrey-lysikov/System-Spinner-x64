@@ -517,7 +517,8 @@ internal static class ConfFormat
         w.Note("Below this brightness the LEDs are off.")
          .Value(nameof(au.VisibleFrom), au.VisibleFrom, "%").Blank();
 
-        w.Note("Go dark earlier on cloudy evenings, by Open-Meteo.")
+        w.Note("Go dark earlier on cloudy evenings, by Open-Meteo. Needs Windows location:",
+               "without it there is no weather and the sun follows the clock.")
          .Value(nameof(au.WeatherCloud), au.WeatherCloud).Blank();
 
         w.Note("LEDs per addressable header, capped by the controller; ASRock keeps its own count.")
