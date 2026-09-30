@@ -80,6 +80,23 @@ internal sealed class MenuRenderer : ToolStripProfessionalRenderer
     {
         e.TextColor = e.Item.Enabled ? Foreground : Disabled;
         base.OnRenderItemText(e);
+
+        // A plain drop-down has no arrow strip, so its submenu items get the arrow drawn here.
+        if (e.Item is ToolStripMenuItem { HasDropDownItems: true } item &&
+            item.Owner is ToolStripDropDown and not ToolStripDropDownMenu)
+        {
+            bool rtl = item.RightToLeft == RightToLeft.Yes;
+            var box = new Rectangle(rtl ? 4 : item.Width - 16, 0, 12, item.Height);
+            DrawArrow(new ToolStripArrowRenderEventArgs(e.Graphics, item, box, e.TextColor,
+                                                        rtl ? ArrowDirection.Left : ArrowDirection.Right));
+        }
+    }
+
+    // WinForms paints submenu arrows in system black whatever the theme; match the text instead.
+    protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
+    {
+        e.ArrowColor = e.Item?.Enabled == false ? Disabled : Foreground;
+        base.OnRenderArrow(e);
     }
 
     protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
