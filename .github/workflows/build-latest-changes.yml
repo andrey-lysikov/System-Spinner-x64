@@ -1,0 +1,26 @@
+name: Build latest changes
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.x'
+
+      - name: Build the exe
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: Attach the exe to the run
+        uses: actions/upload-artifact@v7
+        with:
+          name: System-Spinner-${{ github.sha }}
+          path: build/System-Spinner.exe
+          if-no-files-found: error

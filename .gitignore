@@ -20,3 +20,6 @@ config.conf
 System-Spinner.log
 System-Spinner.log.*
 sensors-found.txt
+
+# Local notes for Claude Code.
+CLAUDE.md
