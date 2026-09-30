@@ -99,8 +99,12 @@ internal static class Text
     // Above the palette: the colour picked there is the base one, the warning colours for heat are
     // worked out from it.
     public static string AuraBaseColor => S(
-        "Base colour", "Основной цвет", "اللون الأساسي", "主颜色",
+        "Base colour", "Базовый цвет", "اللون الأساسي", "主颜色",
         "Couleur principale", "Grundfarbe", "Colore principale", "基本色");
+
+    public static string AuraAccentColor => S(
+        "Accent colour", "Акцентный цвет", "لون التمييز", "强调色",
+        "Couleur d'accent", "Akzentfarbe", "Colore di accento", "アクセント カラー");
 
     // The slider for the ceiling the sun brings the lighting up to.
     public static string AuraMaxBrightness => S(

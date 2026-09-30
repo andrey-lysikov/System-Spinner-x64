@@ -213,7 +213,13 @@ internal sealed class AuraSunlight : IDisposable
             Log.Warn($"[Aura] Color: \"{cfg.Color}\" is not a colour — {color} is used");
         }
 
-        return new AuraLook(cfg.Effect, color, Math.Clamp(cfg.Speed, 1, 10));
+        if (!Rgb.TryParse(cfg.AccentColor, out Rgb accent))
+        {
+            accent = ColorMath.DefaultAccent;
+            Log.Warn($"[Aura] AccentColor: \"{cfg.AccentColor}\" is not a colour — {accent} is used");
+        }
+
+        return new AuraLook(cfg.Effect, color, accent, Math.Clamp(cfg.Speed, 1, 10));
     }
 
     private async Task LoopAsync(CancellationToken ct)
@@ -272,10 +278,11 @@ internal sealed class AuraSunlight : IDisposable
 
                 bool lit = _displayLevel > 0.0005 && _master > 0;
 
-                // Dark lamps have nothing to tint, so the heat is let go of with them.
-                moving |= AdvanceHeat(lit ? Volatile.Read(ref _heatTarget) : 0.0, dt);
-
                 AuraLook look = _look;
+
+                // Dark lamps, or an effect without an accent, have nothing to tint.
+                moving |= AdvanceHeat(lit && look.HasAccent ? Volatile.Read(ref _heatTarget) : 0.0, dt);
+
                 if (look.IsAnimated && lit)
                 {
                     _effectPhase = (_effectPhase + Effects.Rate(look) * dt) % 1.0;
@@ -347,7 +354,7 @@ internal sealed class AuraSunlight : IDisposable
 
         // One colour for the whole light: the effect, then the heat, then the eclipse over both.
         Rgb color = Effects.Render(look, _effectPhase);
-        if (_heat > 0) color = ColorMath.Mix(color, look.WarnColor, _heat);
+        if (_heat > 0) color = ColorMath.Mix(color, look.Accent, _heat);
         if (_blood) color = ColorMath.BloodRed;
         color = ColorMath.Scale(color, output);
 

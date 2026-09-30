@@ -20,15 +20,12 @@ public enum AuraEffect
 }
 
 // What the lighting shows before the sun and the heat have their say.
-internal sealed record AuraLook(AuraEffect Effect, Rgb Color, int Speed)
+internal sealed record AuraLook(AuraEffect Effect, Rgb Color, Rgb Accent, int Speed)
 {
     public bool IsAnimated => Effect != AuraEffect.Solid;
 
-    // The colour a hot machine drifts towards. The rainbow has no base to oppose; the other two
-    // take the colour the table picks against their own.
-    public Rgb WarnColor => Effect == AuraEffect.Rainbow
-        ? ColorMath.DefaultWarn
-        : ColorMath.WarnColorFor(Color);
+    // Only effects with a base colour drift towards the accent; the rainbow shows every hue anyway.
+    public bool HasAccent => Effect != AuraEffect.Rainbow;
 
     public override string ToString() => $"{Effect} {Color}, speed {Speed}";
 }

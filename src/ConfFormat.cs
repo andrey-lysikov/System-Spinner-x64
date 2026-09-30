@@ -300,6 +300,7 @@ internal static class ConfFormat
         AuraConfig au = cfg.Aura;
         au.Enable = file.Flag(AuraSection, nameof(au.Enable)) ?? au.Enable;
         au.Color = file.Text(AuraSection, nameof(au.Color)) ?? au.Color;
+        au.AccentColor = file.Text(AuraSection, nameof(au.AccentColor)) ?? au.AccentColor;
         au.Effect = file.Choice<AuraEffect>(AuraSection, nameof(au.Effect)) ?? au.Effect;
         au.Speed = file.Whole(AuraSection, nameof(au.Speed)) ?? au.Speed;
         au.Brightness = file.Percent(AuraSection, nameof(au.Brightness)) ?? au.Brightness;
@@ -501,6 +502,9 @@ internal static class ConfFormat
 
         w.Note("Colour of every LED, #RRGGBB or a name.")
          .Value(nameof(au.Color), au.Color).Blank();
+
+        w.Note("Colour the base drifts towards near a warning threshold; not used by Rainbow.")
+         .Value(nameof(au.AccentColor), au.AccentColor).Blank();
 
         w.Note("Solid, Breathing or Rainbow; Speed of the last two, 1 to 10.")
          .Value(nameof(au.Effect), au.Effect.ToString())

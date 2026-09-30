@@ -454,8 +454,8 @@ public sealed class TrayIcon : IDisposable
         _auraItem.Visible = true;
     }
 
-    // Under the lighting switch: the palette, and the effect below it. A click on the item itself
-    // still ticks it on and off; pointing at it opens this.
+    // Under the lighting switch: base and accent colour submenus, effect, brightness, warning mode.
+    // A click on the item itself still ticks it on and off; pointing at it opens this.
     private void BuildAuraMenu()
     {
         foreach (ToolStripItem old in _auraItem.DropDownItems.Cast<ToolStripItem>().ToList()) old.Dispose();
@@ -463,21 +463,14 @@ public sealed class TrayIcon : IDisposable
 
         // The captions are labels of the menu's own rather than text the palette and the slider
         // draw: the menu draws them in its font at its scale, as it draws every other item.
-        var palette = new PaletteControl();
-        if (Rgb.TryParse(_cfg.Aura.Color, out Rgb current)) palette.Selected = current;
+        PaletteControl palette = ColorPicker(() => _cfg.Aura.Color, color => _cfg.Aura.Color = color);
+        _auraItem.DropDownItems.Add(ColorMenu(Text.AuraBaseColor, palette));
 
-        palette.Picked += color =>
-        {
-            _cfg.Aura.Color = color.ToString();
-            Save();
-            AuraLookChanged?.Invoke();
+        _accentItem = ColorMenu(Text.AuraAccentColor,
+            ColorPicker(() => _cfg.Aura.AccentColor, color => _cfg.Aura.AccentColor = color));
+        _auraItem.DropDownItems.Add(_accentItem);
+        ShowAccent();
 
-            // A swatch is not a menu item, so the menu has to be told it is done.
-            _menu.Close();
-        };
-
-        _auraItem.DropDownItems.Add(Caption(Text.AuraBaseColor));
-        _auraItem.DropDownItems.Add(new MenuHost(palette));
         _auraItem.DropDownItems.Add(new ToolStripSeparator());
 
         AddChoices(new[]
@@ -490,6 +483,7 @@ public sealed class TrayIcon : IDisposable
             _cfg.Aura.Effect = effect;
             Save();
             AuraLookChanged?.Invoke();
+            ShowAccent();
         });
 
         // The ceiling the sun brings the light up to. The light follows the thumb as it moves; the
@@ -539,7 +533,47 @@ public sealed class TrayIcon : IDisposable
         {
             _cfg.Warn.WarnColorBy = mode;
             Save();
+            ShowAccent();
         });
+    }
+
+    private ToolStripMenuItem? _accentItem;
+
+    // The accent matters only for an effect with a base colour and a warning mode that is on.
+    private void ShowAccent()
+    {
+        if (_accentItem is null) return;
+        _accentItem.Visible = _cfg.Aura.Effect != AuraEffect.Rainbow && _cfg.Warn.WarnColorBy != WarnColorMode.Off;
+    }
+
+    // A palette bound to one colour setting; a pick saves it and closes the menu.
+    private PaletteControl ColorPicker(Func<string> current, Action<string> store)
+    {
+        var palette = new PaletteControl();
+        if (Rgb.TryParse(current(), out Rgb selected)) palette.Selected = selected;
+
+        palette.Picked += color =>
+        {
+            store(color.ToString());
+            Save();
+            AuraLookChanged?.Invoke();
+            _menu.Close();
+        };
+
+        return palette;
+    }
+
+    // A submenu holding one palette, in a plain drop-down without check and arrow strips.
+    private static ToolStripMenuItem ColorMenu(string title, PaletteControl palette)
+    {
+        var item = new ToolStripMenuItem(title) { TextAlign = ContentAlignment.MiddleLeft };
+        item.DropDown = new ToolStripDropDown
+        {
+            LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow,
+            Padding = new Padding(8, 4, 8, 4)
+        };
+        item.DropDownItems.Add(new MenuHost(palette));
+        return item;
     }
 
     // A heading under the lighting switch. Lined up on the left, as the items under it are.

@@ -42,61 +42,12 @@ public readonly record struct Rgb(byte R, byte G, byte B)
 // direct mode, so a lamp at half brightness is simply a lamp of half the colour.
 internal static class ColorMath
 {
-    // The colour of last resort, and the warning colour when the base gives nothing to go by.
+    // Fallbacks for an unreadable base or accent colour.
     public static readonly Rgb Default = Rgb.FromHex(0x0078FF);
-    public static readonly Rgb DefaultWarn = Rgb.FromHex(0xFF3000);
+    public static readonly Rgb DefaultAccent = Rgb.FromHex(0xFF3000);
 
     // A total lunar eclipse takes the palette over entirely.
     public static readonly Rgb BloodRed = Rgb.FromHex(0xFF0000);
-
-    // Hue range of the base, by its upper bound in degrees -> colour at full heat. Taken from
-    // sunlight-flow as is: meant to read as a warning against the base, not as its complement.
-    private static readonly (double UpTo, Rgb Warn)[] WarnColors =
-    {
-        (5, Rgb.FromHex(0xFFD000)),   // red                -> yellow
-        (19, Rgb.FromHex(0xFFD000)),  // red-orange         -> yellow
-        (40, Rgb.FromHex(0xFF0000)),  // orange             -> red
-        (50, Rgb.FromHex(0xFF2000)),  // amber              -> red
-        (70, Rgb.FromHex(0xFF6000)),  // yellow             -> orange
-        (100, Rgb.FromHex(0xFF2000)), // lime, olive        -> red
-        (155, Rgb.FromHex(0xFF8000)), // green              -> orange
-        (180, Rgb.FromHex(0xFF4500)), // teal               -> orange-red
-        (200, Rgb.FromHex(0xFF3000)), // cyan               -> red
-        (230, Rgb.FromHex(0xFF3000)), // blue               -> red
-        (255, Rgb.FromHex(0xFF4000)), // indigo             -> red-orange
-        (285, Rgb.FromHex(0xFF8000)), // purple             -> orange
-        (315, Rgb.FromHex(0xFFC000)), // violet, magenta    -> yellow
-        (345, Rgb.FromHex(0xFFC000)), // pink, crimson      -> yellow
-        (360, Rgb.FromHex(0xFFD000)), // red                -> yellow
-    };
-
-    // Below this saturation a colour reads as grey, and red stands out on grey.
-    private const double GreyBelow = 0.18;
-
-    public static Rgb WarnColorFor(Rgb baseColor)
-    {
-        int max = Math.Max(baseColor.R, Math.Max(baseColor.G, baseColor.B));
-        int min = Math.Min(baseColor.R, Math.Min(baseColor.G, baseColor.B));
-        if (max == 0 || (max - min) / (double)max < GreyBelow) return DefaultWarn;
-
-        double hue = Hue(baseColor);
-        return WarnColors.First(row => hue < row.UpTo).Warn;
-    }
-
-    // Hue in degrees, 0..360.
-    public static double Hue(Rgb c)
-    {
-        double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
-        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b));
-        double delta = max - min;
-        if (delta <= 0) return 0;
-
-        double h = max == r ? (g - b) / delta % 6
-                 : max == g ? (b - r) / delta + 2
-                 : (r - g) / delta + 4;
-
-        return (h * 60 + 360) % 360;
-    }
 
     // Fully saturated, full-value colour of the given hue.
     public static Rgb FromHue(double hue)

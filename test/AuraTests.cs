@@ -99,24 +99,24 @@ public class AuraTests
     public void Нулевой_порог_нагрузки_выключает_оттенок() =>
         Assert.Equal(0.0, WarnHeat.OfLoad(100, 0, 100, 0));
 
-    [Theory]
-    [InlineData(0x0078FF, 0xFF3000)]   // blue       -> red
-    [InlineData(0x00FF00, 0xFF8000)]   // green      -> orange
-    [InlineData(0xFF0000, 0xFFD000)]   // red        -> yellow
-    [InlineData(0x808080, 0xFF3000)]   // grey       -> red
-    public void Предупреждающий_цвет_по_палитре_sunlight_flow(uint baseColor, uint warn) =>
-        Assert.Equal(Rgb.FromHex(warn), ColorMath.WarnColorFor(Rgb.FromHex(baseColor)));
+    [Fact]
+    public void Акцент_есть_только_у_эффектов_с_базовым_цветом()
+    {
+        Assert.True(new AuraLook(AuraEffect.Solid, Rgb.Black, Rgb.Black, 5).HasAccent);
+        Assert.True(new AuraLook(AuraEffect.Breathing, Rgb.Black, Rgb.Black, 5).HasAccent);
+        Assert.False(new AuraLook(AuraEffect.Rainbow, Rgb.Black, Rgb.Black, 5).HasAccent);
+    }
 
     [Fact]
     public void Все_светодиоды_получают_один_цвет_эффекта()
     {
-        var solid = new AuraLook(AuraEffect.Solid, Rgb.FromHex(0x0078FF), 5);
-        var breathing = new AuraLook(AuraEffect.Breathing, Rgb.FromHex(0xFFFFFF), 5);
+        var solid = new AuraLook(AuraEffect.Solid, Rgb.FromHex(0x0078FF), ColorMath.DefaultAccent, 5);
+        var breathing = new AuraLook(AuraEffect.Breathing, Rgb.FromHex(0xFFFFFF), ColorMath.DefaultAccent, 5);
 
         Assert.Equal(Rgb.FromHex(0x0078FF), Effects.Render(solid, 0.37));
         Assert.Equal(Rgb.Black, Effects.Render(breathing, 0.0));          // breathing starts dark
         Assert.Equal(Rgb.FromHex(0xFFFFFF), Effects.Render(breathing, 0.5));
-        Assert.Equal(Rgb.FromHex(0xFF0000), Effects.Render(new AuraLook(AuraEffect.Rainbow, Rgb.Black, 5), 0));
+        Assert.Equal(Rgb.FromHex(0xFF0000), Effects.Render(new AuraLook(AuraEffect.Rainbow, Rgb.Black, ColorMath.DefaultAccent, 5), 0));
     }
 
     [Fact]
@@ -261,7 +261,7 @@ public class AuraTests
             Spinner = { Style = "Sun & Moon", DimAbove = 6, FullBelow = -3 },
             Aura =
             {
-                Enable = true, Color = "Orange", Effect = AuraEffect.Breathing, Speed = 8,
+                Enable = true, Color = "Orange", AccentColor = "Gold", Effect = AuraEffect.Breathing, Speed = 8,
                 Brightness = 70, VisibleFrom = 20, WeatherCloud = false, LedsPerChannel = 90
             }
         };
@@ -274,6 +274,7 @@ public class AuraTests
         Assert.Equal(-3, read.Spinner.FullBelow);
         Assert.True(read.Aura.Enable);
         Assert.Equal("Orange", read.Aura.Color);
+        Assert.Equal("Gold", read.Aura.AccentColor);
         Assert.Equal(AuraEffect.Breathing, read.Aura.Effect);
         Assert.Equal(8, read.Aura.Speed);
         Assert.Equal(70, read.Aura.Brightness);

@@ -241,6 +241,9 @@ public sealed class AuraConfig
     // #RRGGBB or a colour name. Every LED shows the same colour.
     public string Color { get; set; } = "#0078FF";
 
+    // What the base colour drifts towards as the machine nears a Warn* threshold.
+    public string AccentColor { get; set; } = "#FF3000";
+
     public AuraEffect Effect { get; set; } = AuraEffect.Solid;
 
     // Pace of Breathing and Rainbow, 1..10.
