@@ -235,8 +235,6 @@ internal static class ConfFormat
         stats.HistoryPoints = file.Whole(General, "DetailHistoryPoints") ?? stats.HistoryPoints;
         stats.TopProcesses = file.Whole(General, "DetailTopProcesses") ?? stats.TopProcesses;
 
-        cfg.GpuIndex = file.Whole(General, nameof(cfg.GpuIndex)) ?? cfg.GpuIndex;
-
         List<string>? Sensor(string key) => file.List(SensorsSection, key);
 
         SensorNamesConfig s = cfg.Sensors;
@@ -375,9 +373,6 @@ internal static class ConfFormat
          .Value("WarnSwapMem", n.SwapMem, "%")
          .Value("WarnCpuUsage", n.CpuUsage, "%")
          .Value("WarnGpuUsage", n.GpuUsage, "%").Blank();
-
-        w.Note("GPU to watch when there are several; 0 is the discrete one.")
-         .Value(nameof(cfg.GpuIndex), cfg.GpuIndex).Blank();
 
         w.Note("Own OSD for the volume and brightness keys.")
          .Value(nameof(o.AlwaysUseCustomOsd), o.AlwaysUseCustomOsd).Blank();

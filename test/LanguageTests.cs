@@ -51,7 +51,7 @@ public class LanguageTests
     [Fact]
     public void Без_параметра_язык_автоматический()
     {
-        Assert.Equal(Language.Auto, ConfFormat.Read("[General]\nGpuIndex = 0\n").Language);
+        Assert.Equal(Language.Auto, ConfFormat.Read("[General]\nDebug = false\n").Language);
     }
 
     [Fact]

@@ -222,11 +222,19 @@ public sealed class OverlayViewModel : Observable
                 fans[i].UpdateOrHide(i < r.ExtraFanRpm.Count ? r.ExtraFanRpm[i] : null);
 
         Show(OverlayMetric.GpuLoad, r.GpuLoad);
-        Show(OverlayMetric.GpuTemp, r.GpuTempC);
         Show(OverlayMetric.GpuPower, r.GpuPowerW);
         Show(OverlayMetric.GpuClock, r.GpuClockMhz);
-        Show(OverlayMetric.GpuMemory, r.GpuMemUsedGb, decimals: 1);
-        Show(OverlayMetric.GpuFan, r.GpuFanRpm);
+
+        // Integrated graphics have none of these: their cells go rather than stand as dashes.
+        ShowOwn(OverlayMetric.GpuTemp, r.GpuTempC);
+        ShowOwn(OverlayMetric.GpuMemory, r.GpuMemUsedGb, decimals: 1);
+        ShowOwn(OverlayMetric.GpuFan, r.GpuFanRpm);
+
+        void ShowOwn(OverlayMetric name, double? value, int decimals = 0)
+        {
+            if (r.GpuIntegrated) ShowOrHide(name, null);
+            else Show(name, value, decimals);
+        }
     }
 
     // FPS is not shown above MaxShownFps: a fourth digit would cost the whole column its width.

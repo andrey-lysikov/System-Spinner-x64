@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Diagnostics;
+using SystemSpinnerX64.Platform;
 using LibreHardwareMonitor.Hardware;
 
 namespace SystemSpinnerX64.Monitoring;
@@ -75,6 +76,28 @@ internal static class FanClassifier
         hw.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel;
 }
 
+// Graphics built into the processor: no memory, fan or temperature of their own to show.
+internal static class GpuKind
+{
+    public static bool IsIntegrated(IHardware hw) =>
+        IsIntegrated(hw.HardwareType, hw.Identifier.ToString(), AmdAdl.IsIntegrated);
+
+    // Intel's own LHM marks by the identifier; for AMD the driver is asked. No answer — a card.
+    public static bool IsIntegrated(HardwareType type, string identifier, Func<int, bool?> askAmdDriver) => type switch
+    {
+        HardwareType.GpuIntel => identifier.Contains("gpu-intel-integrated", StringComparison.OrdinalIgnoreCase),
+        HardwareType.GpuAmd => AdlIndex(identifier) is int index && askAmdDriver(index) == true,
+        _ => false
+    };
+
+    // LHM names an AMD card "/gpu-amd/<ADL adapter index>".
+    public static int? AdlIndex(string identifier) =>
+        identifier.StartsWith("/gpu-amd/", StringComparison.OrdinalIgnoreCase) &&
+        int.TryParse(identifier.AsSpan("/gpu-amd/".Length), NumberStyles.None, CultureInfo.InvariantCulture, out int index)
+            ? index
+            : null;
+}
+
 // Walks the hardware tree and refreshes the sensor values.
 internal sealed class UpdateVisitor : IVisitor
 {
@@ -100,6 +123,7 @@ public sealed class HardwareMonitor : IDisposable
 
     private IHardware? _cpu;
     private IHardware? _gpu;
+    private bool _gpuIntegrated;
     private IHardware? _memory;
     private readonly List<IHardware> _fanSources = new();
 
@@ -119,6 +143,7 @@ public sealed class HardwareMonitor : IDisposable
     // For the requirement checks in PlatformGuard.
     public string? CpuName => _cpu?.Name;
     public string? GpuName => _gpu?.Name;
+    public bool GpuIntegrated => _gpuIntegrated;
 
     public void Open()
     {
@@ -132,13 +157,15 @@ public sealed class HardwareMonitor : IDisposable
         _cpu = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
         _memory = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Memory);
 
-        // Discrete cards first, or GpuIndex = 0 would be the integrated one on a Core Ultra or a
-        // Ryzen with graphics. Intel goes last; an Arc is picked with GpuIndex.
+        // A discrete card wins over the graphics in the processor; among cards NVIDIA, then AMD.
         var gpus = _computer.Hardware.Where(FanClassifier.IsGpu)
-                                     .OrderBy(h => h.HardwareType == HardwareType.GpuIntel)
-                                     .ThenByDescending(h => h.HardwareType == HardwareType.GpuNvidia)
+                                     .Select(h => (Hardware: h, Integrated: GpuKind.IsIntegrated(h)))
+                                     .OrderBy(g => g.Integrated)
+                                     .ThenBy(g => g.Hardware.HardwareType == HardwareType.GpuIntel)
+                                     .ThenByDescending(g => g.Hardware.HardwareType == HardwareType.GpuNvidia)
                                      .ToList();
-        _gpu = gpus.Count == 0 ? null : gpus[Math.Clamp(_cfg.GpuIndex, 0, gpus.Count - 1)];
+        _gpu = gpus.Count == 0 ? null : gpus[0].Hardware;
+        _gpuIntegrated = gpus.Count > 0 && gpus[0].Integrated;
 
         _fanSources.Clear();
         foreach (var hw in _computer.Hardware)
@@ -191,7 +218,8 @@ public sealed class HardwareMonitor : IDisposable
             _computer.IsGpuEnabled = true;
             Rebind();
 
-            Log.Event($"GPU sensors reopened: {_gpu?.Name ?? "no graphics card found"}");
+            Log.Event($"GPU sensors reopened: {_gpu?.Name ?? "no graphics card found"}" +
+                      (_gpuIntegrated ? " (integrated)" : ""));
         }
         catch (Exception ex)
         {
@@ -229,12 +257,10 @@ public sealed class HardwareMonitor : IDisposable
             SysMemUsedGb = Find(_memory, SensorType.Data, names.RamUsed),
             SysMemFreeGb = Find(_memory, SensorType.Data, names.RamFree),
 
+            GpuIntegrated = _gpuIntegrated,
             GpuLoad = Find(_gpu, SensorType.Load, names.GpuLoad),
-            GpuTempC = Find(_gpu, SensorType.Temperature, names.GpuTemp),
             GpuPowerW = Find(_gpu, SensorType.Power, names.GpuPower),
             GpuClockMhz = Find(_gpu, SensorType.Clock, names.GpuClock),
-            GpuFanRpm = ReadFan(_gpu is null ? _fanSources : Prepend(_gpu),
-                                _cfg.Fans.Gpu, _cfg.Fans.AverageGpu),
 
             CpuFanRpm = ReadFan(_fanSources, _cfg.Fans.Cpu, _cfg.Fans.AverageCpu),
             AioFanRpm = ReadFan(_fanSources, _cfg.Fans.Aio, _cfg.Fans.AverageAio),
@@ -244,9 +270,18 @@ public sealed class HardwareMonitor : IDisposable
                               .ToList()
         };
 
-        // LHM reports video memory in MB — converted to GB.
-        r.GpuMemUsedGb = Find(_gpu, SensorType.SmallData, names.VramUsed) / 1024.0;
-        r.GpuMemTotalGb = Find(_gpu, SensorType.SmallData, names.VramTotal) / 1024.0;
+        // Integrated graphics: the temperature is the processor's, the memory is system memory,
+        // the fan is the CPU cooler — all already shown on the CPU and memory rows.
+        if (!_gpuIntegrated)
+        {
+            r.GpuTempC = Find(_gpu, SensorType.Temperature, names.GpuTemp);
+            r.GpuFanRpm = ReadFan(_gpu is null ? _fanSources : Prepend(_gpu),
+                                  _cfg.Fans.Gpu, _cfg.Fans.AverageGpu);
+
+            // LHM reports video memory in MB — converted to GB.
+            r.GpuMemUsedGb = Find(_gpu, SensorType.SmallData, names.VramUsed) / 1024.0;
+            r.GpuMemTotalGb = Find(_gpu, SensorType.SmallData, names.VramTotal) / 1024.0;
+        }
 
         LogSensorChoice(names);
         LogMemoryStall(r);

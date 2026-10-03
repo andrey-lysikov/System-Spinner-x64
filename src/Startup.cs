@@ -123,7 +123,8 @@ internal static class Preflight
         try
         {
             hw.Open();
-            Log.Event($"sensors opened: CPU \"{hw.CpuName}\", GPU \"{hw.GpuName}\"");
+            Log.Event($"sensors opened: CPU \"{hw.CpuName}\", GPU \"{hw.GpuName}\"" +
+                      (hw.GpuIntegrated ? " (integrated)" : ""));
 
             // Before the icon appears: the sensor list is needed exactly when something will not start.
             if (Environment.GetCommandLineArgs()

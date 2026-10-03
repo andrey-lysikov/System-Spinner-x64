@@ -177,7 +177,8 @@ public partial class StatsWindow : Window
 
         // Integrated graphics have nothing of their own for the bar: the clock belongs to the
         // package. Power or a fan means a card of its own even when the memory sensor is silent.
-        bool ownCard = r.GpuHasOwnMemory || r.GpuPowerW is not null || r.GpuFanRpm is not null;
+        bool ownCard = !r.GpuIntegrated &&
+                       (r.GpuHasOwnMemory || r.GpuPowerW is not null || r.GpuFanRpm is not null);
 
         Note(GpuNote, ownCard
             ? Join(Unit(r.GpuClockMhz, "MHz"), Unit(r.GpuPowerW, "W"), Unit(r.GpuFanRpm, Text.Rpm))

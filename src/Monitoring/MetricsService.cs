@@ -78,6 +78,9 @@ public sealed class Readings
     // Extra fans from the config, in the order they are listed there.
     public IReadOnlyList<double?> ExtraFanRpm { get; set; } = Array.Empty<double?>();
 
+    // Graphics built into the processor: no temperature, memory or fan of their own.
+    public bool GpuIntegrated { get; set; }
+
     public double? GpuLoad { get; set; }
     public double? GpuTempC { get; set; }
     public double? GpuPowerW { get; set; }

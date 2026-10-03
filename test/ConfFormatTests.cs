@@ -18,7 +18,6 @@ public class ConfFormatTests
         {
             Language = Localization.Language.Ja,
             UpdateIntervalMs = 1500,
-            GpuIndex = 1,
             ShowOverlayInGames = false,
             SpinOnDesktop = false,
             Debug = true,
@@ -35,7 +34,6 @@ public class ConfFormatTests
 
         Assert.Equal(Localization.Language.Ja, read.Language);
         Assert.Equal(1500, read.UpdateIntervalMs);   // the file speaks seconds, the timers milliseconds
-        Assert.Equal(1, read.GpuIndex);
         Assert.False(read.ShowOverlayInGames);
         Assert.False(read.SpinOnDesktop);
         Assert.True(read.Debug);
@@ -91,10 +89,18 @@ public class ConfFormatTests
     public void Недостающие_секции_называются_по_имени()
     {
         // A file without [Sensors], [FullScreenOverlay] or [Aura]; the startup writes the file back with them.
-        AppConfig old = ConfFormat.Read("[General]\nDebug = false\nGpuIndex = 0\n[Spinner]\nStyle = Loader\n");
+        AppConfig old = ConfFormat.Read("[General]\nDebug = false\n[Spinner]\nStyle = Loader\n");
 
         Assert.Equal(new[] { "Sensors", "FullScreenOverlay", "Aura" }, old.MissingSections);
         Assert.Empty(ConfFormat.Read(ConfFormat.Write(new AppConfig())).MissingSections);
+    }
+
+    [Fact]
+    public void Убранный_GpuIndex_в_старом_файле_не_мешает()
+    {
+        AppConfig cfg = ConfFormat.Read("[General]\nGpuIndex = 1\nDebug = true\n");
+
+        Assert.True(cfg.Debug);
     }
 
     [Fact]
@@ -113,10 +119,10 @@ public class ConfFormatTests
             ; и такое тоже
 
             [General]
-              GpuIndex = 2
+              AdjustmentStepsOsd = 20
             """);
 
-        Assert.Equal(2, cfg.GpuIndex);
+        Assert.Equal(20, cfg.Osd.AdjustmentSteps);
     }
 
     [Fact]
@@ -129,7 +135,7 @@ public class ConfFormatTests
     [Fact]
     public void Отсутствующий_параметр_оставляет_значение_по_умолчанию()
     {
-        AppConfig cfg = ConfFormat.Read("[General]\nGpuIndex = 1\n");
+        AppConfig cfg = ConfFormat.Read("[General]\nAdjustmentStepsOsd = 20\n");
 
         Assert.Equal(1000, cfg.UpdateIntervalMs);
         Assert.True(cfg.ShowOverlayInGames);
@@ -146,11 +152,11 @@ public class ConfFormatTests
     }
 
     [Theory]
-    [InlineData("[General]\nGpuIndex = не число\n")]
+    [InlineData("[General]\nAdjustmentStepsOsd = не число\n")]
     [InlineData("[FullScreenOverlay]\nEnable = ага\n")]
     [InlineData("[General]\nDebug = ага\n")]
-    [InlineData("[General\nGpuIndex = 1\n")]
-    [InlineData("GpuIndex = 1\n")]                       // a value outside any section
+    [InlineData("[General\nAdjustmentStepsOsd = 20\n")]
+    [InlineData("AdjustmentStepsOsd = 20\n")]                       // a value outside any section
     public void Ошибка_в_файле_не_проходит_молча(string text) =>
         Assert.ThrowsAny<FormatException>(() => ConfFormat.Read(text));
 

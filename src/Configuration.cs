@@ -21,9 +21,6 @@ public sealed class AppConfig
     // How often the sensors are polled and the panel redrawn, milliseconds.
     public int UpdateIntervalMs { get; set; } = 1000;
 
-    // Which GPU to show when there are several.
-    public int GpuIndex { get; set; }
-
     // Show the overlay over full-screen apps — Enable under [FullScreenOverlay].
     public bool ShowOverlayInGames { get; set; } = true;
 

@@ -395,6 +395,64 @@ internal static class SensorDriver
     }
 }
 
+// The AMD driver's own word on an adapter, through its ADL library (adl_defines.h).
+internal static class AmdAdl
+{
+    private const string Dll = "atiadlxx.dll";
+    private const int AdlOk = 0;
+    private const int AsicDiscrete = 1 << 0;
+    private const int AsicIntegrated = 1 << 1;
+
+    private delegate IntPtr MemoryAlloc(int size);
+
+    // Held in a field: the driver keeps the callback for the context's lifetime.
+    private static readonly MemoryAlloc Alloc = Marshal.AllocHGlobal;
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int ADL2_Main_Control_Create(MemoryAlloc callback, int connectedAdapters, out IntPtr context);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int ADL2_Main_Control_Destroy(IntPtr context);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int ADL2_Adapter_ASICFamilyType_Get(IntPtr context, int adapterIndex,
+        out int asicTypes, out int valids);
+
+    // Whether the adapter with this ADL index is built into the processor; null when the
+    // driver is absent or does not say.
+    public static bool? IsIntegrated(int adapterIndex)
+    {
+        try
+        {
+            if (ADL2_Main_Control_Create(Alloc, 1, out IntPtr context) != AdlOk) return null;
+
+            try
+            {
+                int status = ADL2_Adapter_ASICFamilyType_Get(context, adapterIndex, out int types, out int valids);
+                if (status != AdlOk)
+                {
+                    Log.Info($"ADL gave no type for adapter {adapterIndex}: status {status}");
+                    return null;
+                }
+
+                int known = types & valids;
+                if ((known & AsicIntegrated) != 0) return true;
+                if ((known & AsicDiscrete) != 0) return false;
+                return null;
+            }
+            finally
+            {
+                ADL2_Main_Control_Destroy(context);
+            }
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            Log.Info($"ADL gave no adapter type: {ex.Message}");
+            return null;
+        }
+    }
+}
+
 // The app targets Windows 11 x64 and an Intel or AMD processor.
 internal static class PlatformGuard
 {
