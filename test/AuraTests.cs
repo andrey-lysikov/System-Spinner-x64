@@ -63,13 +63,14 @@ public class AuraTests
 
     [Theory]
     [InlineData(null, 0.0)]
-    [InlineData(60.0, 0.0)]     // well below 85 - 15
-    [InlineData(70.0, 0.0)]     // where the colour starts to move
-    [InlineData(77.5, 0.5)]
+    [InlineData(30.0, 0.0)]     // below 40 the colour stays put
+    [InlineData(40.0, 0.0)]     // where the colour starts to move
+    [InlineData(60.0, 0.09)]    // gentle at first
+    [InlineData(80.0, 0.63)]    // steep near the threshold
     [InlineData(85.0, 1.0)]     // at the threshold it has gone all the way
     [InlineData(99.0, 1.0)]
     public void Оттенок_растёт_к_порогу_температуры(double? cpu, double expected) =>
-        Assert.Equal(expected, WarnHeat.Of(cpu, 85, null, 83), 3);
+        Assert.Equal(expected, WarnHeat.Of(cpu, 85, null, 83), 2);
 
     [Fact]
     public void Оттенок_берётся_по_самому_горячему() =>
@@ -81,13 +82,14 @@ public class AuraTests
 
     [Theory]
     [InlineData(null, null, 0.0)]
-    [InlineData(50.0, 60.0, 0.0)]    // an ordinary desktop load leaves the colour alone
-    [InlineData(75.0, null, 0.0)]    // where the colour starts to move: 95 - 20
-    [InlineData(85.0, 10.0, 0.5)]
-    [InlineData(10.0, 85.0, 0.5)]    // the busier of the two, whichever it is
+    [InlineData(0.0, 0.0, 0.0)]      // the colour starts to move at 0 %
+    [InlineData(45.0, null, 0.12)]   // halfway: (e^2 - 1) / (e^4 - 1)
+    [InlineData(80.0, 10.0, 0.63)]   // 8/9 of the way, like 80 °C
+    [InlineData(10.0, 80.0, 0.63)]   // the busier of the two, whichever it is
+    [InlineData(90.0, null, 1.0)]    // complete at the threshold
     [InlineData(20.0, 99.0, 1.0)]
     public void Оттенок_по_нагрузке_берётся_по_самому_загруженному(double? cpu, double? gpu, double expected) =>
-        Assert.Equal(expected, WarnHeat.OfLoad(cpu, 95, gpu, 95), 3);
+        Assert.Equal(expected, WarnHeat.OfLoad(cpu, 90, gpu, 90), 2);
 
     [Theory]
     [InlineData("", WarnColorMode.Heat)]                                       // the default

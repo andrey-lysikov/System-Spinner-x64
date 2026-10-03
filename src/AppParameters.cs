@@ -198,12 +198,13 @@ internal static class AppParameters
         // every sensor poll.
         public static readonly TimeSpan HeatSmoothing = TimeSpan.FromSeconds(1.5);
 
-        // How far below WarnCpuTemp and WarnGpuTemp the colour starts to move, degrees.
-        public const double WarnRampDegrees = 15;
+        // Temperature where the colour starts to move towards WarnCpuTemp and WarnGpuTemp, degrees.
+        // The load tint starts at 0 %.
+        public const double WarnTempFrom = 40;
 
-        // How far below WarnCpuUsage and WarnGpuUsage the colour starts to move, per cent: at the
-        // default 95 from three quarters load up, so a light desktop load leaves it alone.
-        public const double WarnRampLoad = 20;
+        // Bend of the exponential tint: halfway to the threshold the colour is ~12 % there
+        // (40 °C → 0, 60 → 9 %, 80 → 63 %, 85 → 100 %).
+        public const double WarnCurveBend = 4;
 
         // How far a blood-moon pulse dips at its lowest. A third reads as breathing.
         public const double PulseDepth = 1.0 / 3.0;
