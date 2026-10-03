@@ -51,22 +51,21 @@ internal static class Effects
 internal static class WarnHeat
 {
     // Zero switches a threshold off, as it does for the overlay highlighting.
+    // The tint starts at 40 °C.
     public static double Of(double? cpuTemp, double cpuLimit, double? gpuTemp, double gpuLimit) =>
-        Math.Max(Ramp(cpuTemp, AppParameters.Aura.WarnTempFrom, cpuLimit),
-                 Ramp(gpuTemp, AppParameters.Aura.WarnTempFrom, gpuLimit));
+        Math.Max(Ramp(cpuTemp, 40, cpuLimit), Ramp(gpuTemp, 40, gpuLimit));
 
     // The same for the load, per cent against WarnCpuUsage and WarnGpuUsage: the busier of the two.
     public static double OfLoad(double? cpuLoad, double cpuLimit, double? gpuLoad, double gpuLimit) =>
         Math.Max(Ramp(cpuLoad, 0, cpuLimit), Ramp(gpuLoad, 0, gpuLimit));
 
-    // Exponential from `from` to the threshold: gentle at first, steep near the end, complete at it.
+    // Exponential from `from` to the threshold, complete at it: 40 °C → 0, 60 → 9 %, 80 → 63 %, 85 → 100 %.
     private static double Ramp(double? value, double from, double limit)
     {
         if (value is not double v || limit <= 0) return 0;
         if (limit <= from) return v >= limit ? 1 : 0;
 
-        const double bend = AppParameters.Aura.WarnCurveBend;
         double x = Math.Clamp((v - from) / (limit - from), 0, 1);
-        return (Math.Exp(bend * x) - 1) / (Math.Exp(bend) - 1);
+        return (Math.Exp(4 * x) - 1) / (Math.Exp(4) - 1);
     }
 }

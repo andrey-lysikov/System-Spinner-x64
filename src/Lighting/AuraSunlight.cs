@@ -356,7 +356,7 @@ internal sealed class AuraSunlight : IDisposable
         Rgb color = Effects.Render(look, _effectPhase);
         if (_heat > 0) color = ColorMath.Mix(color, look.Accent, _heat);
         if (_blood) color = ColorMath.BloodRed;
-        color = ColorMath.Scale(color, output);
+        color = ColorMath.Scale(ColorMath.Gamma(color), output);
 
         try
         {
@@ -458,8 +458,8 @@ internal sealed class AuraSunlight : IDisposable
         _toggling = true;
     }
 
-    // Exponential drift towards the latest reading: the tint flows between polls instead of
-    // stepping once a second.
+    // Exponential drift towards the latest reading, 1.5 s time constant: the tint flows between
+    // polls instead of stepping once a second.
     private bool AdvanceHeat(double target, double dt)
     {
         double delta = target - _heat;
@@ -469,7 +469,7 @@ internal sealed class AuraSunlight : IDisposable
             return false;
         }
 
-        _heat += delta * (1.0 - Math.Exp(-dt / AppParameters.Aura.HeatSmoothing.TotalSeconds));
+        _heat += delta * (1.0 - Math.Exp(-dt / 1.5));
         return true;
     }
 

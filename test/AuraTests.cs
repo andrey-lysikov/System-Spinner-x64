@@ -122,6 +122,14 @@ public class AuraTests
     }
 
     [Fact]
+    public void Гамма_сохраняет_края_и_затемняет_середину()
+    {
+        Assert.Equal(Rgb.Black, ColorMath.Gamma(Rgb.Black));
+        Assert.Equal(Rgb.FromHex(0xFFFFFF), ColorMath.Gamma(Rgb.FromHex(0xFFFFFF)));
+        Assert.Equal(new Rgb(56, 0, 255), ColorMath.Gamma(new Rgb(128, 0, 255)));
+    }
+
+    [Fact]
     public void Палитра_двенадцать_на_двенадцать_без_повторов()
     {
         var seen = new System.Collections.Generic.HashSet<Rgb>();

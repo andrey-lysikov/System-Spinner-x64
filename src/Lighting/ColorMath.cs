@@ -92,6 +92,13 @@ internal static class ColorMath
             (byte)(a.B + (b.B - a.B) * k));
     }
 
+    // sRGB to LED duty: the LEDs are linear, so mid values and mixes would look washed out.
+    public static Rgb Gamma(Rgb c)
+    {
+        static byte Channel(byte v) => (byte)Math.Round(255 * Math.Pow(v / 255.0, 2.2));
+        return new Rgb(Channel(c.R), Channel(c.G), Channel(c.B));
+    }
+
     public static Rgb Scale(Rgb c, double k)
     {
         k = Math.Clamp(k, 0.0, 1.0);
