@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1
+
+* Support graphics built into the processor (Intel, AMD Ryzen with Radeon).
+
 ## 2.0
 
 * Rewrite location for the sun and weather comes from Windows location (or the default location set in Windows) instead of the IP address
