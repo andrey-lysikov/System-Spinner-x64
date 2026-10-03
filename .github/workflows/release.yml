@@ -19,6 +19,7 @@ jobs:
       release: ${{ steps.check.outputs.release }}
       version: ${{ steps.check.outputs.version }}
       tag: ${{ steps.check.outputs.tag }}
+      update: ${{ steps.check.outputs.update }}
       notes: ${{ steps.check.outputs.notes }}
 
     steps:
@@ -37,23 +38,28 @@ jobs:
           Write-Host "Version in the project: $version"
           if ($version -notmatch '^\d+\.\d+$') { throw "<Version> in $csproj must be two numbers, like 1.4, not $version" }
 
-          $previous = git tag --list 'v[0-9]*' --sort=-v:refname | Select-Object -First 1
-          Write-Host "Newest tag: $(if ($previous) { $previous } else { '(none)' })"
+          $tags = @(git tag --list 'v[0-9]*' --sort=-v:refname)
+          $newest = $tags | Select-Object -First 1
+          Write-Host "Newest tag: $(if ($newest) { $newest } else { '(none)' })"
 
           $newer = $true
-          if ($previous) {
-            $newer = [version]$version -gt [version]($previous -replace '^v', '')
+          $same = $false
+          if ($newest) {
+            $newer = [version]$version -gt [version]($newest -replace '^v', '')
+            $same = [version]$version -eq [version]($newest -replace '^v', '')
           }
+          $update = $same -and $env:GITHUB_EVENT_NAME -eq 'workflow_dispatch'
+          $previous = if ($update) { $tags | Select-Object -Skip 1 -First 1 } else { $newest }
 
           $changelog = Get-Content 'changelog.md' -Raw
           $pattern = '(?ms)^##\s+' + [regex]::Escape($version) + '\s*$(.*?)(?=^##\s|\z)'
           $match = [regex]::Match($changelog, $pattern)
           $described = $match.Success -and $match.Groups[1].Value.Trim().Length -gt 0
 
-          Write-Host "Higher than the tag: $newer; described in changelog.md: $described"
+          Write-Host "Higher than the tag: $newer; manual update of the current release: $update; described in changelog.md: $described"
 
-          if (-not ($newer -and $described)) {
-            $reason = if (-not $newer) { "version $version is not higher than $previous" } else { "changelog.md has no section for $version" }
+          if (-not (($newer -or $update) -and $described)) {
+            $reason = if (-not ($newer -or $update)) { "version $version is not higher than $newest" } else { "changelog.md has no section for $version" }
             Write-Host "No release: $reason"
             "release=false" >> $env:GITHUB_OUTPUT
             "## No release`n`n$reason" >> $env:GITHUB_STEP_SUMMARY
@@ -72,6 +78,7 @@ jobs:
           "release=true"     >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$tag"         >> $env:GITHUB_OUTPUT
+          "update=$("$update".ToLower())" >> $env:GITHUB_OUTPUT
           "notes<<RELEASE_NOTES_EOF`n$notes`nRELEASE_NOTES_EOF" >> $env:GITHUB_OUTPUT
 
   test:
@@ -101,6 +108,7 @@ jobs:
         run: ./installer/installer.ps1 -Version ${{ needs.check.outputs.version }}
 
       - name: Publish the release
+        if: needs.check.outputs.update != 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -112,3 +120,19 @@ jobs:
             --title '${{ needs.check.outputs.tag }}' `
             --notes-file release-notes.md `
             --target ${{ github.sha }}
+
+      - name: Update the current release
+        if: needs.check.outputs.update == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ needs.check.outputs.notes }}
+        run: |
+          Set-Content -Path 'release-notes.md' -Value $env:NOTES -Encoding utf8
+          gh api -X PATCH 'repos/${{ github.repository }}/git/refs/tags/${{ needs.check.outputs.tag }}' `
+            -f sha='${{ github.sha }}' -F force=true
+          if ($LASTEXITCODE) { throw "Could not move tag ${{ needs.check.outputs.tag }}" }
+          gh release upload ${{ needs.check.outputs.tag }} 'build/System-Spinner.msi' --clobber
+          if ($LASTEXITCODE) { throw "Could not upload the installer" }
+          gh release edit ${{ needs.check.outputs.tag }} --notes-file release-notes.md
+          if ($LASTEXITCODE) { throw "Could not update the release notes" }
