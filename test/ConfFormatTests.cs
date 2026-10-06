@@ -79,10 +79,11 @@ public class ConfFormatTests
     [Fact]
     public void Панель_выключается_параметром_Enable()
     {
+        Assert.True(ConfFormat.Read("[FullScreenOverlay]\nEnable = true\n").ShowOverlayInGames);
         Assert.False(ConfFormat.Read("[FullScreenOverlay]\nEnable = false\n").ShowOverlayInGames);
 
         // The old name under [General] is not read any more: the section is written in anew instead.
-        Assert.True(ConfFormat.Read("[General]\nShowOverlayInGames = false\n").ShowOverlayInGames);
+        Assert.False(ConfFormat.Read("[General]\nShowOverlayInGames = true\n").ShowOverlayInGames);
     }
 
     [Fact]
@@ -138,7 +139,7 @@ public class ConfFormatTests
         AppConfig cfg = ConfFormat.Read("[General]\nAdjustmentStepsOsd = 20\n");
 
         Assert.Equal(1000, cfg.UpdateIntervalMs);
-        Assert.True(cfg.ShowOverlayInGames);
+        Assert.False(cfg.ShowOverlayInGames);
         Assert.Null(cfg.Debug);   // the "log the first run in full" rule rests on this
     }
 

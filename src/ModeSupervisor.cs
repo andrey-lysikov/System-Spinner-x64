@@ -52,6 +52,7 @@ public sealed class ModeSupervisor : IDisposable
     private readonly DispatcherTimer _themeTimer = new();
 
     private StatsWindow? _stats;
+    private bool _statsStale;
 
     // The motherboard lighting, when the machine has an Aura controller.
     private AuraSunlight? _aura;
@@ -185,7 +186,12 @@ public sealed class ModeSupervisor : IDisposable
         try
         {
             _gpuWatch = new GpuDriverWatch();
-            _gpuWatch.AdapterChanged += reason => _hardware.PauseGpu(reason);
+            _gpuWatch.AdapterChanged += reason =>
+            {
+                _hardware.PauseGpu(reason);
+                RebuildStats(reason);
+                _osd.ScreensChanged();
+            };
         }
         catch (Exception ex)
         {
@@ -564,14 +570,47 @@ public sealed class ModeSupervisor : IDisposable
         // a difference against the previous poll, and without it the list would be empty.
         _metrics.Detailed = true;
         _stats.ShowStats();
+
+        // Last resort: the size still belongs to another scale, though no screen event said so.
+        if (_stats.KeptOtherScale(out string scales))
+        {
+            Log.Warn("the status window kept the size of another scale (" + scales + ") — rebuilt");
+            _stats.Hide();
+            _stats.Close();
+            _stats = CreateStats();
+            _stats.ShowStats();
+        }
+
         _stats.Apply(_metrics.Latest);
     }
 
     private StatsWindow CreateStats()
     {
         var window = new StatsWindow(_cfg);
-        window.Hidden += () => _metrics.Detailed = false;
+        window.Hidden += () =>
+        {
+            _metrics.Detailed = false;
+            if (_statsStale) _overlay.Dispatcher.BeginInvoke(() => RebuildStats("the screens changed while it was open"));
+        };
         return window;
+    }
+
+    // A hidden window keeps its pixel size from the scale it was built at (console ↔ remote
+    // desktop), so it is built anew. An open one is only moved now and rebuilt once it hides.
+    private void RebuildStats(string why)
+    {
+        if (_stats is { IsVisible: true })
+        {
+            _statsStale = true;
+            _stats.Reposition();
+            return;
+        }
+
+        _statsStale = false;
+        _stats?.Close();
+        _stats = CreateStats();
+        _stats.Prepare();
+        Log.Info("the status window rebuilt: " + why);
     }
 
     private void HideStats()
@@ -860,8 +899,9 @@ public sealed class ModeSupervisor : IDisposable
             _overlay.ApplyLayout();
             UpdateMode();
 
-            // The status window can be left hanging over the edge of what remains.
-            _stats?.Reposition();
+            // The status window can be left hanging over the edge of what remains, or at another scale.
+            RebuildStats("the screen configuration changed");
+            _osd.ScreensChanged();
 
             RescanDisplays("the screen configuration changed");
 

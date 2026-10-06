@@ -27,6 +27,7 @@ public sealed class OsdController : IDisposable
     private readonly DispatcherTimer _hide = new();
 
     private OsdWindow? _window;
+    private bool _stale;
 
     public OsdController(AppConfig cfg)
     {
@@ -43,6 +44,7 @@ public sealed class OsdController : IDisposable
     {
         // The window is built on first use: the app may run all day without anyone touching the
         // volume, and parsing the markup up front would be paid for nothing.
+        if (_stale && _window is { IsVisible: false }) Drop();
         _window ??= new OsdWindow();
 
         _window.Show(percent, kind, _cfg.Osd.AdjustmentSteps);
@@ -50,6 +52,21 @@ public sealed class OsdController : IDisposable
         _hide.Stop();
         _hide.Interval = AppParameters.Osd.Visible;
         _hide.Start();
+    }
+
+    // The screens changed: the window keeps its pixel size from the old scale, so it is built
+    // anew on the next show (an open one first finishes its countdown).
+    public void ScreensChanged()
+    {
+        _stale = true;
+        if (_window is { IsVisible: false }) Drop();
+    }
+
+    private void Drop()
+    {
+        _stale = false;
+        _window?.Close();
+        _window = null;
     }
 
     // Re-reads the theme — called when the system has switched it.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2
+
+* The full-screen overlay is off by default
+* Bugfixs
+
 ## 2.1
 
 * Support graphics built into the processor (Intel, AMD Ryzen with Radeon).

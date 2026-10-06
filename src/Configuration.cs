@@ -22,7 +22,7 @@ public sealed class AppConfig
     public int UpdateIntervalMs { get; set; } = 1000;
 
     // Show the overlay over full-screen apps — Enable under [FullScreenOverlay].
-    public bool ShowOverlayInGames { get; set; } = true;
+    public bool ShowOverlayInGames { get; set; } = false;
 
     // Keep the tray icon spinning outside full-screen apps too.
     public bool SpinOnDesktop { get; set; } = true;

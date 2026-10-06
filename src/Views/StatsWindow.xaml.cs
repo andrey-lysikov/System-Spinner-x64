@@ -8,12 +8,14 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using SystemSpinnerX64.Configuration;
 using SystemSpinnerX64.Localization;
 using SystemSpinnerX64.Monitoring;
+using SystemSpinnerX64.Platform;
 
 namespace SystemSpinnerX64.Views;
 
@@ -181,7 +183,7 @@ public partial class StatsWindow : Window
                        (r.GpuHasOwnMemory || r.GpuPowerW is not null || r.GpuFanRpm is not null);
 
         Note(GpuNote, ownCard
-            ? Join(Unit(r.GpuClockMhz, "MHz"), Unit(r.GpuPowerW, "W"), Unit(r.GpuFanRpm, Text.Rpm))
+            ? Join(Unit(r.GpuClockMhz, "MHz"), Unit(r.GpuPowerW, "W"), GpuFan(r.GpuFanRpm))
             : "");
 
         Row(CpuTempTitle, CpuTempLevel, Text.StatsCpuTemp, r.CpuTempC, "°C", Percent(r.CpuTempC));
@@ -249,6 +251,10 @@ public partial class StatsWindow : Window
         return joined.Length == 0 ? null : joined;
     }
 
+    // A card fan at zero is stopped on purpose (semi-passive mode), as with the fans above.
+    private static string? GpuFan(double? rpm) =>
+        rpm is < 1 ? Text.StatsFanStopped : Unit(rpm, Text.Rpm);
+
     // Fan speeds with tags: "CPU 903 · AIO 2210 · SYS 1200".
     private static string? Fans(Readings r)
     {
@@ -294,6 +300,25 @@ public partial class StatsWindow : Window
         }
 
         _detail.ShowDetail(kind, _latest);
+    }
+
+    // Whether the pixel width disagrees with the scale of the screen it is on: the window kept
+    // the size it had at another scale. "scales" says what was compared, for the log.
+    public bool KeptOtherScale(out string scales)
+    {
+        scales = "";
+        IntPtr handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero || !Win32.TryGetWindowRect(handle, out Win32.RECT rect)) return false;
+
+        double own = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        double screen = Win32.ScaleAt((rect.Left + rect.Right) / 2, (rect.Top + rect.Bottom) / 2);
+        int pixels = rect.Right - rect.Left;
+        double expected = ActualWidth * own;
+
+        scales = string.Create(CultureInfo.InvariantCulture,
+            $"window {own:0.##}, screen {screen:0.##}, {pixels} px for {expected:0} px");
+
+        return Math.Abs(own - screen) > 0.01 || Math.Abs(pixels - expected) > 2;
     }
 
     // Places the window again — after a screen was attached, detached or rescaled.

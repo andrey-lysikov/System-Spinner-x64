@@ -427,8 +427,12 @@ internal static class Text
     public static string StatsFans(string speeds) => $"{speeds} {Rpm}";
 
     public static string StatsFansStopped => S(
-        "fans stopped", "вентиляторы стоят", "المراوح متوقفة", "风扇已停转",
+        "fans stopped", "вентиляторы остановлены", "المراوح متوقفة", "风扇已停转",
         "ventilateurs arrêtés", "Lüfter stehen", "ventole ferme", "ファン停止中");
+
+    public static string StatsFanStopped => S(
+        "fan stopped", "вентилятор остановлен", "المروحة متوقفة", "风扇已停转",
+        "ventilateur arrêté", "Lüfter steht", "ventola ferma", "ファン停止中");
 
     // --- The chart window ---
 
