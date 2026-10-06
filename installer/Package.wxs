@@ -398,7 +398,7 @@
                   Return="ignore" />
 
     <InstallExecuteSequence>
-      <MoveFiles Before="RemoveFiles" />
+      <MoveFiles Sequence="3450" />
       <Custom Action="InstallPawnIo" After="InstallFiles"
               Condition="NOT Installed AND INSTALLPAWNIO = 1" />
       <Custom Action="RemoveOldAutostartTask" After="InstallPawnIo"
