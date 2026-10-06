@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!-- Our one page, between the stock folder page and the last one: where the shortcuts go. The
-     geometry (370 x 270, banner, buttons) follows the stock dialogs so the page does not jump. -->
-
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>
     <UI>
@@ -24,8 +21,6 @@
                  Property="INSTALLDESKTOPSHORTCUT" CheckBoxValue="1"
                  Text="Add a shortcut to the desktop" />
 
-        <!-- The same question the stock last page can ask, asked here instead: there it comes
-             out in a grey box of its own, here it sits on the same ground as the two above. -->
         <Control Id="LaunchCheckBox" Type="CheckBox" X="20" Y="120" Width="330" Height="17"
                  Property="LAUNCHAFTERINSTALL" CheckBoxValue="1"
                  Text="Start the app when the installer finishes" />

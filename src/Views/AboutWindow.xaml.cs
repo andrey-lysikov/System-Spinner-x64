@@ -25,7 +25,7 @@ public partial class AboutWindow : Window
         FlowDirection = Text.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
 
         // The name of the project with its version on one line, the story underneath.
-        Headline.Text = $"System Spinner x64 v{version}";
+        Headline.Text = $"{AppParameters.Identity.Name} v{version}";
         Description.Text = Text.AboutText;
         Project.Content = Text.MenuProject;
         Logo.Source = LoadIcon();

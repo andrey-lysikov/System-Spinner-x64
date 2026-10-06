@@ -25,6 +25,6 @@ jobs:
       - name: Attach the exe to the run
         uses: actions/upload-artifact@v7
         with:
-          name: System-Spinner-${{ github.sha }}
-          path: build/System-Spinner.exe
+          name: System-Spinner-x64-${{ github.sha }}
+          path: build/System-Spinner-x64.exe
           if-no-files-found: error

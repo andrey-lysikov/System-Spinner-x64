@@ -15,34 +15,37 @@ internal static class AppParameters
     internal static class Identity
     {
         // The name shown to the user: the tray tooltip, the About window, the log header.
-        public const string Name = "System-Spinner";
+        public const string Name = "System-Spinner x64";
+
+        // The same name without the space, for everything technical. Renaming it is the installer's
+        // migration job: folders, tasks and the config of older copies keep the old one.
+        public const string Id = "System-Spinner-x64";
 
         // The settings file, next to the exe or in the per-user folder below.
         public const string ConfigFile = "config.conf";
 
         // The log, always beside the settings file.
-        public const string LogFile = "System-Spinner.log";
+        public const string LogFile = Id + ".log";
 
         // The folder under %LOCALAPPDATA% used when the exe sits somewhere it must not write —
         // Program Files, say.
-        public const string AppFolder = "System-Spinner";
+        public const string AppFolder = Id;
 
-        // The task in Task Scheduler that starts the app with Windows: this, followed by the user
-        // it belongs to. Alone, it is the one task for the whole machine of 1.3 and earlier.
-        public const string TaskName = "System-Spinner";
+        // The task in Task Scheduler that starts the app with Windows, followed by the user it belongs to.
+        public const string TaskName = Id;
 
         // The ETW session the frame counter raises.
-        public const string EtwSession = "System-Spinner-Frames";
+        public const string EtwSession = Id + "-Frames";
 
         // The mutex that keeps a second copy from starting.
-        public const string SingleInstanceMutex = "System-Spinner.SingleInstance";
+        public const string SingleInstanceMutex = Id + ".SingleInstance";
 
         // The invisible window that receives the raw input — the brightness keys of the keyboard.
-        public const string MessageWindow = "System-Spinner.Messages";
+        public const string MessageWindow = Id + ".Messages";
 
         // The icon inside the assembly — the tray and the About window read it from there rather
         // than from a file beside the exe.
-        public const string IconResource = "System-Spinner.icon.ico";
+        public const string IconResource = Id + ".icon.ico";
 
         // The version of the running exe, two numbers. The assembly always carries four — .NET
         // fills the rest itself — and the tags, the changelog and the update check speak in two.

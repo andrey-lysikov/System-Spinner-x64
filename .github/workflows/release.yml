@@ -116,7 +116,7 @@ jobs:
         run: |
           Set-Content -Path 'release-notes.md' -Value $env:NOTES -Encoding utf8
           gh release create ${{ needs.check.outputs.tag }} `
-            'build/System-Spinner.msi' `
+            'build/System-Spinner-x64.msi' `
             --title '${{ needs.check.outputs.tag }}' `
             --notes-file release-notes.md `
             --target ${{ github.sha }}
@@ -132,7 +132,7 @@ jobs:
           gh api -X PATCH 'repos/${{ github.repository }}/git/refs/tags/${{ needs.check.outputs.tag }}' `
             -f sha='${{ github.sha }}' -F force=true
           if ($LASTEXITCODE) { throw "Could not move tag ${{ needs.check.outputs.tag }}" }
-          gh release upload ${{ needs.check.outputs.tag }} 'build/System-Spinner.msi' --clobber
+          gh release upload ${{ needs.check.outputs.tag }} 'build/System-Spinner-x64.msi' --clobber
           if ($LASTEXITCODE) { throw "Could not upload the installer" }
           gh release edit ${{ needs.check.outputs.tag }} --notes-file release-notes.md
           if ($LASTEXITCODE) { throw "Could not update the release notes" }

@@ -1,6 +1,6 @@
 <img src="pictures/icon.ico" width="128" alt="icon">
 
-# System Spinner x64 (for Windows)
+# System-Spinner x64 (for Windows)
 
 System monitoring with two faces: a tray icon on the desktop, and a game overlay while a full-screen application is in front of you.
 

@@ -27,6 +27,9 @@ public sealed class AppConfig
     // Keep the tray icon spinning outside full-screen apps too.
     public bool SpinOnDesktop { get; set; } = true;
 
+    // Start with Windows; the scheduled task is brought in line with this at every start.
+    public bool AutoStart { get; set; } = true;
+
     public SensorNamesConfig Sensors { get; set; } = new();
 
     // Detailed logging. null means the parameter was absent — the very first run, which is

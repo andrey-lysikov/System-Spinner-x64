@@ -1,7 +1,7 @@
 <Window x:Class="SystemSpinnerX64.Views.AboutWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="System-Spinner"
+        Title="System-Spinner x64"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -16,7 +16,6 @@
         TextOptions.TextFormattingMode="Ideal">
 
     <Window.Resources>
-        <!-- Both buttons look the same; the colours come from the theme in ApplyTheme(). -->
         <ControlTemplate x:Key="FlatButton" TargetType="Button">
             <Border x:Name="Face"
                     Background="{TemplateBinding Background}"
@@ -33,8 +32,6 @@
         </ControlTemplate>
     </Window.Resources>
 
-    <!-- A window of its own rather than a MessageBox: a system dialog knows no theme and would
-         stay a white rectangle in the middle of a dark menu. -->
     <Border x:Name="Shell" CornerRadius="12" BorderThickness="1" Padding="22,20,22,18">
         <StackPanel x:Name="Body">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,14">

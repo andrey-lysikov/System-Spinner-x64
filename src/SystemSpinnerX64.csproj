@@ -7,35 +7,27 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <AssemblyName>System-Spinner</AssemblyName>
+    <AssemblyName>System-Spinner-x64</AssemblyName>
     <RootNamespace>SystemSpinnerX64</RootNamespace>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
-  <!-- All of this shows in the exe properties and in the Explorer details pane -->
   <PropertyGroup>
-    <Product>System Spinner x64</Product>
+    <Product>System-Spinner x64</Product>
     <Company>lysnet.ru</Company>
     <Authors>Andrey.Lysikov and Claude</Authors>
     <Copyright>© Andrey Lysikov, Apache 2.0 licence.</Copyright>
     <Description>System monitoring: an overlay over games and an animated tray icon outside them.</Description>
-    <Version>2.1</Version>
-    <!-- Two numbers, and only them: without this the product version gets "+<commit>" appended. -->
+    <Version>2.2</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- One icon file for everything: the exe, the tray, the msi and the readme. A multi-size
-         .ico, the format Windows wants, rather than a picture the build has to convert. -->
     <IconFile>$(MSBuildThisFileDirectory)..\pictures\icon.ico</IconFile>
     <ApplicationIcon>$(IconFile)</ApplicationIcon>
-    <!-- The minimum of Windows 11 (build 22000) is checked in PlatformGuard.cs: declaring it
-         through SupportedOSPlatformVersion needs a versioned TFM and the whole Windows SDK. -->
   </PropertyGroup>
 
-  <!-- One exe, but without .NET inside: the machine needs .NET Desktop Runtime 10 or newer. The
-       apphost shows the download link itself, before the first line of C# could check for it. -->
   <PropertyGroup>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
@@ -43,53 +35,34 @@
     <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <!-- Built for net10.0 (LTS until November 2028); runs on 11 and newer too -->
     <RollForward>LatestMajor</RollForward>
-    <!-- WPF must not be trimmed: the app would fall over at startup -->
     <PublishTrimmed>false</PublishTrimmed>
-    <!-- So that no .pdb appears next to the exe -->
     <DebugType>none</DebugType>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <!-- WFO0003 is wrong advice here: the app is WPF, WinForms is only there for the tray icon,
-         and WPF reads its DPI awareness from the manifest before the first line of code. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- CPU/GPU/memory/fan sensors. The version matters: support for Intel Arrow Lake and
-         Lunar Lake only arrived in 0.9.4, so it must not be lowered. -->
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
-    <!-- The ETW session for counting frames: replaces an external PresentMon.exe -->
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.5" />
-    <!-- WMI: brightness of the built-in laptop panel, which DDC/CI does not reach. Declared even
-         though LibreHardwareMonitor brings it, so the version must match the one it pulls. -->
     <PackageReference Include="System.Management" Version="10.0.2" />
-    <!-- Windows location: a minimal projection instead of the ~20 MB Microsoft.Windows.SDK.NET -->
     <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.3.1" />
   </ItemGroup>
 
   <PropertyGroup>
-    <!-- Metadata from the build machine's System32\WinMetadata, no Windows SDK needed.
-         Foundation.Diagnostics needs Windows.Storage; Windows;Microsoft are the package defaults. -->
     <CsWinRTWindowsMetadata>local</CsWinRTWindowsMetadata>
     <CsWinRTIncludes>Windows.Devices.Geolocation;Windows.Foundation</CsWinRTIncludes>
     <CsWinRTExcludes>Windows;Microsoft;Windows.Foundation.Diagnostics</CsWinRTExcludes>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The same icon inside the assembly: NotifyIcon reads it from the resources, and it must
-         not sit next to the exe as a separate file — one exe was promised. -->
-    <EmbeddedResource Include="$(IconFile)" LogicalName="System-Spinner.icon.ico" />
+    <EmbeddedResource Include="$(IconFile)" LogicalName="System-Spinner-x64.icon.ico" />
 
-    <!-- Tray animation frames: one folder per set in Assets, frames numbered from zero. The
-         separator is normalised to a slash; %(RecursiveDir) gives a backslash. -->
     <EmbeddedResource Include="Assets\*\*.png"
                       LogicalName="Spinners/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The tests check internal classes: making them public just to be tested would mean
-         shaping the program around the way it is verified. -->
     <InternalsVisibleTo Include="SystemSpinnerX64.Tests" />
   </ItemGroup>
 

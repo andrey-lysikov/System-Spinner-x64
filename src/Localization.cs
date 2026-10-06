@@ -252,14 +252,14 @@ internal static class Text
     // Shown when the app refuses to start: there is no window to say it in, and the log is the
     // only place the reason exists.
     public static string StartupFailed(string reason) => S(
-        $"System-Spinner did not start: {reason}. Click to open the log.",
-        $"System-Spinner не запустился: {reason}. Нажмите, чтобы открыть журнал.",
-        $"لم يبدأ System-Spinner: {reason}. انقر لفتح السجل.",
-        $"System-Spinner 未能启动：{reason}。点击打开日志。",
-        $"System-Spinner n'a pas démarré : {reason}. Cliquez pour ouvrir le journal.",
-        $"System-Spinner ist nicht gestartet: {reason}. Zum Öffnen des Protokolls klicken.",
-        $"System-Spinner non si è avviato: {reason}. Fai clic per aprire il registro.",
-        $"System-Spinner を起動できませんでした: {reason}。クリックしてログを開きます。");
+        $"System-Spinner x64 did not start: {reason}. Click to open the log.",
+        $"System-Spinner x64 не запустился: {reason}. Нажмите, чтобы открыть журнал.",
+        $"لم يبدأ System-Spinner x64: {reason}. انقر لفتح السجل.",
+        $"System-Spinner x64 未能启动：{reason}。点击打开日志。",
+        $"System-Spinner x64 n'a pas démarré : {reason}. Cliquez pour ouvrir le journal.",
+        $"System-Spinner x64 ist nicht gestartet: {reason}. Zum Öffnen des Protokolls klicken.",
+        $"System-Spinner x64 non si è avviato: {reason}. Fai clic per aprire il registro.",
+        $"System-Spinner x64 を起動できませんでした: {reason}。クリックしてログを開きます。");
 
     public static string MenuExit => S(
         "Quit", "Выход", "خروج", "退出",

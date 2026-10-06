@@ -6,7 +6,7 @@ $repo    = $PSScriptRoot
 $source  = Join-Path $repo 'src'
 $project = Join-Path $source 'SystemSpinnerX64.csproj'
 $output  = Join-Path $repo 'build'
-$exe     = Join-Path $output 'System-Spinner.exe'
+$exe     = Join-Path $output 'System-Spinner-x64.exe'
 
 $leftovers = @((Join-Path $output 'obj'), (Join-Path $output 'bin'))
 $projects  = @($source, (Join-Path $repo 'test'), (Join-Path $repo 'installer'))

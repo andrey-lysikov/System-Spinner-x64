@@ -217,6 +217,7 @@ internal static class ConfFormat
             cfg.UpdateIntervalMs = (int)(seconds * Second);
 
         cfg.SpinOnDesktop = file.Flag(General, nameof(cfg.SpinOnDesktop)) ?? cfg.SpinOnDesktop;
+        cfg.AutoStart = file.Flag(General, nameof(cfg.AutoStart)) ?? cfg.AutoStart;
 
         // A missing switch differs from one set to false: the rule "log the first run in full,
         // then write it off into the file" rests on that.
@@ -361,6 +362,9 @@ internal static class ConfFormat
 
         w.Note("Language: Auto, En, Ru, Ar, Zh, Fr, De, It or Ja.")
          .Value(nameof(cfg.Language), cfg.Language.ToString()).Blank();
+
+        w.Note("Start with Windows, through a task in Task Scheduler.")
+         .Value(nameof(cfg.AutoStart), cfg.AutoStart).Blank();
 
         w.Note("Spin the tray icon outside full-screen apps.")
          .Value(nameof(cfg.SpinOnDesktop), cfg.SpinOnDesktop).Blank();

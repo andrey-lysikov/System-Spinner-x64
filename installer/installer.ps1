@@ -18,9 +18,9 @@ $repo    = Split-Path -Parent $PSScriptRoot
 $source  = Join-Path $repo 'src'
 $project = Join-Path $source 'SystemSpinnerX64.csproj'
 $output  = Join-Path $repo 'build'
-$exe     = Join-Path $output 'System-Spinner.exe'
+$exe     = Join-Path $output 'System-Spinner-x64.exe'
 
-$msi     = Join-Path $output 'System-Spinner.msi'
+$msi     = Join-Path $output 'System-Spinner-x64.msi'
 
 $packageWxs   = Join-Path $wixDir 'Package.wxs'
 $shortcutsWxs = Join-Path $wixDir 'ShortcutsDlg.wxs'
@@ -83,7 +83,7 @@ function Get-PawnIo {
     }
 
     $headers = @{
-        'User-Agent' = 'System-Spinner-build'
+        'User-Agent' = 'System-Spinner-x64-build'
         'Accept'     = 'application/vnd.github+json'
     }
 
@@ -110,7 +110,7 @@ function Get-PawnIo {
 
     Write-Note "fetching $($asset.browser_download_url)"
     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $pawnExe -Headers @{
-        'User-Agent' = 'System-Spinner-build'
+        'User-Agent' = 'System-Spinner-x64-build'
     }
 
     if (-not (Test-Path $pawnExe)) { throw 'The PawnIO setup was not fetched.' }

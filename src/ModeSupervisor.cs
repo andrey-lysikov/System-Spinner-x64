@@ -173,7 +173,7 @@ public sealed class ModeSupervisor : IDisposable
         _stats = CreateStats();
         _stats.Prepare();
 
-        _tray.ShowAutoStart(AutoStart.IsEnabled());
+        SyncAutoStart();
 
         ReloadSpinner();
 
@@ -747,7 +747,16 @@ public sealed class ModeSupervisor : IDisposable
         _tray.ExitRequested += () => System.Windows.Application.Current.Shutdown();
     }
 
-    // The state lives in Task Scheduler — after the attempt the tick is checked against what is there.
+    // The config decides: the task is recreated (the exe may have moved) or removed to match.
+    private void SyncAutoStart()
+    {
+        if (_cfg.AutoStart) AutoStart.Enable();
+        else if (AutoStart.IsEnabled()) AutoStart.Disable();
+
+        _tray.ShowAutoStart(AutoStart.IsEnabled());
+    }
+
+    // The tick is checked against what Task Scheduler really has, and that goes into the config.
     private void SetAutoStart(bool enabled)
     {
         string? problem = enabled ? AutoStart.Enable() : AutoStart.Disable();
@@ -756,7 +765,11 @@ public sealed class ModeSupervisor : IDisposable
             ? Text.AutoStartFailed(problem)
             : enabled ? Text.AutoStartOn : Text.AutoStartOff);
 
-        _tray.ShowAutoStart(AutoStart.IsEnabled());
+        _cfg.AutoStart = AutoStart.IsEnabled();
+        _tray.ShowAutoStart(_cfg.AutoStart);
+
+        if (_cfg.SaveSomewhere() is null)
+            Log.Warn("the autostart setting was not written to config.conf — the next start restores the old one");
     }
 
     // --- System changes ---

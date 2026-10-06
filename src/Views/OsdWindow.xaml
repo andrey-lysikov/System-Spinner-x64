@@ -1,7 +1,7 @@
 <Window x:Class="SystemSpinnerX64.Osd.OsdWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="System-Spinner OSD"
+        Title="System-Spinner x64 OSD"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -18,8 +18,6 @@
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType">
 
-    <!-- Same shape as the status window. Background set in code: a thin film over acrylic,
-         or a solid colour when the system grants no backdrop. -->
     <Border x:Name="Pill"
             CornerRadius="12"
             BorderThickness="1">
@@ -30,8 +28,6 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- A glyph from the system font: the app ships no pictures of its own, and this
-                 set is present in every Windows 11 and follows the theme. -->
             <TextBlock x:Name="Glyph"
                        Grid.Column="0"
                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
@@ -43,8 +39,6 @@
 
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
 
-                <!-- The filled part is drawn over the empty one rather than stretching it: the
-                     bar has rounded ends, and clipping by width looks cleaner. -->
                 <Grid Height="4">
                     <Border x:Name="BarTrack" CornerRadius="2" />
                     <Border x:Name="BarFill"
@@ -53,8 +47,6 @@
                             Width="0" />
                 </Grid>
 
-                <!-- Ticks: they show how large the adjustment step is. Exactly the hint the step
-                     count setting was introduced for in the macOS version. -->
                 <Canvas x:Name="Scale" Height="7" Margin="0,4,0,0" />
             </StackPanel>
         </Grid>

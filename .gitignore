@@ -1,25 +1,18 @@
-# The finished exe and everything the compiler leaves behind: both live under build/ now, see
-# Directory.Build.props. The two bare names below are a safety net for a tool that ignores those
-# settings and writes beside the sources after all.
 build/
 bin/
 obj/
 
-# What WiX leaves beside the msi; installer/installer.ps1 clears it after each run.
 *.wixpdb
 
-# Visual Studio and Rider leave their own state next to the sources.
 .vs/
 .idea/
 *.user
 *.suo
 
-# Files the app itself creates while it runs, next to the exe or in the project root.
 .DS_Store
 config.conf
-System-Spinner.log
-System-Spinner.log.*
+System-Spinner-x64.log
+System-Spinner-x64.log.*
 sensors-found.txt
 
-# Local notes for Claude Code.
 CLAUDE.md

@@ -392,7 +392,7 @@ internal static class AutoStart
                     new XElement(TaskXml + "Exec",
                         new XElement(TaskXml + "Command", exe)))));
 
-        string file = Path.Combine(Path.GetTempPath(), $"{AppParameters.Identity.Name}-task-{Guid.NewGuid():N}.xml");
+        string file = Path.Combine(Path.GetTempPath(), $"{AppParameters.Identity.AppFolder}-task-{Guid.NewGuid():N}.xml");
 
         try
         {

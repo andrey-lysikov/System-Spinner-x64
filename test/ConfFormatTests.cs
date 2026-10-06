@@ -20,6 +20,7 @@ public class ConfFormatTests
             UpdateIntervalMs = 1500,
             ShowOverlayInGames = false,
             SpinOnDesktop = false,
+            AutoStart = false,
             Debug = true,
             Sensors = { CpuLoad = { "CPU Core Max" }, VramUsed = { "My VRAM" }, CpuClockCores = "Core" },
             Fans = { Cpu = { "CPU Fan" }, Extra = { "System Fan #2", "PSU Fan" }, AverageCpu = true },
@@ -36,6 +37,7 @@ public class ConfFormatTests
         Assert.Equal(1500, read.UpdateIntervalMs);   // the file speaks seconds, the timers milliseconds
         Assert.False(read.ShowOverlayInGames);
         Assert.False(read.SpinOnDesktop);
+        Assert.False(read.AutoStart);
         Assert.True(read.Debug);
         Assert.Contains("CPU Core Max", read.Sensors.CpuLoad);
         Assert.Contains("My VRAM", read.Sensors.VramUsed);
