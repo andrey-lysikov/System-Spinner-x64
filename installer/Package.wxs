@@ -16,6 +16,18 @@
     <MajorUpgrade AllowSameVersionUpgrades="yes"
                   DowngradeErrorMessage="A newer version of System-Spinner x64 is already installed." />
 
+    <Property Id="WINDOWSBUILDNUMBER">
+      <RegistrySearch Id="WindowsBuildSearch"
+                      Root="HKLM"
+                      Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentBuildNumber"
+                      Type="raw"
+                      Bitness="always64" />
+    </Property>
+
+    <Launch Condition="VersionNT64 AND WINDOWSBUILDNUMBER &gt;= 19041"
+            Message="System-Spinner x64 needs 64-bit Windows 10 version 2004 or newer. This machine does not meet that, and nothing has been installed." />
+
     <Icon Id="AppIcon.ico" SourceFile="$(Icon)" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/andrey-lysikov/System-Spinner-x64" />

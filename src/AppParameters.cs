@@ -400,7 +400,7 @@ internal static class AppParameters
     // What the program requires of the machine.
     internal static class Requirements
     {
-        // Windows 11 and 10 are declared by the same manifest GUID; the build tells them apart.
-        public const int Windows11Build = 22000;
+        // Windows 10 2004: the base build of every Windows 10 since, LTSC 2021 included.
+        public const int MinWindowsBuild = 19041;
     }
 }

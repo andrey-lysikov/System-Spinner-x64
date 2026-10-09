@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3
+
+* Windows 10 support
+
 ## 2.2
 
 * The full-screen overlay is off by default

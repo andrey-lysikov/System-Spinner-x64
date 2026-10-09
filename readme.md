@@ -44,4 +44,4 @@ The Sun & Moon spinner and the sunlight lighting take the position of the sun an
 
 ## Tech
 
-Written in C#, Windows 11+, .NET Desktop Runtime 10+
+Written in C#, Windows 10 (2004+) and 11, .NET Desktop Runtime 10+

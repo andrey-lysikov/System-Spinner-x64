@@ -106,9 +106,9 @@ public class PlatformGuardTests
     [Fact]
     public void Версия_Windows_проверяется()
     {
-        // The tests run on the same machine as the app: since it built, this is Windows 11.
+        // The tests run on a supported Windows, so a problem here would only name the floor.
         string? problem = PlatformGuard.DescribeOs();
 
-        Assert.True(problem is null || problem.Contains("Windows 11"));
+        Assert.True(problem is null || problem.Contains("Windows 10"));
     }
 }

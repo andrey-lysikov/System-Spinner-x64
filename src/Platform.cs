@@ -200,7 +200,7 @@ internal static class Win32
         }
         catch (DllNotFoundException)
         {
-            // shcore.dll is there on every Windows 11; the guard is for the sake of never
+            // shcore.dll is there on every supported Windows; the guard is for the sake of never
             // bringing the app down over a placement detail.
         }
 
@@ -245,8 +245,8 @@ internal static class Win32
     private static extern int GetDpiForMonitor(IntPtr hMonitor, int dpiType, out uint dpiX, out uint dpiY);
 }
 
-// The blurred backdrop of Windows 11: the window has neither a background of its own nor an
-// image, so the volume panel stays readable on a light desktop and on a dark one.
+// The blurred backdrop of Windows 11 22H2+: older builds refuse it and the windows fall back to
+// their own denser background.
 internal static class Dwm
 {
     private const int DwmwaUseImmersiveDarkMode = 20;
@@ -286,7 +286,7 @@ internal static class Dwm
         }
         catch (Exception ex)
         {
-            // dwmapi ships with every Windows 11, but an older build may lack the attribute.
+            // Windows 10 lacks the corner and backdrop attributes, Windows 11 21H2 the backdrop.
             System.Diagnostics.Debug.WriteLine($"DWM attribute {attribute} was refused: {ex.Message}");
             return false;
         }
@@ -453,18 +453,17 @@ internal static class AmdAdl
     }
 }
 
-// The app targets Windows 11 x64 and an Intel or AMD processor.
+// The app targets Windows 10 2004+ and 11, x64, and an Intel or AMD processor.
 internal static class PlatformGuard
 {
     // Describes the Windows version mismatch, or null when it is fine.
     public static string? DescribeOs()
     {
         Version v = Environment.OSVersion.Version;
-        if (v.Major > 10 || (v.Major == 10 && v.Build >= AppParameters.Requirements.Windows11Build)) return null;
+        if (v.Major > 10 || (v.Major == 10 && v.Build >= AppParameters.Requirements.MinWindowsBuild)) return null;
 
-        return $"Windows 11 or newer is required, but this is Windows {v.Major}, build {v.Build}.\n\n" +
-               "On Windows 10 some sensors are named differently, the Present events used to count " +
-               "frames work another way, and the tray has no per-monitor scaling for its icons.";
+        return $"Windows 10 version 2004 (build {AppParameters.Requirements.MinWindowsBuild}) or newer is required, " +
+               $"but this is Windows {v.Major}, build {v.Build}.";
     }
 
     // Names come from LibreHardwareMonitor: "Intel Core Ultra 7 265K", "AMD Ryzen 9 7950X".
